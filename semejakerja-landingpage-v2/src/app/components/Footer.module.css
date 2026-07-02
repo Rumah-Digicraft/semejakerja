@@ -1,0 +1,145 @@
+.footer {
+  background: var(--color-primary-dark);
+  color: var(--color-text-light);
+  border-top: 1px solid rgba(240, 199, 51, 0.2);
+}
+
+.inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-16) var(--space-6) var(--space-8);
+}
+
+.top {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-10);
+}
+
+@media (min-width: 640px) {
+  .top {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 1024px) {
+  .top {
+    grid-template-columns: 2fr 1fr 1fr;
+  }
+}
+
+.brand {
+  max-width: 320px;
+}
+
+.logo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+  margin-bottom: var(--space-4);
+}
+
+.brandDesc {
+  font-size: var(--text-sm);
+  color: rgba(240, 230, 208, 0.7);
+  line-height: 1.7;
+}
+
+.linksGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.linksTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-accent);
+  margin-bottom: var(--space-4);
+}
+
+.linksList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.link {
+  font-size: var(--text-sm);
+  color: rgba(240, 230, 208, 0.7);
+  transition: all var(--transition-fast);
+  display: inline-block;
+}
+
+.link:hover {
+  color: var(--color-accent);
+  transform: translateX(4px);
+}
+
+.socialRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.socialLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: rgba(240, 230, 208, 0.7);
+  transition: all var(--transition-fast);
+}
+
+.socialLink:hover {
+  color: var(--color-accent);
+  transform: translateX(4px);
+}
+
+.tiktokIcon {
+  filter: brightness(0) invert(0.85);
+  transition: filter var(--transition-fast);
+}
+
+.socialLink:hover .tiktokIcon {
+  filter: brightness(1) invert(0) sepia(1) saturate(5) hue-rotate(15deg);
+}
+
+.divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(240, 199, 51, 0.3),
+    transparent
+  );
+  margin: var(--space-10) 0 var(--space-6);
+}
+
+.bottom {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .bottom {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+
+.copyright {
+  font-size: var(--text-xs);
+  color: rgba(240, 230, 208, 0.5);
+}
+
+.credit {
+  font-size: var(--text-xs);
+  color: rgba(240, 230, 208, 0.4);
+}

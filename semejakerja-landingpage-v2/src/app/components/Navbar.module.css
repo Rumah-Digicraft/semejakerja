@@ -1,0 +1,366 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  transition: all var(--transition-base);
+  background: #3D155F;
+}
+
+.scrolled {
+  background: #3D155F;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--navbar-height);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.logoImg {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+
+/* Desktop Nav */
+.desktopNav {
+  display: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+@media (min-width: 1024px) {
+  .desktopNav {
+    display: flex;
+  }
+}
+
+.navLink {
+  position: relative;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.navLink:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.navLinkActive {
+  color: var(--color-accent) !important;
+  background: rgba(240, 199, 51, 0.1);
+}
+
+.ctaBtn {
+  margin-left: var(--space-3);
+}
+
+/* Mobile Toggle */
+.menuToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+}
+
+.menuToggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+@media (min-width: 1024px) {
+  .menuToggle {
+    display: none;
+  }
+}
+
+/* Mobile Overlay */
+.mobileOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  visibility: hidden;
+  transition: all var(--transition-base);
+  z-index: 90;
+}
+
+.overlayOpen {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Mobile Nav */
+.mobileNav {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(320px, 85vw);
+  background: var(--color-primary-dark);
+  z-index: 95;
+  transform: translateX(100%);
+  transition: transform var(--transition-base);
+  overflow-y: auto;
+}
+
+.mobileNavOpen {
+  transform: translateX(0);
+}
+
+.mobileNavInner {
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--navbar-height) + var(--space-4)) var(--space-6) var(--space-8);
+  gap: var(--space-1);
+}
+
+.mobileLink {
+  display: block;
+  padding: var(--space-4) var(--space-4);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+  opacity: 0;
+  animation: slideInLink 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mobileNavOpen .mobileLink {
+  opacity: 0;
+  animation: slideInLink 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mobileLink:hover, .mobileLink:active {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+.mobileLinkActive {
+  color: var(--color-accent) !important;
+  background: rgba(240, 199, 51, 0.1);
+}
+
+.mobileCta {
+  margin-top: var(--space-6);
+  text-align: center;
+  width: 100%;
+}
+
+@keyframes slideInLink {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobileNav,
+  .mobileOverlay {
+    display: none;
+  }
+}
+
+/* Desktop profile dropdown */
+.profileMenu {
+  position: absolute;
+  top: 110%;
+  right: 0;
+  background: white;
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  min-width: 210px;
+  border: 1px solid var(--color-gray-100);
+}
+
+.profileMenuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3) var(--space-3);
+  border: none;
+  background: none;
+  color: var(--color-gray-700);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.profileMenuItem:hover {
+  background: var(--color-gray-50);
+  color: var(--color-primary);
+}
+
+.profileMenuDivider {
+  height: 1px;
+  background: var(--color-gray-100);
+  margin: var(--space-1) var(--space-2);
+}
+
+/* Desktop "Semeja Activity" dropdown */
+.dropdown {
+  position: relative;
+}
+
+.dropdownTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.dropdownChevron {
+  transition: transform var(--transition-fast);
+}
+
+.dropdown:hover .dropdownChevron,
+.dropdown:focus-within .dropdownChevron {
+  transform: rotate(180deg);
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  padding: var(--space-2);
+  background: white;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--color-gray-100);
+  min-width: 260px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+  z-index: 110;
+}
+
+/* Bridge the gap so hover doesn't drop between trigger and menu */
+.dropdownMenu::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 10px;
+}
+
+.dropdown:hover .dropdownMenu,
+.dropdown:focus-within .dropdownMenu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(4px);
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  transition: background var(--transition-fast);
+}
+
+.dropdownItem:hover {
+  background: var(--color-gray-50);
+}
+
+.dropdownItemEmoji {
+  font-size: 1.4rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.dropdownItemText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdownItemLabel {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-gray-900);
+}
+
+.dropdownItem:hover .dropdownItemLabel {
+  color: var(--color-primary);
+}
+
+.dropdownItemDesc {
+  font-size: var(--text-xs);
+  color: var(--color-gray-500);
+  line-height: 1.4;
+}
+
+/* Mobile "Semeja Activity" group */
+.mobileGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  opacity: 0;
+  animation: slideInLink 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mobileGroupLabel {
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.mobileSubLink {
+  display: block;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-6);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+}
+
+.mobileSubLink:hover, .mobileSubLink:active {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}

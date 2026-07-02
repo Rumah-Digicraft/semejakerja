@@ -1,0 +1,110 @@
+.section {
+  position: relative;
+  padding: var(--space-24) 0;
+  overflow: hidden;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .section {
+    padding: var(--space-32) 0;
+  }
+}
+
+.bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    160deg,
+    var(--color-primary-dark) 0%,
+    var(--color-primary) 60%,
+    var(--color-primary-light) 100%
+  );
+  z-index: 1;
+}
+
+.bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 30% 20%, rgba(240, 199, 51, 0.1) 0%, transparent 40%),
+    radial-gradient(circle at 70% 80%, rgba(240, 199, 51, 0.06) 0%, transparent 40%);
+}
+
+.content {
+  max-width: 650px;
+  margin: 0 auto;
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--color-accent);
+  margin-bottom: var(--space-4);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--text-4xl);
+  font-weight: 800;
+  color: white;
+  line-height: 1.15;
+  margin-bottom: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .title {
+    font-size: var(--text-5xl);
+  }
+}
+
+.highlight {
+  background: linear-gradient(135deg, var(--color-accent), #FFD700);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.desc {
+  font-size: var(--text-lg);
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.7;
+  margin-bottom: var(--space-10);
+}
+
+.actions {
+  margin-bottom: var(--space-10);
+}
+
+.cta {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Social links */
+.socialLinks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.socialLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.6);
+  transition: all var(--transition-fast);
+}
+
+.socialLink:hover {
+  color: var(--color-accent);
+}
+
+.socialDivider {
+  color: rgba(255, 255, 255, 0.3);
+}

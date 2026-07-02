@@ -1,0 +1,260 @@
+.page {
+  /* No top padding so hero background flows under the navbar */
+}
+
+/* Hero */
+.hero {
+  position: relative;
+  padding: calc(var(--navbar-height) + var(--space-20)) 0 var(--space-20) 0;
+  background: linear-gradient(160deg, var(--color-primary-dark), var(--color-primary));
+  overflow: hidden;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .hero { padding: calc(var(--navbar-height) + var(--space-24)) 0 var(--space-24) 0; }
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 40% 60%, rgba(240, 199, 51, 0.08) 0%, transparent 50%);
+}
+
+.heroContent { position: relative; z-index: 2; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: rgba(240, 199, 51, 0.12);
+  border: 1px solid rgba(240, 199, 51, 0.25);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-bottom: var(--space-6);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--text-4xl);
+  font-weight: 800;
+  color: white;
+  line-height: 1.15;
+  margin-bottom: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .title { font-size: var(--text-5xl); }
+}
+
+.highlight {
+  color: var(--color-accent);
+}
+
+.subtitle {
+  font-size: var(--text-lg);
+  color: rgba(255, 255, 255, 0.75);
+  max-width: 550px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+/* Gallery section */
+.gallerySection {
+  padding: var(--space-16) 0 var(--space-20);
+}
+
+.galleryGrid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-10);
+}
+
+@media (min-width: 480px) {
+  .galleryGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 768px) {
+  .galleryGrid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.galleryItem {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  transition: all var(--transition-base);
+  text-align: left;
+}
+
+.galleryItem:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+}
+
+.galleryPlaceholder {
+  aspect-ratio: 4 / 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.galleryPlaceholderIcon {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.galleryPlaceholderText {
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 500;
+}
+
+.galleryInfo {
+  padding: var(--space-3) var(--space-4);
+  background: white;
+  border: 1px solid var(--color-gray-100);
+  border-top: none;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+
+.galleryEdisi {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-primary);
+}
+
+.galleryCaption {
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+  margin-top: var(--space-1);
+}
+
+.note {
+  text-align: center;
+  padding: var(--space-6) var(--space-8);
+  background: rgba(240, 199, 51, 0.08);
+  border: 1px solid rgba(240, 199, 51, 0.2);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-10);
+}
+
+.note p {
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+}
+
+.ctaCenter {
+  text-align: center;
+}
+
+/* Lightbox */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  animation: fade-in 0.2s ease;
+}
+
+.lightboxClose {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  z-index: 10;
+}
+
+.lightboxClose:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lightboxNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  z-index: 10;
+}
+
+.lightboxNav:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lightboxPrev { left: var(--space-4); }
+.lightboxNext { right: var(--space-4); }
+
+.lightboxContent {
+  max-width: 700px;
+  width: 100%;
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+}
+
+.lightboxPlaceholder {
+  aspect-ratio: 16 / 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.lightboxPlaceholderText {
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.lightboxInfo {
+  padding: var(--space-6);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.lightboxEdisi {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-accent);
+}
+
+.lightboxCaption {
+  font-size: var(--text-lg);
+  color: white;
+  margin-top: var(--space-1);
+}
