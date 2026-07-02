@@ -61,7 +61,7 @@ function buildPinSvg(cfg: TierConfig): string {
   const qy = +(cy + (tipY - cy) * 0.4).toFixed(1);
   const ir = +(r * 0.52).toFixed(1); // inner white circle radius
 
-  let innerIcon = '';
+  let innerIcon: string;
   if (hasCheckmark) {
     const s = +(ir * 0.55).toFixed(1);
     innerIcon = [

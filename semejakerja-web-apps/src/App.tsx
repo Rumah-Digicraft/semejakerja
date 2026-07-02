@@ -4,9 +4,11 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MapView from './components/MapView';
 import CafeModal from './components/CafeModal';
+import { LoginModal } from './components/LoginModal';
 import { CafesLoadingOverlay, CafesErrorOverlay } from './components/CafesLoadingOverlay';
 import { useCafes } from './hooks/useCafes';
-import { AdminPanel } from './pages/admin/AdminPanel';
+import { useAuth, mapsAccess } from './hooks/useAuth';
+import { supabase } from './lib/supabaseClient';
 import type { Cafe, FilterState } from './types/cafe';
 import './index.css';
 
@@ -21,9 +23,17 @@ const defaultFilters: FilterState = {
 
 function MapApp() {
   const { cafes, loading, error, refetch } = useCafes();
+  const { user, profile, signIn, landingUrl } = useAuth();
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [selectedCafe, setSelectedCafe] = useState<Cafe | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  // Default: open on desktop (laptop browser), closed on mobile.
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 768
+  );
+
+  // Feature gating per membership tier (see mapsAccess in useAuth).
+  const access = mapsAccess(user, profile?.tier ?? null);
 
   const filteredCount = cafes.filter(cafe => {
     if (filters.facilities.length > 0) {
@@ -40,8 +50,24 @@ function MapApp() {
   }).length;
 
   const handleCafeClick = (cafe: Cafe) => {
+    // If it's a new click (not just toggling off)
+    if (selectedCafe?.id !== cafe.id) {
+      // Optimistically increase click
+      cafe.clicks = (cafe.clicks || 0) + 1;
+      
+      // Send to Supabase (fire and forget)
+      supabase.rpc('increment_cafe_clicks', { cafe_id: cafe.id }).then(({ error }) => {
+        // Fallback if RPC doesn't exist yet
+        if (error) {
+          supabase.from('cafes').update({ clicks: cafe.clicks }).eq('id', cafe.id).then();
+        }
+      });
+    }
+
     setSelectedCafe(prev => prev?.id === cafe.id ? null : cafe);
-    setSidebarOpen(false);
+    // On mobile the sidebar covers the screen, so close it when a cafe is
+    // picked. On desktop it's a side panel that can stay open.
+    if (window.innerWidth < 768) setSidebarOpen(false);
   };
 
   return (
@@ -59,7 +85,6 @@ function MapApp() {
       <Header
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(o => !o)}
-        cafeCount={filteredCount}
       />
       <Sidebar
         filters={filters}
@@ -67,6 +92,9 @@ function MapApp() {
         cafeCount={filteredCount}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        access={access}
+        onRequestLogin={() => setShowLogin(true)}
+        landingUrl={landingUrl}
       />
       {sidebarOpen && (
         <div
@@ -75,16 +103,29 @@ function MapApp() {
         />
       )}
       {selectedCafe && (
-        <CafeModal cafe={selectedCafe} onClose={() => setSelectedCafe(null)} />
+        <CafeModal
+          cafe={selectedCafe}
+          onClose={() => setSelectedCafe(null)}
+          access={access}
+          onRequestLogin={() => setShowLogin(true)}
+          landingUrl={landingUrl}
+        />
+      )}
+      {showLogin && (
+        <LoginModal
+          onClose={() => setShowLogin(false)}
+          onSignIn={signIn}
+          landingUrl={landingUrl}
+        />
       )}
     </div>
   );
 }
 
 function App() {
+  // Admin panel lives in the separate semejakerja-admin app now.
   return (
     <Routes>
-      <Route path="/cafe-bos-semeja/*" element={<AdminPanel />} />
       <Route path="*" element={<MapApp />} />
     </Routes>
   );

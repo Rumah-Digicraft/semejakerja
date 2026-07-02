@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import {
   Wifi, Zap, Wind, BookOpen, Bike, Car,
   Volume2, VolumeX, Clock, CheckCircle2, Star,
-  SlidersHorizontal, X, PlusCircle,
+  SlidersHorizontal, X, PlusCircle, LogIn, Crown, Lock,
 } from 'lucide-react';
 import type { FilterState } from '../types/cafe';
+import type { MapsAccess } from '../hooks/useAuth';
 import { ContributeModal } from './contribute/ContributeModal';
 
 interface SidebarProps {
@@ -13,6 +14,9 @@ interface SidebarProps {
   cafeCount: number;
   isOpen: boolean;
   onClose: () => void;
+  access: MapsAccess;
+  onRequestLogin: () => void;
+  landingUrl: string;
 }
 
 const facilityOptions = [
@@ -24,8 +28,15 @@ const facilityOptions = [
   { id: 'carParking', label: 'Parkir Mobil', icon: Car },
 ];
 
-const Sidebar: React.FC<SidebarProps> = ({ filters, onFiltersChange, cafeCount, isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  filters, onFiltersChange, cafeCount, isOpen, onClose,
+  access, onRequestLogin, landingUrl,
+}) => {
   const [showNewCafeModal, setShowNewCafeModal] = useState(false);
+
+  const isGuest = access === 'guest';
+  // "Maps lengkap (filter fasilitas)" & crowdsource = Nongkrong+
+  const hasFullMaps = access === 'full';
 
   const toggleFacility = (id: string) => {
     const current = filters.facilities;
@@ -46,11 +57,13 @@ const Sidebar: React.FC<SidebarProps> = ({ filters, onFiltersChange, cafeCount, 
           // Base styles
           'glass-panel flex flex-col shadow-xl z-40',
           // Desktop: absolute floating left panel
-          'md:absolute md:left-6 md:top-[120px] md:bottom-6 md:w-[360px] md:rounded-3xl md:translate-y-0',
+          'md:absolute md:left-6 md:top-[120px] md:bottom-6 md:w-[360px] md:rounded-3xl',
           // Mobile: fixed bottom sheet
           'fixed bottom-0 left-0 right-0 rounded-t-3xl transition-transform duration-300 ease-in-out',
-          // Mobile open/close state
-          isOpen ? 'translate-y-0' : 'translate-y-full md:translate-y-0',
+          // Open/close state — mobile slides down, desktop slides off to the left
+          isOpen
+            ? 'translate-y-0 md:translate-x-0'
+            : 'translate-y-full md:translate-y-0 md:-translate-x-[calc(100%+2rem)]',
           // Mobile max height
           'max-h-[85vh] md:max-h-none',
         ].join(' ')}
@@ -77,16 +90,45 @@ const Sidebar: React.FC<SidebarProps> = ({ filters, onFiltersChange, cafeCount, 
           </p>
         </div>
 
-        {/* Filters Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-8 sm:px-6 sm:py-8 space-y-9 sm:space-y-11">
+        {/* Filters Body — blurred for guests (Rule: wajib login untuk pakai filter) */}
+        <div
+          aria-hidden={isGuest}
+          className={[
+            'flex-1 overflow-y-auto px-6 py-8 sm:px-6 sm:py-8 space-y-9 sm:space-y-11',
+            isGuest ? 'blur-[6px] pointer-events-none select-none' : '',
+          ].join(' ')}
+        >
 
-          {/* Fasilitas */}
-          <div>
-            <label className="block font-extrabold text-xs uppercase tracking-widest text-gray-400 mt-6 mb-3">
+          {/* Fasilitas — bagian dari "Maps lengkap", khusus Nongkrong+ */}
+          <div className="relative">
+            <label className="flex items-center gap-2 font-extrabold text-xs uppercase tracking-widest text-gray-400 mt-6 mb-3">
               Fasilitas
+              {!isGuest && !hasFullMaps && (
+                <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-600 border border-amber-200 normal-case tracking-normal">
+                  <Crown size={10} /> Nongkrong+
+                </span>
+              )}
             </label>
+            {!isGuest && !hasFullMaps && (
+              <div className="absolute inset-x-0 top-8 bottom-0 z-10 flex flex-col items-center justify-center gap-2.5 px-4 text-center rounded-2xl">
+                <a
+                  href={`${landingUrl}/membership`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950 text-xs font-extrabold shadow-md shadow-amber-400/30 hover:shadow-amber-400/50 hover:-translate-y-0.5 transition-all"
+                >
+                  <Crown size={14} /> Upgrade untuk Filter Fasilitas
+                </a>
+              </div>
+            )}
             {/* Mobile: 2-col grid. Desktop: 1-col */}
-            <div className="grid grid-cols-2 md:grid-cols-1 gap-3 sm:gap-4">
+            <div
+              aria-hidden={!isGuest && !hasFullMaps}
+              className={[
+                'grid grid-cols-2 md:grid-cols-1 gap-3 sm:gap-4',
+                !isGuest && !hasFullMaps ? 'blur-[5px] pointer-events-none select-none' : '',
+              ].join(' ')}
+            >
               {facilityOptions.map(({ id, label, icon: Icon }) => {
                 const active = isActive(id);
                 return (
@@ -207,13 +249,32 @@ const Sidebar: React.FC<SidebarProps> = ({ filters, onFiltersChange, cafeCount, 
         </div>
 
         {/* Reset Button */}
-        <div className="px-6 py-5 sm:px-8 sm:py-6 flex-shrink-0 border-t border-gray-100/50 bg-white/40 rounded-b-3xl space-y-3">
-          <button
-            onClick={() => setShowNewCafeModal(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-extrabold transition-all shadow-sm bg-purple-600 text-white hover:bg-purple-700"
-          >
-            <PlusCircle size={16} /> Tambahkan Tempat Baru
-          </button>
+        <div
+          aria-hidden={isGuest}
+          className={[
+            'px-6 py-5 sm:px-8 sm:py-6 flex-shrink-0 border-t border-gray-100/50 bg-white/40 rounded-b-3xl space-y-3',
+            isGuest ? 'blur-[6px] pointer-events-none select-none' : '',
+          ].join(' ')}
+        >
+          {/* Crowdsource Maps (submit data) = Nongkrong+ */}
+          {hasFullMaps ? (
+            <button
+              onClick={() => setShowNewCafeModal(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-extrabold transition-all shadow-sm bg-purple-600 text-white hover:bg-purple-700"
+            >
+              <PlusCircle size={16} /> Tambahkan Tempat Baru
+            </button>
+          ) : (
+            <a
+              href={`${landingUrl}/membership`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-extrabold transition-all shadow-sm bg-gray-100 text-gray-400 border border-gray-200 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200"
+              title="Kontribusi tempat baru khusus member Nongkrong+"
+            >
+              <Lock size={14} /> Tambahkan Tempat Baru
+            </a>
+          )}
           <button
             onClick={() => onFiltersChange({
               facilities: [],
@@ -228,6 +289,36 @@ const Sidebar: React.FC<SidebarProps> = ({ filters, onFiltersChange, cafeCount, 
             Reset Semua Filter
           </button>
         </div>
+
+        {/* Guest overlay: filter wajib login (map & nama cafe tetap terlihat).
+            pointer-events-none di container agar tombol close di header tetap bisa diklik. */}
+        {isGuest && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 px-8 text-center pointer-events-none">
+            <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center shadow-sm">
+              <Lock size={22} className="text-purple-600" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-extrabold text-gray-900">Masuk untuk Pakai Filter</p>
+              <p className="text-xs font-medium text-gray-500 leading-relaxed">
+                Filter cafe & fitur member lainnya khusus untuk member Semeja Kerja. Gratis kok!
+              </p>
+            </div>
+            <button
+              onClick={onRequestLogin}
+              className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-purple-800 text-white text-sm font-bold shadow-md shadow-purple-500/30 hover:shadow-purple-500/50 hover:-translate-y-0.5 transition-all"
+            >
+              <LogIn size={15} /> Masuk
+            </button>
+            <a
+              href={`${landingUrl}/auth/register`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pointer-events-auto text-xs font-semibold text-purple-600 hover:underline"
+            >
+              Belum punya akun? Daftar gratis
+            </a>
+          </div>
+        )}
       </aside>
 
       {showNewCafeModal && (

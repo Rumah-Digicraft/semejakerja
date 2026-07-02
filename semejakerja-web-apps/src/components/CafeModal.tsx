@@ -1,17 +1,48 @@
 import React, { useState } from 'react';
 import {
   X, Star, Wifi, Zap, Wind, BookOpen, Bike, Car,
-  CheckCircle2, Clock, Gauge, Tag,
+  CheckCircle2, Gauge, Tag,
   Coffee, MapPin, Phone, ExternalLink,
   Pencil, MessageSquare, Camera, Users,
+  ChevronDown, ChevronUp, Lock, Crown, LogIn,
 } from 'lucide-react';
 import type { Cafe, CafeReview } from '../types/cafe';
+import type { MapsAccess } from '../hooks/useAuth';
 import { ContributeModal, type ContributeType } from './contribute/ContributeModal';
 import { useCafeReviews } from '../hooks/useCafeReviews';
+import SpeedTestButton from './SpeedTestButton';
 
 interface CafeModalProps {
   cafe: Cafe;
   onClose: () => void;
+  access: MapsAccess;
+  onRequestLogin: () => void;
+  landingUrl: string;
+}
+
+// Locked row shown to Nyantai members in place of a Nongkrong+ section.
+function PremiumLock({ title, desc, landingUrl }: { title: string; desc: string; landingUrl: string }) {
+  return (
+    <div className="pt-5 border-t border-gray-100">
+      <a
+        href={`${landingUrl}/membership`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-amber-50/70 border border-amber-100 hover:bg-amber-50 hover:border-amber-200 transition-all group"
+      >
+        <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+          <Lock size={14} className="text-amber-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-gray-800">{title}</p>
+          <p className="text-[11px] font-medium text-gray-500">{desc}</p>
+        </div>
+        <span className="flex items-center gap-1 text-[10px] font-extrabold px-2 py-1 rounded-full bg-amber-400 text-amber-950 shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
+          <Crown size={10} /> Upgrade
+        </span>
+      </a>
+    </div>
+  );
 }
 
 const StarRating: React.FC<{ rating: number }> = ({ rating }) => {
@@ -29,7 +60,7 @@ const StarRating: React.FC<{ rating: number }> = ({ rating }) => {
   );
 };
 
-const facilityConfig: Record<string, { label: string; icon: React.FC<any>; color: string }> = {
+const facilityConfig: Record<string, { label: string; icon: React.FC<{ size?: number; style?: React.CSSProperties }>; color: string }> = {
   wifi: { label: 'WiFi Cepat', icon: Wifi, color: '#2563eb' },
   powerOutlets: { label: 'Banyak Colokan', icon: Zap, color: '#d97706' },
   ac: { label: 'AC Sejuk', icon: Wind, color: '#0891b2' },
@@ -150,9 +181,15 @@ function CommunityReviews({ cafeId, onWriteReview }: { cafeId: string; onWriteRe
 
 // ── Main Modal ─────────────────────────────────────────────────────────────
 
-const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose }) => {
+const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestLogin, landingUrl }) => {
   const [discountClaimed, setDiscountClaimed] = useState(false);
   const [contributeType, setContributeType] = useState<ContributeType | null>(null);
+  const [showHours, setShowHours] = useState(false);
+
+  const isGuest = access === 'guest';
+  const hasFullMaps = access === 'full';
+  // Guests see the real sections blurred (teaser); Nyantai sees locked rows.
+  const showPremiumSections = hasFullMaps || isGuest;
 
   const activeFacilities = Object.entries(cafe.facilities)
     .filter(([, val]) => val)
@@ -249,6 +286,16 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose }) => {
             </p>
           </div>
 
+          {/* Detail di bawah nama cafe: blur + wajib login untuk guest */}
+          <div className="relative">
+          <div
+            aria-hidden={isGuest}
+            className={[
+              'space-y-5 sm:space-y-6',
+              isGuest ? 'blur-[8px] pointer-events-none select-none max-h-[320px] overflow-hidden' : '',
+            ].join(' ')}
+          >
+
           {/* Quick Summary */}
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl flex-wrap bg-purple-50/80 border border-purple-100/80">
             {cafe.quickSummary.split(' | ').map((item, i) => (
@@ -260,68 +307,140 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose }) => {
           </div>
 
           {/* Open status + hours */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: cafe.isOpenNow ? '#10b981' : '#ef4444', boxShadow: `0 0 8px ${cafe.isOpenNow ? '#10b981' : '#ef4444'}` }} />
-              <span className="text-xs font-bold" style={{ color: cafe.isOpenNow ? '#059669' : '#dc2626' }}>
-                {cafe.isOpenNow ? 'Buka Sekarang' : 'Tutup'}
-              </span>
+          <div className="flex flex-col gap-2 bg-gray-50/80 p-3 rounded-xl border border-gray-100">
+            <div 
+              className="flex items-center justify-between cursor-pointer group"
+              onClick={() => setShowHours(!showHours)}
+            >
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: cafe.isOpenNow ? '#10b981' : '#ef4444', boxShadow: `0 0 8px ${cafe.isOpenNow ? '#10b981' : '#ef4444'}` }} />
+                <span className="text-xs font-bold" style={{ color: cafe.isOpenNow ? '#059669' : '#dc2626' }}>
+                  {cafe.isOpenNow ? 'Buka Sekarang' : 'Tutup'}
+                </span>
+                <span className="text-xs text-gray-400 mx-1">•</span>
+                <span className="text-xs font-semibold text-gray-500">
+                  {cafe.openHours.toLowerCase().includes('tutup') 
+                    ? 'Tutup hari ini' 
+                    : cafe.isOpenNow 
+                      ? `Tutup pukul ${cafe.openHours.split(' - ')[1] || ''}`
+                      : `Buka pukul ${cafe.openHours.split(' - ')[0] || ''}`
+                  }
+                </span>
+              </div>
+              <div className="p-1 rounded-lg bg-gray-100 text-gray-400 group-hover:bg-gray-200 transition-colors">
+                {showHours ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </div>
             </div>
-            <span className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
-              <Clock size={12} />{cafe.openHours}
-            </span>
+            
+            {showHours && cafe.schedule && cafe.schedule.length > 0 && (
+              <div className="pt-2 mt-2 border-t border-gray-200/60 space-y-1">
+                {cafe.schedule.map((dayLine, i) => {
+                  const formatter = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long' });
+                  const todayName = formatter.format(new Date());
+                  const isToday = dayLine.toLowerCase().startsWith(todayName.toLowerCase());
+                  
+                  const parts = dayLine.split(': ');
+                  const day = parts[0];
+                  const time = parts.slice(1).join(': ');
+                  
+                  return (
+                    <div key={i} className={`flex justify-between text-xs py-0.5 ${isToday ? 'font-bold text-gray-900' : 'text-gray-500 font-medium'}`}>
+                      <span className="w-16">{day}</span>
+                      <span>{time}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            
+            {showHours && (!cafe.schedule || cafe.schedule.length === 0) && (
+              <div className="pt-2 mt-2 border-t border-gray-200/60 text-xs text-gray-400">
+                Jadwal lengkap belum tersedia.
+              </div>
+            )}
           </div>
 
           <div className="h-px bg-gray-100" />
 
-          {/* Fasilitas */}
-          <div className="space-y-3.5">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Fasilitas</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {activeFacilities.map(key => {
-                const config = facilityConfig[key];
-                if (!config) return null;
-                const Icon = config.icon;
-                return (
-                  <div key={key} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-gray-50/80 border border-gray-100 transition-all hover:bg-white hover:shadow-sm">
-                    <Icon size={14} style={{ color: config.color }} />
-                    <span className="text-xs font-semibold text-gray-700">{config.label}</span>
-                  </div>
-                );
-              })}
+          {/* Fasilitas — "Maps lengkap" = Nongkrong+ */}
+          {showPremiumSections ? (
+            <div className="space-y-3.5">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Fasilitas</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {activeFacilities.map(key => {
+                  const config = facilityConfig[key];
+                  if (!config) return null;
+                  const Icon = config.icon;
+                  return (
+                    <div key={key} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-gray-50/80 border border-gray-100 transition-all hover:bg-white hover:shadow-sm">
+                      <Icon size={14} style={{ color: config.color }} />
+                      <span className="text-xs font-semibold text-gray-700">{config.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          ) : (
+            <PremiumLock
+              title="Fasilitas Lengkap"
+              desc="WiFi, colokan, AC, mushola, parkir & lainnya"
+              landingUrl={landingUrl}
+            />
+          )}
 
-          {/* Internet Speed */}
-          <div className="pt-5 border-t border-gray-100">
-            <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-blue-50/50 border border-blue-100">
-              <div className="w-8 h-8 rounded-xl bg-blue-100/80 flex items-center justify-center flex-shrink-0">
-                <Gauge size={16} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Kecepatan Internet</p>
-                <p className="text-base font-black text-blue-700">{cafe.wifiSpeed} Mbps</p>
-              </div>
-              <div className="ml-auto">
-                <div
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"
-                  style={{
-                    background: cafe.wifiSpeed >= 50 ? '#dcfce7' : cafe.wifiSpeed >= 25 ? '#fef9c3' : '#fee2e2',
-                    color: cafe.wifiSpeed >= 50 ? '#059669' : cafe.wifiSpeed >= 25 ? '#d97706' : '#dc2626',
-                    border: `1px solid ${cafe.wifiSpeed >= 50 ? '#bbf7d0' : cafe.wifiSpeed >= 25 ? '#fef08a' : '#fecaca'}`,
-                  }}
-                >
-                  {cafe.wifiSpeed >= 50 ? 'Super Cepat' : cafe.wifiSpeed >= 25 ? 'Stabil' : 'Standar'}
+          {/* Internet Speed + Live Speed Test — Nongkrong+ */}
+          {showPremiumSections ? (
+            <>
+              <div className="pt-5 border-t border-gray-100">
+                <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-blue-50/50 border border-blue-100">
+                  <div className="w-8 h-8 rounded-xl bg-blue-100/80 flex items-center justify-center flex-shrink-0">
+                    <Gauge size={16} className="text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Kecepatan Internet</p>
+                    <p className="text-base font-black text-blue-700">{cafe.wifiSpeed} Mbps</p>
+                  </div>
+                  <div className="ml-auto">
+                    <div
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"
+                      style={{
+                        background: cafe.wifiSpeed >= 50 ? '#dcfce7' : cafe.wifiSpeed >= 25 ? '#fef9c3' : '#fee2e2',
+                        color: cafe.wifiSpeed >= 50 ? '#059669' : cafe.wifiSpeed >= 25 ? '#d97706' : '#dc2626',
+                        border: `1px solid ${cafe.wifiSpeed >= 50 ? '#bbf7d0' : cafe.wifiSpeed >= 25 ? '#fef08a' : '#fecaca'}`,
+                      }}
+                    >
+                      {cafe.wifiSpeed >= 50 ? 'Super Cepat' : cafe.wifiSpeed >= 25 ? 'Stabil' : 'Standar'}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Community Reviews */}
-          <CommunityReviews
-            cafeId={cafe.id}
-            onWriteReview={() => setContributeType('review')}
-          />
+              {/* Live Speed Test */}
+              <div className="pt-5 border-t border-gray-100">
+                <SpeedTestButton cafe={cafe} />
+              </div>
+            </>
+          ) : (
+            <PremiumLock
+              title="Kecepatan Internet & Speed Test"
+              desc="Data real-time kecepatan WiFi di cafe ini"
+              landingUrl={landingUrl}
+            />
+          )}
+
+          {/* Community Reviews — Nongkrong+ */}
+          {showPremiumSections ? (
+            <CommunityReviews
+              cafeId={cafe.id}
+              onWriteReview={() => setContributeType('review')}
+            />
+          ) : (
+            <PremiumLock
+              title="Ulasan Member"
+              desc="Review jujur dari sesama member Semeja Kerja"
+              landingUrl={landingUrl}
+            />
+          )}
 
           {/* Menu Utama */}
           <div className="pt-5 border-t border-gray-100 space-y-3.5">
@@ -343,24 +462,64 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose }) => {
             </div>
           </div>
 
-          {/* CTA: Klaim Diskon */}
+          {/* CTA: Klaim Diskon — benefit "Diskon 10% di Cafe Mitra" = Nongkrong+ */}
           {cafe.isMitraSemejaKerja && (
-            <>
-              <div className="h-px bg-gray-100" />
-              <button
-                onClick={() => setDiscountClaimed(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all shadow-md text-white"
-                style={{
-                  background: discountClaimed
-                    ? 'linear-gradient(135deg, #059669, #047857)'
-                    : 'linear-gradient(135deg, #10b981, #059669)',
-                }}
-              >
-                <CheckCircle2 size={16} />
-                {discountClaimed ? 'Diskon Berhasil Diklaim! 🎉' : 'Klaim Diskon Semeja Kerja'}
-              </button>
-            </>
+            showPremiumSections ? (
+              <>
+                <div className="h-px bg-gray-100" />
+                <button
+                  onClick={() => setDiscountClaimed(true)}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all shadow-md text-white"
+                  style={{
+                    background: discountClaimed
+                      ? 'linear-gradient(135deg, #059669, #047857)'
+                      : 'linear-gradient(135deg, #10b981, #059669)',
+                  }}
+                >
+                  <CheckCircle2 size={16} />
+                  {discountClaimed ? 'Diskon Berhasil Diklaim! 🎉' : 'Klaim Diskon Semeja Kerja'}
+                </button>
+              </>
+            ) : (
+              <PremiumLock
+                title="Diskon 10% di Cafe Mitra"
+                desc="Klaim diskon khusus member Nongkrong+"
+                landingUrl={landingUrl}
+              />
+            )
           )}
+
+          </div>
+
+          {/* Guest overlay: detail cafe wajib login */}
+          {isGuest && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3.5 px-6 text-center">
+              <div className="w-11 h-11 rounded-2xl bg-purple-100 flex items-center justify-center shadow-sm">
+                <Lock size={20} className="text-purple-600" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-extrabold text-gray-900">Masuk untuk Lihat Detail Cafe</p>
+                <p className="text-xs font-medium text-gray-500 leading-relaxed">
+                  Fasilitas, jam buka, ulasan member & info lengkap lainnya khusus member. Gratis!
+                </p>
+              </div>
+              <button
+                onClick={onRequestLogin}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-purple-800 text-white text-sm font-bold shadow-md shadow-purple-500/30 hover:shadow-purple-500/50 hover:-translate-y-0.5 transition-all"
+              >
+                <LogIn size={15} /> Masuk
+              </button>
+              <a
+                href={`${landingUrl}/auth/register`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-purple-600 hover:underline"
+              >
+                Belum punya akun? Daftar gratis
+              </a>
+            </div>
+          )}
+          </div>
         </div>
 
         {/* Footer sticky buttons */}
@@ -380,27 +539,49 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose }) => {
               <ExternalLink size={14} /> Lihat di Maps
             </button>
           </div>
-          {/* Contribute actions */}
-          <div className="flex gap-1.5 px-4 pb-4">
-            <button
-              onClick={() => setContributeType('edit')}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-gray-500 hover:text-purple-700 hover:bg-purple-50 border border-gray-100 hover:border-purple-200 transition-all"
-            >
-              <Pencil size={12} /> Koreksi Info
-            </button>
-            <button
-              onClick={() => setContributeType('review')}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-gray-500 hover:text-purple-700 hover:bg-purple-50 border border-gray-100 hover:border-purple-200 transition-all"
-            >
-              <MessageSquare size={12} /> Tulis Ulasan
-            </button>
-            <button
-              onClick={() => setContributeType('photo')}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-gray-500 hover:text-purple-700 hover:bg-purple-50 border border-gray-100 hover:border-purple-200 transition-all"
-            >
-              <Camera size={12} /> Upload Foto
-            </button>
-          </div>
+          {/* Contribute actions — Crowdsource Maps = Nongkrong+ */}
+          {hasFullMaps ? (
+            <div className="flex gap-1.5 px-4 pb-4">
+              <button
+                onClick={() => setContributeType('edit')}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-gray-500 hover:text-purple-700 hover:bg-purple-50 border border-gray-100 hover:border-purple-200 transition-all"
+              >
+                <Pencil size={12} /> Koreksi Info
+              </button>
+              <button
+                onClick={() => setContributeType('review')}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-gray-500 hover:text-purple-700 hover:bg-purple-50 border border-gray-100 hover:border-purple-200 transition-all"
+              >
+                <MessageSquare size={12} /> Tulis Ulasan
+              </button>
+              <button
+                onClick={() => setContributeType('photo')}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-gray-500 hover:text-purple-700 hover:bg-purple-50 border border-gray-100 hover:border-purple-200 transition-all"
+              >
+                <Camera size={12} /> Upload Foto
+              </button>
+            </div>
+          ) : isGuest ? (
+            <div className="px-4 pb-4">
+              <button
+                onClick={onRequestLogin}
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-purple-600 bg-purple-50 border border-purple-100 hover:bg-purple-100 transition-all"
+              >
+                <LogIn size={12} /> Masuk untuk koreksi info, tulis ulasan & upload foto
+              </button>
+            </div>
+          ) : (
+            <div className="px-4 pb-4">
+              <a
+                href={`${landingUrl}/membership`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-100 hover:bg-amber-100 transition-all"
+              >
+                <Lock size={12} /> Kontribusi (koreksi, ulasan, foto) khusus Nongkrong+
+              </a>
+            </div>
+          )}
         </div>
       </div>
 

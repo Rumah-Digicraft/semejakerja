@@ -1,6 +1,7 @@
 import type { Cafe } from '../types/cafe';
 
-export const cafesData: Cafe[] = [
+// Mock/demo data — real data comes from Supabase via useCafes.
+const rawCafesData: Omit<Cafe, 'schedule' | 'clicks'>[] = [
   {
     id: '1',
     name: 'Semeja Coffee Flagship',
@@ -339,3 +340,9 @@ export const cafesData: Cafe[] = [
     priceRange: 'Rp 10.000 - 45.000',
   },
 ];
+
+export const cafesData: Cafe[] = rawCafesData.map((cafe) => ({
+  ...cafe,
+  schedule: [],
+  clicks: 0,
+}));

@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { ZoomIn, ZoomOut, Compass, MapPin } from 'lucide-react';
+import { ZoomIn, ZoomOut, Compass, MapPin, Navigation } from 'lucide-react';
+import L from 'leaflet';
 import type { Cafe, FilterState } from '../types/cafe';
 import { createMarkerIcon, getMarkerTier, getZIndexOffset } from './MapMarker';
+import MapSearch from './MapSearch';
 
 interface MapViewProps {
   cafes: Cafe[];
@@ -11,13 +13,43 @@ interface MapViewProps {
   onCafeClick: (cafe: Cafe) => void;
 }
 
-const MapControls: React.FC<{ filteredCount: number; totalCount: number }> = ({ filteredCount, totalCount }) => {
+const MapControls: React.FC<{ 
+  filteredCount: number; 
+  totalCount: number;
+  userLocation: [number, number] | null;
+  setUserLocation: (loc: [number, number] | null) => void;
+}> = ({ filteredCount, totalCount, userLocation, setUserLocation }) => {
   const map = useMap();
+  const [isLocating, setIsLocating] = React.useState(false);
+
+  const handleLocateMe = () => {
+    if (!navigator.geolocation) {
+      alert('Browser Anda tidak mendukung Geolocation.');
+      return;
+    }
+    
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setUserLocation([lat, lng]);
+        map.flyTo([lat, lng], 16, { animate: true, duration: 1.5 });
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        alert('Tidak dapat mendeteksi lokasi. Pastikan izin lokasi aktif.');
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   return (
     <>
       {/* Custom Map Controls */}
-      <div className="absolute right-4 sm:right-6 top-20 sm:top-24 flex flex-col gap-2 z-[400]">
+      <div className="absolute right-4 sm:right-6 top-32 sm:top-36 flex flex-col gap-2 z-[400]">
         <button
           onClick={() => map.zoomIn()}
           title="Zoom In"
@@ -38,6 +70,14 @@ const MapControls: React.FC<{ filteredCount: number; totalCount: number }> = ({ 
           className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/90 backdrop-blur-md text-purple-600 hover:text-purple-800"
         >
           <Compass size={16} />
+        </button>
+        <button
+          onClick={handleLocateMe}
+          title="Lokasi Saya"
+          disabled={isLocating}
+          className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/90 backdrop-blur-md ${userLocation ? 'text-blue-600' : 'text-slate-600 hover:text-blue-600'} ${isLocating ? 'animate-pulse' : ''}`}
+        >
+          <Navigation size={16} className={userLocation ? 'fill-current' : ''} />
         </button>
       </div>
 
@@ -63,7 +103,23 @@ const MapControls: React.FC<{ filteredCount: number; totalCount: number }> = ({ 
   );
 };
 
-const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe: _selectedCafe, onCafeClick }) => {
+const MapView: React.FC<MapViewProps> = ({ cafes, filters, onCafeClick }) => {
+  const [userLocation, setUserLocation] = React.useState<[number, number] | null>(null);
+
+  // Custom icon for user location (blue dot)
+  const userIcon = useMemo(() => {
+    return L.divIcon({
+      className: 'bg-transparent border-none',
+      html: `
+        <div class="relative flex items-center justify-center w-6 h-6">
+          <div class="absolute w-full h-full bg-blue-500 rounded-full opacity-30 animate-ping"></div>
+          <div class="absolute w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full shadow-md"></div>
+        </div>
+      `,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+  }, []);
   const filteredCafes = useMemo(() => {
     return cafes.filter(cafe => {
       if (filters.facilities.length > 0) {
@@ -89,10 +145,10 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe: _select
         center={position}
         zoom={14}
         zoomControl={false}
+        attributionControl={false}
         className="w-full h-full"
       >
         <TileLayer
-          attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
 
@@ -179,7 +235,18 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe: _select
           );
         })}
 
-        <MapControls filteredCount={filteredCafes.length} totalCount={cafes.length} />
+        <MapSearch cafes={cafes} onCafeClick={onCafeClick} />
+
+        {/* User Location Marker */}
+        {userLocation && (
+          <Marker
+            position={userLocation}
+            icon={userIcon}
+            zIndexOffset={1000} // Always on top
+          />
+        )}
+
+        <MapControls filteredCount={filteredCafes.length} totalCount={cafes.length} userLocation={userLocation} setUserLocation={setUserLocation} />
       </MapContainer>
     </div>
   );

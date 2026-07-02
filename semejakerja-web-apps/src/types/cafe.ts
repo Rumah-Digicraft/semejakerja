@@ -23,6 +23,7 @@ export interface CafeRow {
   open_hours: string | null;
   weekday_text: string | null;
   top_review: string | null;
+  clicks: number;
   created_at: string;
 }
 
@@ -52,6 +53,7 @@ export interface Cafe {
   vibes: number;           // 1 (tenang) to 5 (ramai) — default 3 until enriched
   facilities: CafeFacility;
   openHours: string;
+  schedule: string[];
   isOpenNow: boolean;
   isOpenNight: boolean;
   isMitraSemejaKerja: boolean;
@@ -68,6 +70,7 @@ export interface Cafe {
   website?: string | null;
   topReview?: string | null;
   discountValue?: number;
+  clicks: number;
 }
 
 export interface FilterState {
