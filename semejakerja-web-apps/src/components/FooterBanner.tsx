@@ -51,14 +51,14 @@ const FooterBanner: React.FC = () => {
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-400" />
               <span className="text-sm font-medium" style={{ color: '#a78bfa' }}>
-                <span className="font-bold text-white">2.4K+</span> Member Aktif
+                <span className="font-bold text-white">500+</span> Member Aktif
               </span>
             </div>
             <div className="w-px h-5" style={{ background: 'rgba(255,255,255,0.15)' }} />
             <div className="flex items-center gap-2">
               <MapPin size={14} style={{ color: '#a78bfa' }} />
               <span className="text-sm font-medium" style={{ color: '#a78bfa' }}>
-                <span className="font-bold text-white">30+</span> Cafe Mitra
+                <span className="font-bold text-white">5</span> Cafe Mitra
               </span>
             </div>
           </div>

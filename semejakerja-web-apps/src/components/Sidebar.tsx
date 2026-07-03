@@ -19,13 +19,24 @@ interface SidebarProps {
   landingUrl: string;
 }
 
-const facilityOptions = [
+interface FacilityOption {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
+}
+
+// Filter fasilitas untuk tier Free (Nyantai).
+const freeFacilityOptions: FacilityOption[] = [
+  { id: 'motorParking', label: 'Parkir Motor', icon: Bike },
+  { id: 'carParking', label: 'Parkir Mobil', icon: Car },
+  { id: 'mushola', label: 'Mushola', icon: BookOpen },
+];
+
+// Bagian "Maps lengkap" — khusus Nongkrong+.
+const premiumFacilityOptions: FacilityOption[] = [
   { id: 'wifi', label: 'WiFi Cepat', icon: Wifi },
   { id: 'powerOutlets', label: 'Colokan Banyak', icon: Zap },
   { id: 'ac', label: 'AC', icon: Wind },
-  { id: 'mushola', label: 'Mushola', icon: BookOpen },
-  { id: 'motorParking', label: 'Parkir Motor', icon: Bike },
-  { id: 'carParking', label: 'Parkir Mobil', icon: Car },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -35,8 +46,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showNewCafeModal, setShowNewCafeModal] = useState(false);
 
   const isGuest = access === 'guest';
-  // "Maps lengkap (filter fasilitas)" & crowdsource = Nongkrong+
+  // "Maps lengkap" (filter WiFi/colokan/AC, suasana, waktu buka, mitra)
+  // & crowdsource = Nongkrong+
   const hasFullMaps = access === 'full';
+  // Tier Free (Nyantai): filter premium diblur dengan CTA upgrade.
+  const isFreeTier = access === 'basic';
 
   const toggleFacility = (id: string) => {
     const current = filters.facilities;
@@ -47,6 +61,31 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const isActive = (id: string) => filters.facilities.includes(id);
+
+  const renderFacilityButton = ({ id, label, icon: Icon }: FacilityOption) => {
+    const active = isActive(id);
+    return (
+      <button
+        key={id}
+        onClick={() => toggleFacility(id)}
+        className="flex items-center gap-3 sm:gap-5 px-3 sm:px-5 py-4 sm:py-4 mb-1 rounded-2xl text-left w-full transition-all shadow-sm"
+        style={{
+          background: active ? '#f3e8ff' : 'rgba(255,255,255,0.8)',
+          border: active ? '1px solid #d8b4fe' : '1px solid rgba(255,255,255,0.9)',
+          color: active ? '#6d28d9' : '#4b5563',
+        }}
+      >
+        <div
+          className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm"
+          style={{ background: active ? '#e9d5ff' : 'rgba(243, 244, 246, 0.8)' }}
+        >
+          <Icon size={15} style={{ color: active ? '#7c3aed' : '#9ca3af' }} />
+        </div>
+        <span className="text-xs sm:text-sm font-extrabold leading-tight">{label}</span>
+        {active && <CheckCircle2 size={15} className="text-purple-600 ml-auto hidden sm:block" />}
+      </button>
+    );
+  };
 
   return (
     <>
@@ -99,62 +138,62 @@ const Sidebar: React.FC<SidebarProps> = ({
           ].join(' ')}
         >
 
-          {/* Fasilitas — bagian dari "Maps lengkap", khusus Nongkrong+ */}
-          <div className="relative">
-            <label className="flex items-center gap-2 font-extrabold text-xs uppercase tracking-widest text-gray-400 mt-6 mb-3">
+          {/* Fasilitas — parkir motor/mobil & mushola untuk semua member;
+              WiFi/colokan/AC bagian "Maps lengkap", khusus Nongkrong+ */}
+          <div>
+            <label className="block font-extrabold text-xs uppercase tracking-widest text-gray-400 mt-6 mb-3">
               Fasilitas
-              {!isGuest && !hasFullMaps && (
-                <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-600 border border-amber-200 normal-case tracking-normal">
-                  <Crown size={10} /> Nongkrong+
-                </span>
-              )}
             </label>
-            {!isGuest && !hasFullMaps && (
-              <div className="absolute inset-x-0 top-8 bottom-0 z-10 flex flex-col items-center justify-center gap-2.5 px-4 text-center rounded-2xl">
+            {/* Mobile: 2-col grid. Desktop: 1-col */}
+            <div className="grid grid-cols-2 md:grid-cols-1 gap-3 sm:gap-4">
+              {freeFacilityOptions.map(renderFacilityButton)}
+            </div>
+            <div className="relative mt-3 sm:mt-4">
+              {isFreeTier && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2.5 px-4 text-center rounded-2xl">
+                  <a
+                    href={`${landingUrl}/membership`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950 text-xs font-extrabold shadow-md shadow-amber-400/30 hover:shadow-amber-400/50 hover:-translate-y-0.5 transition-all"
+                  >
+                    <Crown size={14} /> Upgrade untuk Filter WiFi, Colokan & AC
+                  </a>
+                </div>
+              )}
+              <div
+                aria-hidden={isFreeTier}
+                className={[
+                  'grid grid-cols-2 md:grid-cols-1 gap-3 sm:gap-4',
+                  isFreeTier ? 'blur-[5px] pointer-events-none select-none' : '',
+                ].join(' ')}
+              >
+                {premiumFacilityOptions.map(renderFacilityButton)}
+              </div>
+            </div>
+          </div>
+
+          {/* Suasana, waktu buka & mitra — bagian "Maps lengkap", khusus Nongkrong+ */}
+          <div className="relative">
+            {isFreeTier && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2.5 px-4 text-center rounded-2xl">
                 <a
                   href={`${landingUrl}/membership`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950 text-xs font-extrabold shadow-md shadow-amber-400/30 hover:shadow-amber-400/50 hover:-translate-y-0.5 transition-all"
                 >
-                  <Crown size={14} /> Upgrade untuk Filter Fasilitas
+                  <Crown size={14} /> Upgrade untuk Semua Filter
                 </a>
               </div>
             )}
-            {/* Mobile: 2-col grid. Desktop: 1-col */}
             <div
-              aria-hidden={!isGuest && !hasFullMaps}
+              aria-hidden={isFreeTier}
               className={[
-                'grid grid-cols-2 md:grid-cols-1 gap-3 sm:gap-4',
-                !isGuest && !hasFullMaps ? 'blur-[5px] pointer-events-none select-none' : '',
+                'space-y-9 sm:space-y-11',
+                isFreeTier ? 'blur-[5px] pointer-events-none select-none' : '',
               ].join(' ')}
             >
-              {facilityOptions.map(({ id, label, icon: Icon }) => {
-                const active = isActive(id);
-                return (
-                  <button
-                    key={id}
-                    onClick={() => toggleFacility(id)}
-                    className="flex items-center gap-3 sm:gap-5 px-3 sm:px-5 py-4 sm:py-4 mb-1 rounded-2xl text-left w-full transition-all shadow-sm"
-                    style={{
-                      background: active ? '#f3e8ff' : 'rgba(255,255,255,0.8)',
-                      border: active ? '1px solid #d8b4fe' : '1px solid rgba(255,255,255,0.9)',
-                      color: active ? '#6d28d9' : '#4b5563',
-                    }}
-                  >
-                    <div
-                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm"
-                      style={{ background: active ? '#e9d5ff' : 'rgba(243, 244, 246, 0.8)' }}
-                    >
-                      <Icon size={15} style={{ color: active ? '#7c3aed' : '#9ca3af' }} />
-                    </div>
-                    <span className="text-xs sm:text-sm font-extrabold leading-tight">{label}</span>
-                    {active && <CheckCircle2 size={15} className="text-purple-600 ml-auto hidden sm:block" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
           {/* Suasana Slider */}
           <div>
@@ -245,6 +284,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </span>
               )}
             </button>
+          </div>
+
+            </div>
           </div>
         </div>
 

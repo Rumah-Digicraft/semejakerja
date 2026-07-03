@@ -102,12 +102,12 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
                 <div className="flex items-center gap-5 sm:gap-6 mb-7 sm:mb-8">
                   <div className="flex items-center gap-2.5">
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-sm font-semibold text-gray-500"><strong className="text-gray-900 font-extrabold">2.4K+</strong> Member</span>
+                    <span className="text-sm font-semibold text-gray-500"><strong className="text-gray-900 font-extrabold">500+</strong> Member</span>
                   </div>
                   <div className="w-px h-6 bg-gray-200" />
                   <div className="flex items-center gap-2.5">
                     <MapPin size={14} className="text-purple-500" />
-                    <span className="text-sm font-semibold text-gray-500"><strong className="text-gray-900 font-extrabold">30+</strong> Mitra</span>
+                    <span className="text-sm font-semibold text-gray-500"><strong className="text-gray-900 font-extrabold">5</strong> Mitra</span>
                   </div>
                 </div>
                 <button className="w-full flex items-center justify-center gap-3 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-800 text-white text-sm sm:text-base font-bold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:-translate-y-0.5 transition-all">

@@ -20,31 +20,6 @@ interface CafeModalProps {
   landingUrl: string;
 }
 
-// Locked row shown to Nyantai members in place of a Nongkrong+ section.
-function PremiumLock({ title, desc, landingUrl }: { title: string; desc: string; landingUrl: string }) {
-  return (
-    <div className="pt-5 border-t border-gray-100">
-      <a
-        href={`${landingUrl}/membership`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-amber-50/70 border border-amber-100 hover:bg-amber-50 hover:border-amber-200 transition-all group"
-      >
-        <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-          <Lock size={14} className="text-amber-600" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold text-gray-800">{title}</p>
-          <p className="text-[11px] font-medium text-gray-500">{desc}</p>
-        </div>
-        <span className="flex items-center gap-1 text-[10px] font-extrabold px-2 py-1 rounded-full bg-amber-400 text-amber-950 shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
-          <Crown size={10} /> Upgrade
-        </span>
-      </a>
-    </div>
-  );
-}
-
 const StarRating: React.FC<{ rating: number }> = ({ rating }) => {
   return (
     <div className="flex items-center gap-1">
@@ -86,7 +61,7 @@ function StarRow({ rating, size = 13 }: { rating: number; size?: number }) {
   );
 }
 
-function CommunityReviews({ cafeId, onWriteReview }: { cafeId: string; onWriteReview: () => void }) {
+function CommunityReviews({ cafeId, canWrite, onWriteReview }: { cafeId: string; canWrite: boolean; onWriteReview: () => void }) {
   const { data: reviews = [], isLoading } = useCafeReviews(cafeId);
 
   const avgRating = reviews.length > 0
@@ -122,12 +97,14 @@ function CommunityReviews({ cafeId, onWriteReview }: { cafeId: string; onWriteRe
       ) : reviews.length === 0 ? (
         <div className="flex flex-col items-center py-5 text-center gap-2">
           <p className="text-xs text-gray-400">Belum ada ulasan dari member.</p>
-          <button
-            onClick={onWriteReview}
-            className="text-xs font-semibold text-purple-600 hover:text-purple-700 underline underline-offset-2"
-          >
-            Jadilah yang pertama menulis ulasan
-          </button>
+          {canWrite && (
+            <button
+              onClick={onWriteReview}
+              className="text-xs font-semibold text-purple-600 hover:text-purple-700 underline underline-offset-2"
+            >
+              Jadilah yang pertama menulis ulasan
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -165,7 +142,7 @@ function CommunityReviews({ cafeId, onWriteReview }: { cafeId: string; onWriteRe
               )}
             </div>
           ))}
-          {reviews.length >= 3 && (
+          {canWrite && reviews.length >= 3 && (
             <button
               onClick={onWriteReview}
               className="w-full py-2 text-xs font-semibold text-purple-600 hover:text-purple-700 border border-purple-100 hover:border-purple-200 rounded-xl hover:bg-purple-50 transition-all"
@@ -182,14 +159,15 @@ function CommunityReviews({ cafeId, onWriteReview }: { cafeId: string; onWriteRe
 // ── Main Modal ─────────────────────────────────────────────────────────────
 
 const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestLogin, landingUrl }) => {
-  const [discountClaimed, setDiscountClaimed] = useState(false);
   const [contributeType, setContributeType] = useState<ContributeType | null>(null);
   const [showHours, setShowHours] = useState(false);
 
   const isGuest = access === 'guest';
   const hasFullMaps = access === 'full';
-  // Guests see the real sections blurred (teaser); Nyantai sees locked rows.
-  const showPremiumSections = hasFullMaps || isGuest;
+  // Tier Free (Nyantai): fasilitas diblur + CTA upgrade. Jam buka, harga,
+  // speed test & ulasan terbuka. Guest melihat semua detail diblur di balik
+  // overlay login.
+  const facilitiesLocked = access === 'basic';
 
   const activeFacilities = Object.entries(cafe.facilities)
     .filter(([, val]) => val)
@@ -362,9 +340,15 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
 
           <div className="h-px bg-gray-100" />
 
-          {/* Fasilitas — "Maps lengkap" = Nongkrong+ */}
-          {showPremiumSections ? (
-            <div className="space-y-3.5">
+          {/* Fasilitas — "Maps lengkap" = Nongkrong+; tier Free melihatnya blur */}
+          <div className="relative">
+            <div
+              aria-hidden={facilitiesLocked}
+              className={[
+                'space-y-3.5',
+                facilitiesLocked ? 'blur-[6px] pointer-events-none select-none' : '',
+              ].join(' ')}
+            >
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Fasilitas</h3>
               <div className="grid grid-cols-2 gap-2">
                 {activeFacilities.map(key => {
@@ -380,67 +364,56 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
                 })}
               </div>
             </div>
-          ) : (
-            <PremiumLock
-              title="Fasilitas Lengkap"
-              desc="WiFi, colokan, AC, mushola, parkir & lainnya"
-              landingUrl={landingUrl}
-            />
-          )}
+            {facilitiesLocked && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center px-4">
+                <a
+                  href={`${landingUrl}/membership`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950 text-xs font-extrabold shadow-md shadow-amber-400/30 hover:shadow-amber-400/50 hover:-translate-y-0.5 transition-all"
+                >
+                  <Crown size={13} /> Upgrade untuk Fasilitas Lengkap
+                </a>
+              </div>
+            )}
+          </div>
 
-          {/* Internet Speed + Live Speed Test — Nongkrong+ */}
-          {showPremiumSections ? (
-            <>
-              <div className="pt-5 border-t border-gray-100">
-                <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-blue-50/50 border border-blue-100">
-                  <div className="w-8 h-8 rounded-xl bg-blue-100/80 flex items-center justify-center flex-shrink-0">
-                    <Gauge size={16} className="text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Kecepatan Internet</p>
-                    <p className="text-base font-black text-blue-700">{cafe.wifiSpeed} Mbps</p>
-                  </div>
-                  <div className="ml-auto">
-                    <div
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"
-                      style={{
-                        background: cafe.wifiSpeed >= 50 ? '#dcfce7' : cafe.wifiSpeed >= 25 ? '#fef9c3' : '#fee2e2',
-                        color: cafe.wifiSpeed >= 50 ? '#059669' : cafe.wifiSpeed >= 25 ? '#d97706' : '#dc2626',
-                        border: `1px solid ${cafe.wifiSpeed >= 50 ? '#bbf7d0' : cafe.wifiSpeed >= 25 ? '#fef08a' : '#fecaca'}`,
-                      }}
-                    >
-                      {cafe.wifiSpeed >= 50 ? 'Super Cepat' : cafe.wifiSpeed >= 25 ? 'Stabil' : 'Standar'}
-                    </div>
-                  </div>
+          {/* Internet Speed + Live Speed Test — semua member */}
+          <div className="pt-5 border-t border-gray-100">
+            <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-blue-50/50 border border-blue-100">
+              <div className="w-8 h-8 rounded-xl bg-blue-100/80 flex items-center justify-center flex-shrink-0">
+                <Gauge size={16} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Kecepatan Internet</p>
+                <p className="text-base font-black text-blue-700">{cafe.wifiSpeed} Mbps</p>
+              </div>
+              <div className="ml-auto">
+                <div
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"
+                  style={{
+                    background: cafe.wifiSpeed >= 50 ? '#dcfce7' : cafe.wifiSpeed >= 25 ? '#fef9c3' : '#fee2e2',
+                    color: cafe.wifiSpeed >= 50 ? '#059669' : cafe.wifiSpeed >= 25 ? '#d97706' : '#dc2626',
+                    border: `1px solid ${cafe.wifiSpeed >= 50 ? '#bbf7d0' : cafe.wifiSpeed >= 25 ? '#fef08a' : '#fecaca'}`,
+                  }}
+                >
+                  {cafe.wifiSpeed >= 50 ? 'Super Cepat' : cafe.wifiSpeed >= 25 ? 'Stabil' : 'Standar'}
                 </div>
               </div>
+            </div>
+          </div>
 
-              {/* Live Speed Test */}
-              <div className="pt-5 border-t border-gray-100">
-                <SpeedTestButton cafe={cafe} />
-              </div>
-            </>
-          ) : (
-            <PremiumLock
-              title="Kecepatan Internet & Speed Test"
-              desc="Data real-time kecepatan WiFi di cafe ini"
-              landingUrl={landingUrl}
-            />
-          )}
+          {/* Live Speed Test */}
+          <div className="pt-5 border-t border-gray-100">
+            <SpeedTestButton cafe={cafe} />
+          </div>
 
-          {/* Community Reviews — Nongkrong+ */}
-          {showPremiumSections ? (
-            <CommunityReviews
-              cafeId={cafe.id}
-              onWriteReview={() => setContributeType('review')}
-            />
-          ) : (
-            <PremiumLock
-              title="Ulasan Member"
-              desc="Review jujur dari sesama member Semeja Kerja"
-              landingUrl={landingUrl}
-            />
-          )}
+          {/* Community Reviews — semua member; tulis ulasan tetap Nongkrong+ */}
+          <CommunityReviews
+            cafeId={cafe.id}
+            canWrite={hasFullMaps}
+            onWriteReview={() => setContributeType('review')}
+          />
 
           {/* Menu Utama */}
           <div className="pt-5 border-t border-gray-100 space-y-3.5">
@@ -461,33 +434,6 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
               <span className="text-[11px] font-medium text-gray-500">Rentang Harga: {cafe.priceRange}</span>
             </div>
           </div>
-
-          {/* CTA: Klaim Diskon — benefit "Diskon 10% di Cafe Mitra" = Nongkrong+ */}
-          {cafe.isMitraSemejaKerja && (
-            showPremiumSections ? (
-              <>
-                <div className="h-px bg-gray-100" />
-                <button
-                  onClick={() => setDiscountClaimed(true)}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all shadow-md text-white"
-                  style={{
-                    background: discountClaimed
-                      ? 'linear-gradient(135deg, #059669, #047857)'
-                      : 'linear-gradient(135deg, #10b981, #059669)',
-                  }}
-                >
-                  <CheckCircle2 size={16} />
-                  {discountClaimed ? 'Diskon Berhasil Diklaim! 🎉' : 'Klaim Diskon Semeja Kerja'}
-                </button>
-              </>
-            ) : (
-              <PremiumLock
-                title="Diskon 10% di Cafe Mitra"
-                desc="Klaim diskon khusus member Nongkrong+"
-                landingUrl={landingUrl}
-              />
-            )
-          )}
 
           </div>
 

@@ -14,8 +14,10 @@ export interface MemberProfile {
 /**
  * Access level for the map features (mirrors the membership pricing matrix):
  * - 'guest'  — not logged in: map + cafe names only; filters & cafe detail blurred.
- * - 'basic'  — logged in, tier Nyantai (or tier unknown): maps basic
- *              (nama, alamat, jam buka); "Maps lengkap" features locked.
+ * - 'basic'  — tier Free/Nyantai (or tier unknown): map, filter parkir
+ *              motor/mobil & mushola, dan di detail cafe: jam buka/tutup,
+ *              rentang harga, kecepatan internet + speed test, ulasan member.
+ *              Sisanya blur dengan CTA upgrade.
  * - 'full'   — tier Nongkrong / Mode Serius: everything unlocked.
  */
 export type MapsAccess = 'guest' | 'basic' | 'full';
