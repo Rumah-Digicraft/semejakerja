@@ -6,6 +6,12 @@ import { queryClient } from './lib/queryClient'
 import './index.css'
 import App from './App.tsx'
 
+// Static/prerendered SEO tags and the crawler-only content block are for
+// no-JS crawlers; once the app boots, <Seo/> owns the head, so drop them
+// to avoid duplicate tags.
+document.querySelectorAll('[data-seo]').forEach(el => el.remove())
+document.getElementById('seo-content')?.remove()
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

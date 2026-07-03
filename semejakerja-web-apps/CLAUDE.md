@@ -12,10 +12,11 @@ Public interactive cafe map for the Semeja Kerja WFC community in Purwokerto, pl
 ## Commands (run from this folder)
 
 ```bash
-npm run dev      # Vite dev server
-npm run build    # tsc -b && vite build
-npm run lint     # eslint .
-npm run preview  # preview production build
+npm run dev        # Vite dev server
+npm run build      # tsc -b && vite build && prerender (needs VITE_SUPABASE_* env)
+npm run build:spa  # build without the SEO prerender step (no Supabase needed)
+npm run lint       # eslint .
+npm run preview    # preview production build
 ```
 
 ## Architecture
@@ -38,6 +39,13 @@ npm run preview  # preview production build
 ## Env
 
 Copy `.env.local.example` → `.env.local`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+
+## SEO / prerender
+
+- `scripts/prerender.ts` runs after `vite build`: it fetches all cafes from Supabase and writes `dist/cafe/<slug>.html` (unique meta + CafeOrCoffeeShop JSON-LD + a crawlable `#seo-content` block), rewrites `dist/index.html`, and generates `dist/sitemap.xml`. Slugs come from `src/lib/slug.ts` (name + 8-char id prefix — shared with the router, no DB column).
+- The SPA mirrors this per-cafe SEO at runtime via `src/components/Seo.tsx` (React 19 native head hoisting); URL `/cafe/:slug` is the source of truth for the open cafe modal (see `App.tsx`).
+- Static SEO tags carry `data-seo` and live between `<!-- seo:start -->`/`<!-- seo:end -->` markers in `index.html`; `main.tsx` strips them (and `#seo-content`) before mount. Keep both conventions intact.
+- ⚠️ **Never add `public/_redirects` with `/* /index.html 200`** — on Cloudflare Pages, redirect rules beat static assets and would shadow every prerendered cafe page. Rely on Pages' automatic SPA fallback, and don't add a `404.html` (that would disable the fallback).
 
 ## Gotchas
 

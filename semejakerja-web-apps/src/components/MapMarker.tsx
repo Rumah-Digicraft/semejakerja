@@ -38,7 +38,7 @@ const TIER_CFG: Record<MarkerTier, TierConfig> = {
     fill: '#1D9E75', stroke: '#0F6E56',
     pinW: 34, pinH: 44,
     badgeText: 'MITRA', badgeFontSize: 9,
-    hasCheckmark: true, hasStar: false, hasPulse: true, hasLabel: false,
+    hasCheckmark: true, hasStar: false, hasPulse: true, hasLabel: true,
     zOffset: 200,
   },
   sponsor: {

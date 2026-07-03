@@ -1,0 +1,14 @@
+# Peta Cafe Purwokerto — Semeja Kerja
+
+> Direktori dan peta interaktif 350+ cafe ramah-WFC (Work From Cafe) di Purwokerto, Jawa Tengah, Indonesia — oleh komunitas Semeja Kerja. Setiap cafe punya data rating, jam buka, kisaran harga, dan fasilitas (Wi-Fi, stopkontak, AC, mushola, parkir).
+
+## Struktur situs
+
+- [Peta interaktif](https://semeja-cafe.pages.dev/): semua cafe di satu peta, bisa difilter fasilitas/suasana/jam buka
+- Halaman per cafe: pola URL https://semeja-cafe.pages.dev/cafe/<slug> — berisi alamat, rating, harga, jam buka, dan fasilitas
+- [Sitemap](https://semeja-cafe.pages.dev/sitemap.xml): daftar lengkap semua halaman cafe
+
+## Komunitas
+
+- [Semeja Kerja](https://semejakerja.pages.dev): komunitas WFC Purwokerto di balik peta ini — gabung gratis
+- Instagram: https://instagram.com/semejakerja

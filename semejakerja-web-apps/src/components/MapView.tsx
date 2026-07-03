@@ -103,7 +103,16 @@ const MapControls: React.FC<{
   );
 };
 
-const MapView: React.FC<MapViewProps> = ({ cafes, filters, onCafeClick }) => {
+// Centers the map on the cafe from the URL (deep links + marker clicks).
+const FlyToCafe: React.FC<{ cafe: Cafe | null }> = ({ cafe }) => {
+  const map = useMap();
+  React.useEffect(() => {
+    if (cafe) map.flyTo([cafe.lat, cafe.lng], 16, { animate: true, duration: 1.2 });
+  }, [cafe, map]);
+  return null;
+};
+
+const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeClick }) => {
   const [userLocation, setUserLocation] = React.useState<[number, number] | null>(null);
 
   // Custom icon for user location (blue dot)
@@ -236,6 +245,8 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, onCafeClick }) => {
         })}
 
         <MapSearch cafes={cafes} onCafeClick={onCafeClick} />
+
+        <FlyToCafe cafe={selectedCafe} />
 
         {/* User Location Marker */}
         {userLocation && (
