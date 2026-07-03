@@ -1,0 +1,9 @@
+# macOS AppleDouble / metadata junk.
+# The Expansion drive isn't a native macOS filesystem, so macOS spawns a
+# "._<name>" sibling for many files. Never commit these (or .DS_Store).
+._*
+.DS_Store
+
+# Editor/OS noise
+.claude/
+Thumbs.db
