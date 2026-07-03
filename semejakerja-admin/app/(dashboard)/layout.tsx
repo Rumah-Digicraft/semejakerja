@@ -80,6 +80,14 @@ const navGroups: NavGroup[] = [
       { href: '/lapkeu', label: 'Laporan Keuangan', icon: <TrendingUp size={16} />, roles: ['super_admin'] },
     ],
   },
+  {
+    label: 'Sistem',
+    icon: <Settings size={14} />,
+    roles: ['super_admin'],
+    items: [
+      { href: '/settings', label: 'Pengaturan', icon: <Settings size={16} />, roles: ['super_admin'] },
+    ],
+  },
 ]
 
 interface SidebarProps {

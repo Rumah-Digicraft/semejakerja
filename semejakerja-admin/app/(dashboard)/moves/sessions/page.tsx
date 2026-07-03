@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useAppSettings } from '@/lib/useAppSettings'
 import { formatDate, formatCurrency } from '@/lib/utils/format'
 import {
   Plus, Edit2, AlertTriangle, Loader2, X,
@@ -73,6 +74,7 @@ const SPORT_CONFIG: Record<SportType, { label: string; color: string; icon: Reac
 
 export default function SessionsPage() {
   const supabase = createClient()
+  const { landingUrl } = useAppSettings()
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [filterSport, setFilterSport] = useState<string>('all')
@@ -163,8 +165,8 @@ export default function SessionsPage() {
 
   const copyLink = (token: string, type: SportType) => {
     const sport = type === 'funminton' ? 'f' : 'p'
-    // Public join page now lives on the landing site (static export → query params)
-    const link = `${process.env.NEXT_PUBLIC_LANDING_URL ?? 'https://semejakerja.com'}/moves/join?sport=${sport}&token=${token}`
+    // Public join page lives on the landing site; domain aktif dibaca dari app_settings
+    const link = `${landingUrl}/moves/join?sport=${sport}&token=${token}`
     navigator.clipboard.writeText(link)
     setCopiedToken(token)
     showToast('Link public form disalin!')

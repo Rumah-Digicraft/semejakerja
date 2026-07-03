@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useAppSettings } from '@/lib/useAppSettings'
 import { formatDate, formatCurrency } from '@/lib/utils/format'
 import { 
   Check, X, Copy, Image as ImageIcon, Trash2, Plus, Settings, 
@@ -70,6 +71,7 @@ export default function SessionDetailPage() {
   const id = params?.id as string
   const router = useRouter()
   const supabase = createClient()
+  const { movesUrl } = useAppSettings()
 
   const [session, setSession] = useState<Session | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -130,7 +132,7 @@ export default function SessionDetailPage() {
   const handleCopyLink = () => {
     if (!session) return
     const prefix = session.sport_type === 'funminton' ? 'f' : 'p'
-    const link = `${process.env.NEXT_PUBLIC_MOVES_URL ?? 'https://moves.semejakerja.com'}/${prefix}/${session.token}`
+    const link = `${movesUrl}/${prefix}/${session.token}`
     navigator.clipboard.writeText(link)
     setIsCopied(true)
     showToast('Link disalin!')
@@ -454,7 +456,7 @@ export default function SessionDetailPage() {
               <h3 className="font-bold text-slate-900 mb-1">Public Link Form</h3>
               <p className="text-xs text-slate-500 mb-4">Bagikan link ini ke grup WA agar peserta bisa daftar & bayar mandiri.</p>
               <div className="flex items-center gap-2">
-                <input readOnly value={`${process.env.NEXT_PUBLIC_MOVES_URL ?? 'https://moves.semejakerja.com'}/${session.sport_type === 'funminton' ? 'f' : 'p'}/${session.token}`} className="w-full bg-white px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-600 focus:outline-none" />
+                <input readOnly value={`${movesUrl}/${session.sport_type === 'funminton' ? 'f' : 'p'}/${session.token}`} className="w-full bg-white px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-600 focus:outline-none" />
                 <button onClick={handleCopyLink} className={`p-2 rounded-xl transition text-white shadow-sm flex-shrink-0 ${isCopied ? 'bg-emerald-500' : 'bg-purple-600 hover:bg-purple-500'}`}>
                   {isCopied ? <Check size={16} /> : <Copy size={16} />}
                 </button>
