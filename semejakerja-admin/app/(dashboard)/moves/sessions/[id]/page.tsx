@@ -1,7 +1,7 @@
 'use client'
 
-import { Suspense, useEffect, useState, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate, formatCurrency } from '@/lib/utils/format'
 import { 
@@ -65,9 +65,9 @@ const SPORT_CONFIG: Record<SportType, { icon: React.ReactNode }> = {
   volleyball: { icon: <Trophy size={24} className="text-amber-600" /> },
 }
 
-function SessionDetailPage() {
-  const searchParams = useSearchParams()
-  const id = searchParams.get('id') ?? ''
+export default function SessionDetailPage() {
+  const params = useParams()
+  const id = params?.id as string
   const router = useRouter()
   const supabase = createClient()
 
@@ -870,13 +870,5 @@ function SessionDetailPage() {
         </div>
       )}
     </div>
-  )
-}
-
-export default function SessionDetailPageWrapper() {
-  return (
-    <Suspense>
-      <SessionDetailPage />
-    </Suspense>
   )
 }

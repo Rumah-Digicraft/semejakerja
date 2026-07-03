@@ -347,7 +347,7 @@ export default function SessionsPage() {
                       <Edit2 size={14} />
                     </button>
                     <Link
-                      href={`/moves/sessions/detail?id=${session.id}`}
+                      href={`/moves/sessions/${session.id}`}
                       className="p-1.5 rounded-lg hover:bg-emerald-50 hover:text-emerald-600 text-slate-400 transition"
                       title="Lihat detail sesi"
                     >

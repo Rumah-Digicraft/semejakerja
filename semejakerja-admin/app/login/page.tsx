@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Eye, EyeOff, Shield, Loader2 } from 'lucide-react'
@@ -18,20 +18,6 @@ function LoginForm() {
       ? 'Akun ini bukan admin. Gunakan akun admin internal.'
       : ''
   )
-
-  // Already-signed-in admins skip the form (proxy.ts used to do this server-side).
-  useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return
-      const { data } = await supabase
-        .from('admin_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle()
-      if (data) router.replace('/dashboard')
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

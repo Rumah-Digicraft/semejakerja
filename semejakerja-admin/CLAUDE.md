@@ -26,9 +26,9 @@ npm run lint     # eslint
 ## Architecture
 
 - `app/` — App Router.
-  - `app/(dashboard)/` — the authenticated area, grouped by domain: `maps/cafes`, `maps/moderasi`, `moves/sessions` (+ `moves/sessions/detail?id=<uuid>`), `moves/participants`, `community/members`, `community/promo-codes`, `addon/manage`, `addon/subscribers`, `dashboard`, `lapkeu`. Shared chrome in `(dashboard)/layout.tsx`.
-  - `app/login/` — auth page. `app/page.tsx` — entry point (client redirect to `/dashboard`).
-- **Auth gate is client-side.** This app is a **static export** (`output: 'export'` in `next.config.ts`) deployed to Cloudflare Pages — there is **no Node server**, so Proxy/Middleware is unsupported and there is no `proxy.ts`. Route protection lives in `app/(dashboard)/layout.tsx` (redirects to `/login` when there's no session or the account has no `admin_roles` row) and `app/login/page.tsx` (redirects signed-in admins to `/dashboard`). The real security boundary is **Supabase RLS** — the client gate is UX, not enforcement. Static export also forbids dynamic route segments without `generateStaticParams()`, which is why session detail is `?id=` query param, not `[id]`.
+  - `app/(dashboard)/` — the authenticated area, grouped by domain: `maps/cafes`, `maps/moderasi`, `moves/sessions` (+ `[id]`), `moves/participants`, `community/members`, `community/promo-codes`, `addon/manage`, `addon/subscribers`, `dashboard`, `lapkeu`. Shared chrome in `(dashboard)/layout.tsx`.
+  - `app/login/` — auth page. `app/page.tsx` — entry/redirect.
+- **`proxy.ts`** — the auth gate. It's a Supabase-SSR middleware that redirects unauthenticated users to `/login` and authenticated users away from `/login`. Everything except `/` and `/login` is protected. Edit this when changing auth/route protection.
 - `lib/supabase/client.ts` (browser) and `lib/supabase/server.ts` (RSC/route handlers) — pick the right one for the context; never share a client across the server/client boundary.
 - `lib/utils.ts` — `cn()`; `lib/utils/format.ts` — formatting helpers.
 - `types/index.ts` — **canonical domain types** for the ecosystem (cafes, contributions, moderation, moves, etc.).

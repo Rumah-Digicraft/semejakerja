@@ -177,30 +177,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [userRole, setUserRole] = useState<AdminRole | null>(null)
   const [userEmail, setUserEmail] = useState('')
-  const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      // Static export has no proxy.ts gate, so this IS the auth gate now:
-      // no session → bounce to /login (Supabase RLS still guards the data).
-      if (!user) {
-        router.replace('/login')
-        return
-      }
+      if (!user) return
       setUserEmail(user.email ?? '')
       const { data } = await supabase.from('admin_roles').select('role').eq('user_id', user.id).single()
-      // No role row → not an admin. Sign out and send to /login.
-      if (data) {
-        setUserRole(data.role as AdminRole)
-      } else {
-        await supabase.auth.signOut()
-        router.replace('/login')
-      }
+      // No role row → not an admin. Middleware (proxy.ts) already blocks this;
+      // sign out here as belt-and-braces instead of assuming super_admin.
+      if (data) setUserRole(data.role as AdminRole)
+      else await supabase.auth.signOut()
     }
     init()
-  }, [router, supabase])
+  }, [])
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
