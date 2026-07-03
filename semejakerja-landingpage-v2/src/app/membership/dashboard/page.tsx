@@ -30,49 +30,20 @@ import {
   tierTaglines,
   type MembershipTier,
 } from "../features";
+import MembershipECard from "./MembershipECard";
+import {
+  formatDate,
+  type Membership,
+  type MembershipStatus,
+  type UserProfile,
+} from "./types";
 import styles from "./dashboard.module.css";
-
-type MembershipStatus = "active" | "expired" | "cancelled" | "pending_payment";
-
-interface UserProfile {
-  id: string;
-  full_name: string | null;
-  nickname: string | null;
-  occupation: string | null;
-  city: string | null;
-  phone: string | null;
-  avatar_url: string | null;
-  is_student: boolean;
-  student_verified_at: string | null;
-  created_at: string;
-}
-
-interface Membership {
-  id: string;
-  user_id: string;
-  tier: MembershipTier;
-  status: MembershipStatus;
-  started_at: string | null;
-  expires_at: string | null;
-  promo_code_used: string | null;
-  price_paid: number | null;
-  created_at: string;
-}
 
 const rupiah = new Intl.NumberFormat("id-ID", {
   style: "currency",
   currency: "IDR",
   maximumFractionDigits: 0,
 });
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
 
 // Active = status 'active' AND (no expiry OR not yet expired).
 // Mirrors the logic in semejakerja-web-apps/src/hooks/useAuth.ts.
@@ -205,6 +176,11 @@ export default function DashboardPage() {
               </Link>
             </div>
           </div>
+        )}
+
+        {/* E-Card member (hanya tier berbayar dengan membership aktif) */}
+        {active && active.tier !== "nyantai" && (
+          <MembershipECard profile={profile} membership={active} />
         )}
 
         <div className={styles.grid}>
