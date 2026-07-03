@@ -92,6 +92,9 @@ export interface CafePhoto {
 export interface UserProfile {
   id: string
   full_name: string | null
+  nickname: string | null
+  occupation: string | null
+  city: string | null
   phone: string | null
   avatar_url: string | null
   is_student: boolean
