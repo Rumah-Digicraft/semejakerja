@@ -1,16 +1,34 @@
 import type { Metadata } from "next";
 import { Dumbbell, ArrowRight, Calendar, Users, Heart, Zap } from "lucide-react";
 import styles from "./moves.module.css";
+import JsonLd from "../components/JsonLd";
+import { breadcrumbSchema, webPageSchema } from "@/lib/schema";
 
 export const metadata: Metadata = {
   title: "Semeja Moves",
   description:
     "Semeja Moves — olahraga bareng komunitas Semeja Kerja. Badminton & Padel tiap weekend di Purwokerto. Lepas penat, sehat bareng!",
+  alternates: { canonical: "/moves" },
+  openGraph: { url: "/moves" },
 };
 
 export default function MovesPage() {
   return (
     <div className={styles.page}>
+      <JsonLd
+        data={webPageSchema({
+          name: "Semeja Moves — Olahraga Bareng Komunitas",
+          description:
+            "Semeja Moves — olahraga bareng komunitas Semeja Kerja. Badminton & Padel tiap weekend di Purwokerto.",
+          path: "/moves",
+        })}
+      />
+      <JsonLd
+        data={breadcrumbSchema([
+          { name: "Semeja Kerja", path: "/" },
+          { name: "Semeja Moves", path: "/moves" },
+        ])}
+      />
       {/* Hero */}
       <section className={styles.hero}>
         <div className={styles.heroOverlay} />

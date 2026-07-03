@@ -12,11 +12,15 @@ import {
   Sparkles,
 } from "lucide-react";
 import styles from "./english.module.css";
+import JsonLd from "../components/JsonLd";
+import { breadcrumbSchema, webPageSchema } from "@/lib/schema";
 
 export const metadata: Metadata = {
   title: "Semeja English",
   description:
     "Semeja English — klub belajar Bahasa Inggris mingguan komunitas Semeja Kerja. Diskusi, debat, dan games tiap Sabtu. Santai, suportif, dan bebas takut salah.",
+  alternates: { canonical: "/english" },
+  openGraph: { url: "/english" },
 };
 
 const quickInfo = [
@@ -68,6 +72,20 @@ const rules = [
 export default function EnglishPage() {
   return (
     <div className={styles.page}>
+      <JsonLd
+        data={webPageSchema({
+          name: "Semeja English — Klub Belajar Bahasa Inggris",
+          description:
+            "Semeja English — klub belajar Bahasa Inggris mingguan komunitas Semeja Kerja. Diskusi, debat, dan games tiap Sabtu.",
+          path: "/english",
+        })}
+      />
+      <JsonLd
+        data={breadcrumbSchema([
+          { name: "Semeja Kerja", path: "/" },
+          { name: "Semeja English", path: "/english" },
+        ])}
+      />
       {/* Hero */}
       <section className={styles.hero}>
         <div className={styles.heroOverlay} />

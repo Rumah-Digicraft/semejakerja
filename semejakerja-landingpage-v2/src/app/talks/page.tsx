@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import { Mic, ArrowRight, Lightbulb, Users, TrendingUp, Presentation } from "lucide-react";
 import styles from "./talks.module.css";
+import JsonLd from "../components/JsonLd";
+import { breadcrumbSchema, webPageSchema } from "@/lib/schema";
 
 export const metadata: Metadata = {
   title: "Semeja Talks",
   description:
     "Semeja Talks — seminar & workshop komunitas Semeja Kerja untuk scale up bareng. Belajar dari praktisi internal maupun narasumber dari luar komunitas.",
+  alternates: { canonical: "/talks" },
+  openGraph: { url: "/talks" },
 };
 
 const benefits = [
@@ -36,6 +40,20 @@ const topics = [
 export default function TalksPage() {
   return (
     <div className={styles.page}>
+      <JsonLd
+        data={webPageSchema({
+          name: "Semeja Talks — Seminar & Workshop Komunitas",
+          description:
+            "Semeja Talks — seminar & workshop komunitas Semeja Kerja untuk scale up bareng, dari praktisi internal maupun narasumber luar.",
+          path: "/talks",
+        })}
+      />
+      <JsonLd
+        data={breadcrumbSchema([
+          { name: "Semeja Kerja", path: "/" },
+          { name: "Semeja Talks", path: "/talks" },
+        ])}
+      />
       {/* Hero */}
       <section className={styles.hero}>
         <div className={styles.heroOverlay} />

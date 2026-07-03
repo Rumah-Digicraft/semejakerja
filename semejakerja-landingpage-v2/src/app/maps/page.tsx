@@ -2,11 +2,16 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { MapPin, ExternalLink, Coffee, Wifi, Clock } from "lucide-react";
 import styles from "./maps.module.css";
+import JsonLd from "../components/JsonLd";
+import { breadcrumbSchema, webPageSchema } from "@/lib/schema";
+import { MAPS_URL } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Maps Kafe",
   description:
     "Temukan kafe-kafe terbaik untuk WFC di Purwokerto. Peta interaktif dengan filter fasilitas, rating, dan jam buka.",
+  alternates: { canonical: "/maps" },
+  openGraph: { url: "/maps" },
 };
 
 const cafes = [
@@ -20,6 +25,20 @@ const cafes = [
 export default function MapsPage() {
   return (
     <div className={styles.page}>
+      <JsonLd
+        data={webPageSchema({
+          name: "Peta Cafe WFC Purwokerto",
+          description:
+            "Peta interaktif 350+ cafe untuk WFC di Purwokerto: fasilitas, Wi-Fi, jam buka, dan rating dari komunitas Semeja Kerja.",
+          path: "/maps",
+        })}
+      />
+      <JsonLd
+        data={breadcrumbSchema([
+          { name: "Semeja Kerja", path: "/" },
+          { name: "Maps Kafe", path: "/maps" },
+        ])}
+      />
       {/* Hero */}
       <section className={styles.hero}>
         <div className={styles.heroOverlay} />
@@ -37,7 +56,7 @@ export default function MapsPage() {
             dan rating dari komunitas.
           </p>
           <a
-            href="https://semejakerja-web-apps.vercel.app"
+            href={MAPS_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn--primary btn--large"
