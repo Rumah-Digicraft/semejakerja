@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { STUDENT_MEMBERSHIP_ENABLED } from "@/lib/flags";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import styles from "../auth.module.css";
 
@@ -296,20 +297,22 @@ function RegisterForm() {
             )}
           </div>
 
-          <div className={styles.checkboxGroup}>
-            <input
-              id="isStudent"
-              type="checkbox"
-              className={styles.checkbox}
-              checked={isStudent}
-              onChange={(e) => setIsStudent(e.target.checked)}
-            />
-            <label htmlFor="isStudent" className={styles.checkboxLabel}>
-              <strong>Saya adalah Mahasiswa Aktif 🎓</strong>
-              Centang ini jika kamu masih mahasiswa. Kamu berhak mendapat diskon
-              untuk membership premium. (KTM akan diverifikasi nanti)
-            </label>
-          </div>
+          {STUDENT_MEMBERSHIP_ENABLED && (
+            <div className={styles.checkboxGroup}>
+              <input
+                id="isStudent"
+                type="checkbox"
+                className={styles.checkbox}
+                checked={isStudent}
+                onChange={(e) => setIsStudent(e.target.checked)}
+              />
+              <label htmlFor="isStudent" className={styles.checkboxLabel}>
+                <strong>Saya adalah Mahasiswa Aktif 🎓</strong>
+                Centang ini jika kamu masih mahasiswa. Kamu berhak mendapat diskon
+                untuk membership premium. (KTM akan diverifikasi nanti)
+              </label>
+            </div>
+          )}
 
           <button
             type="submit"

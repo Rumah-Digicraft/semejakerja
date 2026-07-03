@@ -10,8 +10,8 @@ export default function MembershipPage() {
   const [isAnnual, setIsAnnual] = useState(false);
 
   // Pricing based on Triwulan vs Bulanan (Triwulan is 3 months)
-  const priceNongkrong = isAnnual ? "85.000" : "31.000";
-  const priceSerius = isAnnual ? "185.000" : "69.000";
+  const priceNongkrong = isAnnual ? "47.000" : "19.000";
+  const priceSerius = isAnnual ? "77.000" : "31.000";
   const periodLabel = isAnnual ? "/triwulan" : "/bln";
   const linkParams = isAnnual ? "?period=triwulan" : "?period=bulanan";
 

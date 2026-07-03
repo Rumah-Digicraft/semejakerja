@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { STUDENT_MEMBERSHIP_ENABLED } from "@/lib/flags";
 import type { User } from "@supabase/supabase-js";
 import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import styles from "./checkout.module.css";
@@ -48,8 +49,8 @@ function CheckoutContent() {
 
   // Pricing Logic
   const getBasePrice = () => {
-    if (tierParam === "nongkrong") return periodParam === "triwulan" ? 85000 : 31000;
-    if (tierParam === "mode_serius") return periodParam === "triwulan" ? 185000 : 69000;
+    if (tierParam === "nongkrong") return periodParam === "triwulan" ? 47000 : 19000;
+    if (tierParam === "mode_serius") return periodParam === "triwulan" ? 77000 : 31000;
     return 0;
   };
 
@@ -88,7 +89,7 @@ function CheckoutContent() {
     setDiscountPercent(promo.discount_percent);
     setPromoStatus("success");
     setPromoMsg(
-      promo.type === "student"
+      promo.type === "student" && STUDENT_MEMBERSHIP_ENABLED
         ? `Promo pelajar berhasil! Diskon ${promo.discount_percent}% (khusus mahasiswa terverifikasi)`
         : `Promo berhasil digunakan! Diskon ${promo.discount_percent}%`
     );
@@ -202,7 +203,9 @@ function CheckoutContent() {
               </div>
 
               <div className={styles.promoSection}>
-                <label className={styles.promoLabel}>Kode Promo / Student Code</label>
+                <label className={styles.promoLabel}>
+                  {STUDENT_MEMBERSHIP_ENABLED ? "Kode Promo / Student Code" : "Kode Promo"}
+                </label>
                 <div className={styles.promoInputGroup}>
                   <input 
                     type="text" 

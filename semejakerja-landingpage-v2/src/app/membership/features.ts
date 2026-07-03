@@ -11,8 +11,8 @@ export interface Feature {
 // `serius` here maps to the DB tier `mode_serius`.
 export const features: Feature[] = [
   { name: "Daftar & join Regularan", nyantai: true, nongkrong: true, serius: true },
-  { name: "Maps basic (nama, alamat, jam buka)", nyantai: true, nongkrong: true, serius: true },
-  { name: "Maps lengkap (filter, fasilitas, foto)", nyantai: false, nongkrong: true, serius: true },
+  { name: "Maps basic (jam buka, harga, speed test, ulasan member)", nyantai: true, nongkrong: true, serius: true },
+  { name: "Maps lengkap (semua filter & detail fasilitas)", nyantai: false, nongkrong: true, serius: true },
   { name: "Real-time slot ketersediaan WFC", nyantai: false, nongkrong: true, serius: true },
   { name: "Crowdsource Maps (submit/edit data)", nyantai: false, nongkrong: true, serius: true },
   { name: "Diskon 10% di Cafe Mitra", nyantai: false, nongkrong: true, serius: true },

@@ -24,6 +24,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { STUDENT_MEMBERSHIP_ENABLED } from "@/lib/flags";
 import {
   benefitsForTier,
   tierLabels,
@@ -488,7 +489,7 @@ function ProfileCard({
               {profile?.nickname && (
                 <p className={styles.profileNick}>“{profile.nickname}”</p>
               )}
-              {profile?.is_student && (
+              {STUDENT_MEMBERSHIP_ENABLED && profile?.is_student && (
                 <span
                   className={`${styles.studentBadge} ${
                     profile.student_verified_at ? styles.verified : styles.unverified
