@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { parseOpenStatus } from '../lib/openHours';
-import type { Cafe, CafeCategory, CafeTier, CafeRow } from '../types/cafe';
+import type { Cafe, CafeCategory, CafeFacility, CafeTier, CafeRow } from '../types/cafe';
 
 // ---------- helpers ----------
 
@@ -19,7 +19,7 @@ const CATEGORY_COLOR: Record<CafeCategory, string> = {
   regular: '#a855f7',   // Purple-500
 };
 
-const DEFAULT_FACILITIES = {
+const DEFAULT_FACILITIES: CafeFacility = {
   wifi: false,
   ac: false,
   powerOutlets: false,
@@ -27,6 +27,45 @@ const DEFAULT_FACILITIES = {
   motorParking: false,
   carParking: false,
 };
+
+// Peta chip editor admin lama (array string) → key objek client.
+const LEGACY_FACILITY_MAP: Record<string, keyof CafeFacility> = {
+  'WiFi': 'wifi',
+  'AC': 'ac',
+  'Stopkontak': 'powerOutlets',
+  'Mushola': 'mushola',
+  'Parkir Motor': 'motorParking',
+  'Parkir Mobil': 'carParking',
+};
+
+// cafes.facilities di DB bisa objek 6-boolean (bentuk kanonik sejak
+// migration 015), string JSON, atau array string legacy — normalkan semua.
+function normalizeFacilities(raw: unknown): CafeFacility {
+  let value = raw;
+  if (typeof value === 'string') {
+    try { value = JSON.parse(value); } catch { return DEFAULT_FACILITIES; }
+  }
+  if (Array.isArray(value)) {
+    const result = { ...DEFAULT_FACILITIES };
+    for (const item of value) {
+      const key = LEGACY_FACILITY_MAP[String(item)];
+      if (key) result[key] = true;
+    }
+    return result;
+  }
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    return {
+      wifi: Boolean(obj.wifi),
+      ac: Boolean(obj.ac),
+      powerOutlets: Boolean(obj.powerOutlets),
+      mushola: Boolean(obj.mushola),
+      motorParking: Boolean(obj.motorParking),
+      carParking: Boolean(obj.carParking),
+    };
+  }
+  return DEFAULT_FACILITIES;
+}
 
 // ---------- mapper ----------
 
@@ -101,9 +140,9 @@ function mapRowToCafe(row: CafeRow): Cafe {
     lng: row.lng,
     rating: parseFloat(String(row.rating)) || 0,
     reviewCount: row.total_reviews ?? 0,
-    wifiSpeed: 0,      // not yet in DB — will be enriched later
-    vibes: 3,          // default mid — will be enriched later
-    facilities: DEFAULT_FACILITIES,
+    wifiSpeed: parseFloat(String(row.wifi_speed_mbps ?? '')) || 0,
+    vibes: Math.min(5, Math.max(1, Math.round(Number(row.vibes)) || 3)),
+    facilities: normalizeFacilities(row.facilities),
     openHours: todayStatus,
     schedule,
     isOpenNow: isOpenNow,
@@ -127,14 +166,20 @@ function mapRowToCafe(row: CafeRow): Cafe {
 
 // ---------- fetcher ----------
 
+// Only the columns mapRowToCafe reads — select('*') doubles the payload
+// (~396 KB vs ~191 KB for 390 cafes), which mobile users pay on every load.
+const CAFE_COLUMNS =
+  'id,name,lat,lng,rating,total_reviews,tier,is_partner,open_hours,weekday_text,' +
+  'address,price_level,phone,website,discount_value,clicks,facilities,vibes,wifi_speed_mbps';
+
 async function fetchCafes(): Promise<Cafe[]> {
   const { data, error } = await supabase
     .from('cafes')
-    .select('*')
+    .select(CAFE_COLUMNS)
     .order('total_reviews', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return (data as CafeRow[]).map(mapRowToCafe);
+  return (data as unknown as CafeRow[]).map(mapRowToCafe);
 }
 
 // ---------- hook ----------

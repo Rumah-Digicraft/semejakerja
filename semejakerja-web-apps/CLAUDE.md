@@ -31,7 +31,7 @@ npm run preview    # preview production build
 ## Key domain notes
 
 - **Two cafe shapes in `types/cafe.ts`**: `CafeRow` is the raw Supabase row; `Cafe` is the mapped UI model. A mapper fills safe defaults for columns not yet in the DB — keep new fields flowing through that mapper, don't read raw rows in components. Note Supabase returns `numeric` as a string.
-- `facilities` on the UI `Cafe` is a structured object (`wifi`, `ac`, `powerOutlets`, `mushola`, `motorParking`, `carParking`). ⚠️ In `semejakerja-admin` the same DB column is typed as `string[]` — the two apps model it differently.
+- `facilities` is a structured object (`wifi`, `ac`, `powerOutlets`, `mushola`, `motorParking`, `carParking`) — since migration 015 this 6-boolean object is the canonical DB shape shared with `semejakerja-admin`. Legacy string-array rows are still normalized defensively in `useCafes.ts`.
 - `vibes` is 1 (tenang) … 5 (ramai), default 3 until enriched.
 - Cafe clicks are tracked optimistically via the `increment_cafe_clicks` Supabase RPC, with a direct-update fallback (see `App.tsx`).
 - **Supabase schema** lives in `../semejakerja-admin/supabase/migrations/` — this app has no migrations of its own.

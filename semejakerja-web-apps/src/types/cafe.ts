@@ -25,6 +25,11 @@ export interface CafeRow {
   top_review: string | null;
   clicks: number;
   created_at: string;
+  // Kolom enrichment (migration 015) — facilities bisa objek 6-boolean,
+  // string JSON, atau array string legacy; selalu lewat normalizeFacilities.
+  facilities?: unknown;
+  vibes?: number | null;
+  wifi_speed_mbps?: number | string | null;
 }
 
 export interface CafeFacility {
