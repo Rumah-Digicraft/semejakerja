@@ -198,6 +198,15 @@ export interface AdminRoleRecord {
   created_at: string
 }
 
+// Baris hasil RPC admin_list_admins (admin_roles ⋈ auth.users),
+// dikonsumsi halaman /admins lewat /api/admins.
+export interface AdminUser {
+  user_id: string
+  email: string
+  role: AdminRole
+  created_at: string
+}
+
 // ── CASHFLOW (from semejamoves-web-apps) ─────────────────────────────────
 export interface CashflowEntry {
   id: string
