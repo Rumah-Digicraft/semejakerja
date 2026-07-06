@@ -1,11 +1,22 @@
 // ── CAFE & MAPS ──────────────────────────────────────────────────────────
+// Bentuk yang sama dengan CafeFacility di semejakerja-web-apps —
+// 6 boolean camelCase, disimpan apa adanya di kolom jsonb cafes.facilities.
+export interface CafeFacilities {
+  wifi: boolean
+  ac: boolean
+  powerOutlets: boolean
+  mushola: boolean
+  motorParking: boolean
+  carParking: boolean
+}
+
 export interface Cafe {
   id: string
   name: string
   address: string
   lat: number
   lng: number
-  location: string
+  location: string | null
   rating: number
   total_reviews: number
   price_level: number
@@ -16,8 +27,29 @@ export interface Cafe {
   discount_value: number | null
   open_hours: string | null
   weekday_text: string[] | null
-  facilities: string[] | null
+  // Baris lama bisa masih berbentuk array string / string JSON —
+  // selalu baca lewat normalizeFacilities() dari maps/cafes/lib.ts.
+  facilities: CafeFacilities | null
+  vibes: number
+  wifi_speed_mbps: number | null
+  clicks: number
   top_review: string | null
+  created_at: string
+}
+
+// Baris tabel speed_tests (migration 005) — ditulis peta publik,
+// dibaca panel Speedtest di editor kafe. Numeric bisa datang sebagai
+// string dari PostgREST — bungkus Number() sebelum dihitung.
+export interface SpeedTest {
+  id: string
+  cafe_id: string
+  download_mbps: number
+  upload_mbps: number
+  latency_ms: number | null
+  user_lat: number
+  user_lng: number
+  distance_m: number
+  gps_accuracy_m: number | null
   created_at: string
 }
 

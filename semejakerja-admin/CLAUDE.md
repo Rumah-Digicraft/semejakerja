@@ -37,7 +37,7 @@ npm run lint     # eslint
 ## Key domain notes
 
 - **Moderation model**: community contributions arrive as `CafeSubmission` (new cafe), `CafeEdit` (suggested edits), `CafeReview`, and `CafePhoto`, each with `status: 'pending' | 'approved' | 'rejected'` and reviewer metadata. The moderation screen approves/rejects these into the live `cafes` table.
-- On the `Cafe` type here, `facilities` is `string[] | null` — this **differs** from `semejakerja-web-apps`, which models facilities as a structured boolean object. Reconcile carefully when moving data between the two.
+- `cafes.facilities` is a 6-boolean object (`wifi`, `ac`, `powerOutlets`, `mushola`, `motorParking`, `carParking`) — canonical since migration 015 and shared with `semejakerja-web-apps`. Legacy rows may still hold a string array; always read via `normalizeFacilities()` in `app/(dashboard)/maps/cafes/lib.ts`.
 - `SUPABASE_SERVICE_ROLE_KEY` is a **server-only** secret — only use it in server code (`lib/supabase/server.ts` / route handlers), never expose it to the client.
 
 ## Env
