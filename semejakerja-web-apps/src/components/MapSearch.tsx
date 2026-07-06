@@ -56,7 +56,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ cafes, onCafeClick }) => {
         </div>
         <input
           type="text"
-          className="w-full bg-white/90 backdrop-blur-md border border-white shadow-lg rounded-2xl py-3 pl-11 pr-10 text-sm font-medium text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+          className="w-full bg-white/95 sm:bg-white/90 sm:backdrop-blur-md border border-white shadow-lg rounded-2xl py-3 pl-11 pr-10 text-sm font-medium text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
           placeholder="Cari nama cafe atau lokasi..."
           value={query}
           onChange={(e) => {
@@ -76,7 +76,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ cafes, onCafeClick }) => {
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white sm:bg-white/95 sm:backdrop-blur-xl rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in">
           {!query.trim() && (
             <div className="px-4 py-3 bg-gray-50/80 border-b border-gray-100 flex items-center gap-2">
               <TrendingUp size={14} className="text-purple-600" />

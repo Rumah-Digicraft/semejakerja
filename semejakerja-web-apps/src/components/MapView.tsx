@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import { ZoomIn, ZoomOut, Compass, MapPin, Navigation } from 'lucide-react';
 import L from 'leaflet';
 import type { Cafe, FilterState } from '../types/cafe';
@@ -53,21 +53,21 @@ const MapControls: React.FC<{
         <button
           onClick={() => map.zoomIn()}
           title="Zoom In"
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/90 backdrop-blur-md text-purple-600 hover:text-purple-800"
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/95 sm:bg-white/90 sm:backdrop-blur-md text-purple-600 hover:text-purple-800"
         >
           <ZoomIn size={16} />
         </button>
         <button
           onClick={() => map.zoomOut()}
           title="Zoom Out"
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/90 backdrop-blur-md text-purple-600 hover:text-purple-800"
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/95 sm:bg-white/90 sm:backdrop-blur-md text-purple-600 hover:text-purple-800"
         >
           <ZoomOut size={16} />
         </button>
         <button
           onClick={() => map.flyTo([-7.4245, 109.2302], 14)}
           title="Reset View"
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/90 backdrop-blur-md text-purple-600 hover:text-purple-800"
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/95 sm:bg-white/90 sm:backdrop-blur-md text-purple-600 hover:text-purple-800"
         >
           <Compass size={16} />
         </button>
@@ -75,14 +75,14 @@ const MapControls: React.FC<{
           onClick={handleLocateMe}
           title="Lokasi Saya"
           disabled={isLocating}
-          className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/90 backdrop-blur-md ${userLocation ? 'text-blue-600' : 'text-slate-600 hover:text-blue-600'} ${isLocating ? 'animate-pulse' : ''}`}
+          className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/95 sm:bg-white/90 sm:backdrop-blur-md ${userLocation ? 'text-blue-600' : 'text-slate-600 hover:text-blue-600'} ${isLocating ? 'animate-pulse' : ''}`}
         >
           <Navigation size={16} className={userLocation ? 'fill-current' : ''} />
         </button>
       </div>
 
       {/* Cafe count badge */}
-      <div className="absolute bottom-6 sm:bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-sm font-semibold shadow-xl bg-white/90 backdrop-blur-md z-[400]">
+      <div className="absolute bottom-6 sm:bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-sm font-semibold shadow-xl bg-white/95 sm:bg-white/90 sm:backdrop-blur-md z-[400]">
         <MapPin size={14} className="text-purple-600" />
         <span className="text-gray-600">
           <span className="font-bold text-gray-900">{filteredCount}</span>
@@ -96,7 +96,7 @@ const MapControls: React.FC<{
       </div>
 
       {/* Attribution */}
-      <div className="absolute bottom-1 right-2 sm:right-6 sm:bottom-2 px-2 py-1 rounded-md pointer-events-none text-[10px] font-medium text-gray-500 z-[400] bg-white/60 backdrop-blur-sm">
+      <div className="absolute bottom-1 right-2 sm:right-6 sm:bottom-2 px-2 py-1 rounded-md pointer-events-none text-[10px] font-medium text-gray-500 z-[400] bg-white/80 sm:bg-white/60 sm:backdrop-blur-sm">
         © Peta Cafe Purwokerto • Semeja Kerja
       </div>
     </>
@@ -112,8 +112,85 @@ const FlyToCafe: React.FC<{ cafe: Cafe | null }> = ({ cafe }) => {
   return null;
 };
 
+// Reports the settled viewport (moveend fires after pan, zoom and flyTo) so
+// MapView can cull markers. Panning itself never re-renders React.
+const ViewportWatcher: React.FC<{
+  onChange: (bounds: L.LatLngBounds, zoom: number) => void;
+}> = ({ onChange }) => {
+  const map = useMapEvents({
+    moveend: () => onChange(map.getBounds(), map.getZoom()),
+  });
+  React.useEffect(() => {
+    onChange(map.getBounds(), map.getZoom());
+  }, [map, onChange]);
+  return null;
+};
+
+// One marker per cafe, memoized: re-renders only when the cafe object or the
+// click handler actually changes, never from unrelated MapView state.
+const CafeMarker = React.memo(function CafeMarker({
+  cafe,
+  onCafeClick,
+}: {
+  cafe: Cafe;
+  onCafeClick: (cafe: Cafe) => void;
+}) {
+  const tier = getMarkerTier(cafe);
+  return (
+    <Marker
+      position={[cafe.lat, cafe.lng]}
+      icon={createMarkerIcon(cafe, tier)}
+      zIndexOffset={getZIndexOffset(tier)}
+      eventHandlers={{
+        click: () => onCafeClick(cafe),
+      }}
+    >
+      <Popup className="custom-popup" closeButton={false}>
+        <div className="p-1 min-w-[200px]">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <h3 className="font-bold text-gray-900 text-sm m-0 leading-tight">{cafe.name}</h3>
+            {cafe.isMitraSemejaKerja && (
+              <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                Mitra SK
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 mb-3 text-xs text-gray-500 font-medium">
+            <span className="text-yellow-500 font-bold">★ {cafe.rating}</span>
+            <span>({cafe.reviewCount})</span>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCafeClick(cafe);
+            }}
+            className="w-full py-2 rounded-lg bg-purple-600 text-white text-xs font-bold hover:bg-purple-700 transition-colors shadow-sm"
+          >
+            Lihat Detail
+          </button>
+        </div>
+      </Popup>
+    </Marker>
+  );
+});
+
+// At far zoom-out every cafe sits in the viewport, so cap the basic-tier pins
+// to the most popular ones (cafes arrive sorted by total_reviews). At the
+// default zoom (14) and closer, nothing is capped — the map looks exactly as
+// before. Special tiers and the selected cafe always render.
+function maxBasicPins(zoom: number): number {
+  if (zoom >= 14) return Infinity;
+  if (zoom === 13) return 200;
+  return 120;
+}
+
 const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeClick }) => {
   const [userLocation, setUserLocation] = React.useState<[number, number] | null>(null);
+  const [viewport, setViewport] = React.useState<{ bounds: L.LatLngBounds; zoom: number } | null>(null);
+
+  const handleViewportChange = React.useCallback((bounds: L.LatLngBounds, zoom: number) => {
+    setViewport({ bounds, zoom });
+  }, []);
 
   // Custom icon for user location (blue dot)
   const userIcon = useMemo(() => {
@@ -145,6 +222,27 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeC
     });
   }, [cafes, filters]);
 
+  // Cull markers to the settled viewport (padded so pins don't pop in at the
+  // edges mid-pan) and cap basic pins at far zoom-out. Before the first
+  // moveend (viewport === null) only the zoom cap applies.
+  const visibleCafes = useMemo(() => {
+    const bounds = viewport ? viewport.bounds.pad(0.3) : null;
+    const maxBasic = maxBasicPins(viewport?.zoom ?? 14);
+    let basicCount = 0;
+    const visible: Cafe[] = [];
+    for (const cafe of filteredCafes) {
+      if (getMarkerTier(cafe) !== 'basic' || cafe.id === selectedCafe?.id) {
+        visible.push(cafe);
+        continue;
+      }
+      if (bounds && !bounds.contains([cafe.lat, cafe.lng])) continue;
+      if (basicCount >= maxBasic) continue;
+      basicCount++;
+      visible.push(cafe);
+    }
+    return visible;
+  }, [filteredCafes, viewport, selectedCafe]);
+
   // Center of Purwokerto
   const position: [number, number] = [-7.4245, 109.2302];
 
@@ -161,92 +259,15 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeC
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
 
-        {filteredCafes.filter(cafe => getMarkerTier(cafe) !== 'sponsor').map(cafe => {
-          const tier = getMarkerTier(cafe);
-          return (
-            <Marker
-              key={cafe.id}
-              position={[cafe.lat, cafe.lng]}
-              icon={createMarkerIcon(cafe, tier)}
-              zIndexOffset={getZIndexOffset(tier)}
-              eventHandlers={{
-                click: () => onCafeClick(cafe),
-              }}
-            >
-              <Popup className="custom-popup" closeButton={false}>
-                <div className="p-1 min-w-[200px]">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <h3 className="font-bold text-gray-900 text-sm m-0 leading-tight">{cafe.name}</h3>
-                    {cafe.isMitraSemejaKerja && (
-                      <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
-                        Mitra SK
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 mb-3 text-xs text-gray-500 font-medium">
-                    <span className="text-yellow-500 font-bold">★ {cafe.rating}</span>
-                    <span>({cafe.reviewCount})</span>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCafeClick(cafe);
-                    }}
-                    className="w-full py-2 rounded-lg bg-purple-600 text-white text-xs font-bold hover:bg-purple-700 transition-colors shadow-sm"
-                  >
-                    Lihat Detail
-                  </button>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
-
-        {/* Tier 4 Sponsor — always individual, never clustered */}
-        {filteredCafes.filter(cafe => getMarkerTier(cafe) === 'sponsor').map(cafe => {
-          const tier = getMarkerTier(cafe);
-          return (
-            <Marker
-              key={cafe.id}
-              position={[cafe.lat, cafe.lng]}
-              icon={createMarkerIcon(cafe, tier)}
-              zIndexOffset={getZIndexOffset(tier)}
-              eventHandlers={{
-                click: () => onCafeClick(cafe),
-              }}
-            >
-              <Popup className="custom-popup" closeButton={false}>
-                <div className="p-1 min-w-[200px]">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <h3 className="font-bold text-gray-900 text-sm m-0 leading-tight">{cafe.name}</h3>
-                    {cafe.isMitraSemejaKerja && (
-                      <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
-                        Mitra SK
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 mb-3 text-xs text-gray-500 font-medium">
-                    <span className="text-yellow-500 font-bold">★ {cafe.rating}</span>
-                    <span>({cafe.reviewCount})</span>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCafeClick(cafe);
-                    }}
-                    className="w-full py-2 rounded-lg bg-purple-600 text-white text-xs font-bold hover:bg-purple-700 transition-colors shadow-sm"
-                  >
-                    Lihat Detail
-                  </button>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+        {visibleCafes.map(cafe => (
+          <CafeMarker key={cafe.id} cafe={cafe} onCafeClick={onCafeClick} />
+        ))}
 
         <MapSearch cafes={cafes} onCafeClick={onCafeClick} />
 
         <FlyToCafe cafe={selectedCafe} />
+
+        <ViewportWatcher onChange={handleViewportChange} />
 
         {/* User Location Marker */}
         {userLocation && (
@@ -263,4 +284,5 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeC
   );
 };
 
-export default MapView;
+// Memoized so sidebar/modal/login state changes in App never touch the map.
+export default React.memo(MapView);

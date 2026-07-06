@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Routes, Route, useMatch, useNavigate } from 'react-router-dom';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -67,7 +67,9 @@ function MapApp() {
     return true;
   }).length;
 
-  const handleCafeClick = (cafe: Cafe) => {
+  // Stable identity (with MapView memoized) so sidebar/login/filter state
+  // changes don't cascade into re-rendering every marker.
+  const handleCafeClick = useCallback((cafe: Cafe) => {
     // If it's a new click (not just toggling off)
     if (selectedCafe?.id !== cafe.id) {
       // Optimistically increase click
@@ -86,7 +88,7 @@ function MapApp() {
     // On mobile the sidebar covers the screen, so close it when a cafe is
     // picked. On desktop it's a side panel that can stay open.
     if (window.innerWidth < 768) setSidebarOpen(false);
-  };
+  }, [selectedCafe, navigate]);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#e9ecef]">
@@ -152,7 +154,7 @@ function MapApp() {
       />
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/30 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}

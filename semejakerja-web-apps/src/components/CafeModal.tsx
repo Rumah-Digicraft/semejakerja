@@ -175,8 +175,10 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-40 md:hidden bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      {/* Backdrop. No backdrop-blur: it fades in while the map is still
+          flying to the tapped cafe, and re-blurring the animating map
+          janks on phones. */}
+      <div className="fixed inset-0 z-40 md:hidden bg-black/40" onClick={onClose} />
       <div className="fixed inset-0 z-40 hidden md:block" onClick={onClose} />
 
       {/* Panel:

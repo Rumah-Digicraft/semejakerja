@@ -111,9 +111,37 @@ export function getZIndexOffset(tier: MarkerTier): number {
   return TIER_CFG[tier].zOffset;
 }
 
-export function createMarkerIcon(cafe: Cafe, tier: MarkerTier = 'basic'): L.DivIcon {
+// Icons are cached module-wide so every render hands react-leaflet the SAME
+// instance. A new instance would trigger marker.setIcon(), which tears down
+// and recreates the marker's DOM node — for ~400 markers that freezes the map
+// on every interaction (filter, sidebar, modal). Only labeled tiers embed the
+// cafe name, so the cache stays tiny (basic/verified are shared per tier).
+const iconCache = new Map<string, L.Icon | L.DivIcon>();
+
+export function createMarkerIcon(cafe: Cafe, tier: MarkerTier = 'basic'): L.Icon | L.DivIcon {
   const cfg = TIER_CFG[tier];
+  const cacheKey = cfg.hasLabel ? `${tier}:${cafe.name}` : tier;
+  const cached = iconCache.get(cacheKey);
+  if (cached) return cached;
+  const icon = buildIcon(cafe, cfg);
+  iconCache.set(cacheKey, icon);
+  return icon;
+}
+
+function buildIcon(cafe: Cafe, cfg: TierConfig): L.Icon | L.DivIcon {
   const { pinW, pinH, badgeText, badgeFontSize, hasPulse, hasLabel, fill, stroke } = cfg;
+
+  // Plain pins (basic tier — the vast majority) become a single <img> via an
+  // SVG data URI instead of a DivIcon's nested divs: ~1 DOM node per marker
+  // instead of ~4, which is what keeps pan/zoom smooth on phones.
+  if (!badgeText && !hasPulse && !hasLabel) {
+    return L.icon({
+      iconUrl: 'data:image/svg+xml,' + encodeURIComponent(buildPinSvg(cfg)),
+      iconSize: [pinW, pinH],
+      iconAnchor: [pinW / 2, pinH],
+      popupAnchor: [0, -pinH],
+    });
+  }
 
   const hasBadge = Boolean(badgeText);
   const badgeOffset = hasBadge ? BADGE_H : 0;
