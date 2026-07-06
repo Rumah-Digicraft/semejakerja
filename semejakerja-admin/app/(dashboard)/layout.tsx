@@ -5,87 +5,83 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { AdminRole } from '@/types'
+import { ALL_ROLES, allowedRolesFor } from '@/lib/access'
 import {
   LayoutDashboard, Map, Store, Shield, Users, Tag,
   Dumbbell, CalendarDays, UserCheck, Layers, Settings,
   Bike, Menu, X, LogOut, ChevronRight, TrendingUp,
-  BarChart2, MapPin, UsersRound, Activity, Wallet, Receipt
+  BarChart2, MapPin, UsersRound, Activity, Wallet, Receipt,
+  UserCog
 } from 'lucide-react'
 
 interface NavItem {
   href: string
   label: string
   icon: React.ReactNode
-  roles: AdminRole[]
 }
 
 interface NavGroup {
   label: string
   icon: React.ReactNode
   items: NavItem[]
-  roles: AdminRole[]
 }
 
+// Role per menu tidak di-hardcode di sini — sumbernya lib/access.ts
+// (ROUTE_ACCESS), yang juga dipakai proxy.ts sebagai gerbang route.
 const navGroups: NavGroup[] = [
   {
     label: 'Overview',
     icon: <BarChart2 size={14} />,
-    roles: ['super_admin', 'maps_admin', 'community_admin', 'moves_admin'],
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={16} />, roles: ['super_admin', 'maps_admin', 'community_admin', 'moves_admin'] },
+      { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={16} /> },
     ],
   },
   {
     label: 'Semeja Moves',
     icon: <Activity size={14} />,
-    roles: ['super_admin', 'moves_admin'],
     items: [
-      { href: '/moves/sessions', label: 'Jadwal & Sesi', icon: <CalendarDays size={16} />, roles: ['super_admin', 'moves_admin'] },
-      { href: '/moves/participants', label: 'Peserta', icon: <UserCheck size={16} />, roles: ['super_admin', 'moves_admin'] },
+      { href: '/moves/sessions', label: 'Jadwal & Sesi', icon: <CalendarDays size={16} /> },
+      { href: '/moves/participants', label: 'Peserta', icon: <UserCheck size={16} /> },
     ],
   },
   {
     label: 'Community',
     icon: <UsersRound size={14} />,
-    roles: ['super_admin', 'community_admin'],
     items: [
-      { href: '/community/members', label: 'Manajemen Member', icon: <Users size={16} />, roles: ['super_admin', 'community_admin'] },
-      { href: '/community/transactions', label: 'Transaksi Membership', icon: <Receipt size={16} />, roles: ['super_admin', 'community_admin'] },
-      { href: '/community/promo-codes', label: 'Promo Code', icon: <Tag size={16} />, roles: ['super_admin', 'community_admin'] },
+      { href: '/community/members', label: 'Manajemen Member', icon: <Users size={16} /> },
+      { href: '/community/transactions', label: 'Transaksi Membership', icon: <Receipt size={16} /> },
+      { href: '/community/promo-codes', label: 'Promo Code', icon: <Tag size={16} /> },
     ],
   },
   {
     label: 'Add-on Olahraga',
     icon: <Dumbbell size={14} />,
-    roles: ['super_admin', 'moves_admin'],
     items: [
-      { href: '/addon/manage', label: 'Kelola Add-on', icon: <Layers size={16} />, roles: ['super_admin', 'moves_admin'] },
-      { href: '/addon/subscribers', label: 'Subscriber & Drop-in', icon: <Bike size={16} />, roles: ['super_admin', 'moves_admin'] },
+      { href: '/addon/manage', label: 'Kelola Add-on', icon: <Layers size={16} /> },
+      { href: '/addon/subscribers', label: 'Subscriber & Drop-in', icon: <Bike size={16} /> },
     ],
   },
   {
     label: 'Maps Purwokerto',
     icon: <MapPin size={14} />,
-    roles: ['super_admin', 'maps_admin'],
     items: [
-      { href: '/maps/cafes', label: 'Data Kafe', icon: <Store size={16} />, roles: ['super_admin', 'maps_admin'] },
-      { href: '/maps/moderasi', label: 'Moderasi Komunitas', icon: <Shield size={16} />, roles: ['super_admin', 'maps_admin'] },
+      { href: '/maps/cafes', label: 'Data Kafe', icon: <Store size={16} /> },
+      { href: '/maps/moderasi', label: 'Moderasi Komunitas', icon: <Shield size={16} /> },
     ],
   },
   {
     label: 'Keuangan',
     icon: <Wallet size={14} />,
-    roles: ['super_admin'],
     items: [
-      { href: '/lapkeu', label: 'Laporan Keuangan', icon: <TrendingUp size={16} />, roles: ['super_admin'] },
+      { href: '/lapkeu', label: 'Laporan Keuangan', icon: <TrendingUp size={16} /> },
     ],
   },
   {
     label: 'Sistem',
     icon: <Settings size={14} />,
-    roles: ['super_admin'],
     items: [
-      { href: '/settings', label: 'Pengaturan', icon: <Settings size={16} />, roles: ['super_admin'] },
+      { href: '/settings', label: 'Pengaturan', icon: <Settings size={16} /> },
+      { href: '/admins', label: 'Manajemen Admin', icon: <UserCog size={16} /> },
     ],
   },
 ]
@@ -106,12 +102,14 @@ export function Sidebar({ userRole, userEmail, onClose }: SidebarProps) {
     router.push('/login')
   }
 
-  const canAccess = (roles: AdminRole[]) => {
+  const canAccess = (href: string) => {
     if (!userRole) return false
-    return roles.includes(userRole)
+    return (allowedRolesFor(href) ?? ALL_ROLES).includes(userRole)
   }
 
-  const filteredGroups = navGroups.filter(g => canAccess(g.roles))
+  const filteredGroups = navGroups
+    .map(g => ({ ...g, items: g.items.filter(item => canAccess(item.href)) }))
+    .filter(g => g.items.length > 0)
 
   return (
     <div className="flex flex-col h-full bg-slate-900 text-slate-300">
@@ -133,7 +131,7 @@ export function Sidebar({ userRole, userEmail, onClose }: SidebarProps) {
                 {group.label}
               </p>
             </div>
-            {group.items.filter(item => canAccess(item.roles)).map(item => {
+            {group.items.map(item => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               return (
                 <Link

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { canAccessPath } from '@/lib/access'
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -33,6 +34,9 @@ export async function proxy(request: NextRequest) {
   const isProtectedRoute = !isAuthPage && request.nextUrl.pathname !== '/'
 
   if (!user && isProtectedRoute) {
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Harus login' }, { status: 401 })
+    }
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
@@ -59,6 +63,19 @@ export async function proxy(request: NextRequest) {
     }
 
     if (isAuthPage) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
+
+    // Per-role route gate: the sidebar only hides links; this actually
+    // blocks a legit admin from other domains' pages. No signOut — they
+    // just belong on their own dashboard.
+    if (!canAccessPath(request.nextUrl.pathname, adminRole.role)) {
+      if (request.nextUrl.pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Akses ditolak' }, { status: 403 })
+      }
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       url.search = ''
