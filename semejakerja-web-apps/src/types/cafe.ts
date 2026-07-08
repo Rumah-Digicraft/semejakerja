@@ -29,7 +29,14 @@ export interface CafeRow {
   // string JSON, atau array string legacy; selalu lewat normalizeFacilities.
   facilities?: unknown;
   vibes?: number | null;
+  // Kecepatan internet (migration 017) — wifi_speed_mbps = DOWNLOAD.
   wifi_speed_mbps?: number | string | null;
+  wifi_upload_mbps?: number | string | null;
+  wifi_latency_ms?: number | string | null;
+  wifi_tested_at?: string | null;
+  // Kolom skala (migration 016) — jsonb { area, motorParking, carParking,
+  // outlets } 0-3; baris lama bisa null; selalu lewat normalizeScales.
+  scales?: unknown;
 }
 
 export interface CafeFacility {
@@ -39,6 +46,17 @@ export interface CafeFacility {
   mushola: boolean;
   motorParking: boolean;
   carParking: boolean;
+  meetingRoom: boolean;
+  outdoor: boolean;
+  heavyMeal: boolean;
+}
+
+// Skala ordinal 0-3 (0 = tidak ada / belum ada info) dari kolom cafes.scales.
+export interface CafeScale {
+  area: number;
+  motorParking: number;
+  carParking: number;
+  outlets: number;
 }
 
 export interface MenuItem {
@@ -54,9 +72,14 @@ export interface Cafe {
   lng: number;
   rating: number;
   reviewCount: number;
-  wifiSpeed: number;
+  // Kecepatan internet — 1 sumber (baris cafe), di-replace tiap update.
+  wifiDownload: number;
+  wifiUpload: number;
+  wifiLatency: number | null;
+  wifiTestedAt: string | null; // waktu pengukuran terakhir (cooldown global 10 mnt)
   vibes: number;           // 1 (tenang) to 5 (ramai) — default 3 until enriched
   facilities: CafeFacility;
+  scales: CafeScale;       // area/parkir/colokan 0-3 — default 0 until enriched
   openHours: string;
   schedule: string[];
   isOpenNow: boolean;
@@ -82,6 +105,11 @@ export interface FilterState {
   facilities: string[];
   vibesMin: number;
   vibesMax: number;
+  // Filter skala minimum (0 = tanpa filter). Kafe lolos kalau scale >= min.
+  areaMin: number;
+  motorParkingMin: number;
+  carParkingMin: number;
+  outletsMin: number;
   openNow: boolean;
   openNight: boolean;
   mitraSemejaKerja: boolean;

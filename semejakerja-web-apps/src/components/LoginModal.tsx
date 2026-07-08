@@ -1,33 +1,54 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Loader2, Eye, EyeOff, Coffee } from 'lucide-react';
+import { X, Loader2, Coffee } from 'lucide-react';
 
 interface LoginModalProps {
   onClose: () => void;
-  onSignIn: (email: string, password: string) => Promise<string | null>;
-  landingUrl: string;
+  onSignInWithGoogle: () => Promise<string | null>;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSignIn, landingUrl }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+// Multicolor Google "G" — inline so no external asset is fetched.
+function GoogleIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  );
+}
+
+export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSignInWithGoogle }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // If the user backs out of Google's account screen, the browser restores
+  // this page from the bfcache with loading still true — re-enable the button.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setLoading(false);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') setLoading(false);
+    };
+    window.addEventListener('pageshow', onPageShow);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('pageshow', onPageShow);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
+  const handleGoogle = async () => {
     setLoading(true);
     setError('');
-
-    const msg = await onSignIn(email, password);
+    const msg = await onSignInWithGoogle();
+    // On success the browser redirects to Google, so we won't reach here.
     if (msg) {
-      setError(msg === 'Invalid login credentials' ? 'Email atau password salah.' : msg);
+      setError(msg);
       setLoading(false);
-      return;
     }
-    // onAuthStateChange in useAuth updates the header; just close.
-    onClose();
   };
 
   // Portal to <body>: an ancestor with backdrop-filter (e.g. the glass-panel
@@ -55,76 +76,31 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSignIn, landi
           </div>
           <h2 className="text-lg font-extrabold text-gray-900">Masuk ke Semeja Kerja</h2>
           <p className="text-sm text-gray-500 mt-1 text-center">
-            Masuk untuk akses fitur member.
+            Masuk atau daftar cukup dengan Google untuk akses fitur member.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
-              <p className="text-red-600 text-sm font-medium">{error}</p>
-            </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-4">
+            <p className="text-red-600 text-sm font-medium">{error}</p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 py-3 rounded-xl bg-white border border-gray-200 text-gray-800 font-bold shadow-sm hover:bg-gray-50 hover:border-gray-300 disabled:opacity-60 transition-all"
+        >
+          {loading ? (
+            <><Loader2 size={18} className="animate-spin" /> Menghubungkan…</>
+          ) : (
+            <><GoogleIcon /> Lanjut dengan Google</>
           )}
+        </button>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5" htmlFor="login-email">
-              Email
-            </label>
-            <input
-              id="login-email"
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="nama@email.com"
-              className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent focus:bg-white transition"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5" htmlFor="login-password">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                id="login-password"
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-4 py-2.5 pr-11 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent focus:bg-white transition"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-purple-800 text-white font-bold shadow-md shadow-purple-500/30 hover:shadow-purple-500/50 disabled:opacity-60 transition-all"
-          >
-            {loading ? <><Loader2 size={18} className="animate-spin" /> Masuk...</> : 'Masuk'}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-gray-500 mt-5">
-          Belum punya akun?{' '}
-          <a
-            href={`${landingUrl}/auth/register`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-purple-600 font-semibold hover:underline"
-          >
-            Daftar Gratis
-          </a>
+        <p className="text-center text-xs text-gray-400 mt-5">
+          Akun otomatis dibuat saat pertama kali masuk dengan Google.
         </p>
       </div>
     </div>,

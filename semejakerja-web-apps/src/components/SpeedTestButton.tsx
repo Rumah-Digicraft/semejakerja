@@ -55,7 +55,7 @@ const SpeedTestButton: React.FC<SpeedTestButtonProps> = ({ cafe }) => {
         disabled
         className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
       >
-        <Clock3 size={14} /> Kamu baru saja test di sini · coba lagi {formatCooldown(cooldownMs)}
+        <Clock3 size={14} /> Baru saja ada yang test di sini · coba lagi {formatCooldown(cooldownMs)}
       </button>
     );
   }

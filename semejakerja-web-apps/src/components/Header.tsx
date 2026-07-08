@@ -24,7 +24,7 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
   const [showCommunity, setShowCommunity] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
-  const { user, profile, signIn, signOut, landingUrl } = useAuth();
+  const { user, profile, signInWithGoogle, signOut, landingUrl } = useAuth();
 
   const initial =
     (profile?.fullName || user?.email || 'S').trim().charAt(0).toUpperCase();
@@ -95,7 +95,7 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
                       <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200">Free</span>
                     </h3>
                     <p className="text-sm text-gray-500 leading-relaxed font-medium">
-                      Bergabung dengan ribuan member, akses diskon eksklusif di cafe mitra kami.
+                      Bergabung dengan ratusan member, akses diskon eksklusif di cafe mitra kami.
                     </p>
                   </div>
                 </div>
@@ -192,8 +192,7 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
       {showLogin && (
         <LoginModal
           onClose={() => setShowLogin(false)}
-          onSignIn={signIn}
-          landingUrl={landingUrl}
+          onSignInWithGoogle={signInWithGoogle}
         />
       )}
     </header>

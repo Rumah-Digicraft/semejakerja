@@ -5,6 +5,7 @@ import {
   Coffee, MapPin, Phone, ExternalLink,
   Pencil, MessageSquare, Camera, Users,
   ChevronDown, ChevronUp, Lock, Crown, LogIn,
+  Presentation, Trees, UtensilsCrossed, Maximize,
 } from 'lucide-react';
 import type { Cafe, CafeReview } from '../types/cafe';
 import type { MapsAccess } from '../hooks/useAuth';
@@ -35,14 +36,45 @@ const StarRating: React.FC<{ rating: number }> = ({ rating }) => {
   );
 };
 
+// Parkir & colokan tak lagi jadi chip — ditampilkan sebagai skala (scaleConfig).
 const facilityConfig: Record<string, { label: string; icon: React.FC<{ size?: number; style?: React.CSSProperties }>; color: string }> = {
   wifi: { label: 'WiFi Cepat', icon: Wifi, color: '#2563eb' },
-  powerOutlets: { label: 'Banyak Colokan', icon: Zap, color: '#d97706' },
   ac: { label: 'AC Sejuk', icon: Wind, color: '#0891b2' },
   mushola: { label: 'Mushola', icon: BookOpen, color: '#059669' },
-  motorParking: { label: 'Parkir Motor', icon: Bike, color: '#7c3aed' },
-  carParking: { label: 'Parkir Mobil', icon: Car, color: '#4f46e5' },
+  meetingRoom: { label: 'Ruang Meeting', icon: Presentation, color: '#7c3aed' },
+  outdoor: { label: 'Area Outdoor', icon: Trees, color: '#16a34a' },
+  heavyMeal: { label: 'Makanan Berat', icon: UtensilsCrossed, color: '#d97706' },
 };
+
+// Skala 0-3 → label per level (index 0 tak ditampilkan). Selaras SCALE_CONFIG admin.
+const scaleConfig: { key: 'area' | 'motorParking' | 'carParking' | 'outlets'; label: string; icon: React.FC<{ size?: number; style?: React.CSSProperties }>; levels: [string, string, string] }[] = [
+  { key: 'area', label: 'Luas Area', icon: Maximize, levels: ['Kecil', 'Sedang', 'Luas'] },
+  { key: 'motorParking', label: 'Parkir Motor', icon: Bike, levels: ['Sempit', 'Sedang', 'Luas'] },
+  { key: 'carParking', label: 'Parkir Mobil', icon: Car, levels: ['Sempit', 'Sedang', 'Luas'] },
+  { key: 'outlets', label: 'Colokan', icon: Zap, levels: ['Sedikit', 'Sedang', 'Banyak'] },
+];
+
+// Warna badge per level (1 abu, 2 amber, 3 hijau) — pola sama dg badge WiFi.
+const scaleBadge = (level: number) =>
+  level >= 3
+    ? { background: '#dcfce7', color: '#059669', border: '1px solid #bbf7d0' }
+    : level === 2
+      ? { background: '#fef9c3', color: '#d97706', border: '1px solid #fef08a' }
+      : { background: '#f3f4f6', color: '#4b5563', border: '1px solid #e5e7eb' };
+
+// "Diukur X lalu" untuk waktu tes terakhir.
+function formatTestedAt(iso: string): string {
+  const diffMs = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(diffMs) || diffMs < 0) return 'baru saja';
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return 'baru saja';
+  if (min < 60) return `${min} menit lalu`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} jam lalu`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day} hari lalu`;
+  return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 // ── Community Reviews Section ──────────────────────────────────────────────
 
@@ -172,6 +204,18 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
   const activeFacilities = Object.entries(cafe.facilities)
     .filter(([, val]) => val)
     .map(([key]) => key);
+
+  // Skala yang sudah terisi (level > 0); 0 = belum ada info → sembunyikan.
+  const activeScales = scaleConfig.filter(s => cafe.scales[s.key] > 0);
+
+  // Kecepatan internet: 1 sumber (baris cafe). Label & warna dari download.
+  const wd = cafe.wifiDownload;
+  const hasWifiData = cafe.wifiTestedAt != null || wd > 0;
+  const speedTone = wd >= 50
+    ? { bg: '#dcfce7', fg: '#059669', bd: '#bbf7d0', label: 'Super Cepat' }
+    : wd >= 25
+      ? { bg: '#fef9c3', fg: '#d97706', bd: '#fef08a', label: 'Stabil' }
+      : { bg: '#fee2e2', fg: '#dc2626', bd: '#fecaca', label: 'Standar' };
 
   return (
     <>
@@ -365,6 +409,28 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
                   );
                 })}
               </div>
+
+              {/* Ukuran & Kapasitas — skala 0-3 (area, parkir, colokan) */}
+              {activeScales.length > 0 && (
+                <>
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Ukuran &amp; Kapasitas</h3>
+                  <div className="space-y-2">
+                    {activeScales.map(s => {
+                      const level = cafe.scales[s.key];
+                      const Icon = s.icon;
+                      return (
+                        <div key={s.key} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-gray-50/80 border border-gray-100">
+                          <Icon size={14} style={{ color: '#7c3aed' }} />
+                          <span className="text-xs font-semibold text-gray-700">{s.label}</span>
+                          <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full" style={scaleBadge(level)}>
+                            {s.levels[level - 1]}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
             {facilitiesLocked && (
               <div className="absolute inset-0 z-10 flex items-center justify-center px-4">
@@ -380,33 +446,50 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
             )}
           </div>
 
-          {/* Internet Speed + Live Speed Test — semua member */}
-          <div className="pt-5 border-t border-gray-100">
-            <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-blue-50/50 border border-blue-100">
-              <div className="w-8 h-8 rounded-xl bg-blue-100/80 flex items-center justify-center flex-shrink-0">
-                <Gauge size={16} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Kecepatan Internet</p>
-                <p className="text-base font-black text-blue-700">{cafe.wifiSpeed} Mbps</p>
-              </div>
-              <div className="ml-auto">
-                <div
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"
-                  style={{
-                    background: cafe.wifiSpeed >= 50 ? '#dcfce7' : cafe.wifiSpeed >= 25 ? '#fef9c3' : '#fee2e2',
-                    color: cafe.wifiSpeed >= 50 ? '#059669' : cafe.wifiSpeed >= 25 ? '#d97706' : '#dc2626',
-                    border: `1px solid ${cafe.wifiSpeed >= 50 ? '#bbf7d0' : cafe.wifiSpeed >= 25 ? '#fef08a' : '#fecaca'}`,
-                  }}
-                >
-                  {cafe.wifiSpeed >= 50 ? 'Super Cepat' : cafe.wifiSpeed >= 25 ? 'Stabil' : 'Standar'}
+          {/* Kecepatan Internet — 1 kartu: nilai tersimpan (Download/Upload) + live test */}
+          <div className="pt-5 border-t border-gray-100 space-y-3">
+            <div className="px-3 py-3 rounded-xl bg-blue-50/50 border border-blue-100">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-100/80 flex items-center justify-center flex-shrink-0">
+                  <Gauge size={16} className="text-blue-600" />
                 </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Kecepatan Internet</p>
+                  {hasWifiData ? (
+                    <div className="flex items-center gap-5 mt-1">
+                      <div>
+                        <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Download</span>
+                        <p className="text-base font-black text-blue-700 leading-none">
+                          {cafe.wifiDownload.toFixed(1)} <span className="text-xs font-bold">Mbps</span>
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Upload</span>
+                        <p className="text-base font-black text-blue-700 leading-none">
+                          {cafe.wifiUpload.toFixed(1)} <span className="text-xs font-bold">Mbps</span>
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs font-semibold text-blue-700/70 mt-0.5">Belum ada data — jalankan test di lokasi</p>
+                  )}
+                </div>
+                {hasWifiData && (
+                  <div
+                    className="self-start text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"
+                    style={{ background: speedTone.bg, color: speedTone.fg, border: `1px solid ${speedTone.bd}` }}
+                  >
+                    {speedTone.label}
+                  </div>
+                )}
               </div>
+              {hasWifiData && (cafe.wifiLatency != null || cafe.wifiTestedAt) && (
+                <div className="flex items-center gap-3 mt-2 pl-11 text-[11px] font-medium text-blue-600/70">
+                  {cafe.wifiLatency != null && <span>Latency {Math.round(cafe.wifiLatency)} ms</span>}
+                  {cafe.wifiTestedAt && <span>Diukur {formatTestedAt(cafe.wifiTestedAt)}</span>}
+                </div>
+              )}
             </div>
-          </div>
-
-          {/* Live Speed Test */}
-          <div className="pt-5 border-t border-gray-100">
             <SpeedTestButton cafe={cafe} />
           </div>
 

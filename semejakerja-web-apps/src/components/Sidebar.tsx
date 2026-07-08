@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
   Wifi, Zap, Wind, BookOpen, Bike, Car,
-  Volume2, VolumeX, Clock, CheckCircle2, Star,
+  Volume2, VolumeX, Clock, CheckCircle2, Moon,
   SlidersHorizontal, X, PlusCircle, LogIn, Crown, Lock,
+  Presentation, Trees, UtensilsCrossed, Maximize,
 } from 'lucide-react';
 import type { FilterState } from '../types/cafe';
 import type { MapsAccess } from '../hooks/useAuth';
@@ -25,19 +26,47 @@ interface FacilityOption {
   icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
 }
 
-// Filter fasilitas untuk tier Free (Nyantai).
+// Filter fasilitas untuk tier Free (Nyantai). Parkir/colokan pindah ke
+// slider skala (ScaleFilter) — di sini tinggal amenity boolean.
 const freeFacilityOptions: FacilityOption[] = [
-  { id: 'motorParking', label: 'Parkir Motor', icon: Bike },
-  { id: 'carParking', label: 'Parkir Mobil', icon: Car },
   { id: 'mushola', label: 'Mushola', icon: BookOpen },
+  { id: 'outdoor', label: 'Area Outdoor', icon: Trees },
+  { id: 'heavyMeal', label: 'Makanan Berat', icon: UtensilsCrossed },
 ];
 
 // Bagian "Maps lengkap" — khusus Nongkrong+.
 const premiumFacilityOptions: FacilityOption[] = [
   { id: 'wifi', label: 'WiFi Cepat', icon: Wifi },
-  { id: 'powerOutlets', label: 'Colokan Banyak', icon: Zap },
   { id: 'ac', label: 'AC', icon: Wind },
+  { id: 'meetingRoom', label: 'Ruang Meeting', icon: Presentation },
 ];
+
+// Slider skala "minimal" 0-3 (0 = Semua). Reuse pola slider Suasana.
+function ScaleFilter({ label, icon: Icon, value, levels, onChange }: {
+  label: string;
+  icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
+  value: number;
+  levels: [string, string, string];
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-gray-600">
+          <Icon size={15} style={{ color: '#7c3aed' }} /> {label}
+        </span>
+        <span className="text-xs font-extrabold text-purple-700 bg-white px-2.5 py-0.5 rounded-lg shadow-sm border border-purple-100">
+          {value === 0 ? 'Semua' : levels[value - 1]}
+        </span>
+      </div>
+      <input
+        type="range" min={0} max={3} value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        className="w-full"
+      />
+    </div>
+  );
+}
 
 const Sidebar: React.FC<SidebarProps> = ({
   filters, onFiltersChange, cafeCount, isOpen, onClose,
@@ -173,6 +202,27 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
+          {/* Ukuran & Kapasitas — skala minimal (area/parkir untuk semua member) */}
+          <div>
+            <label className="block font-extrabold text-xs uppercase tracking-widest text-gray-400 mt-6 mb-3">
+              Ukuran & Kapasitas
+            </label>
+            <div className="space-y-5">
+              <ScaleFilter
+                label="Luas Area" icon={Maximize} value={filters.areaMin} levels={['Kecil', 'Sedang', 'Luas']}
+                onChange={v => onFiltersChange({ ...filters, areaMin: v })}
+              />
+              <ScaleFilter
+                label="Parkir Motor" icon={Bike} value={filters.motorParkingMin} levels={['Sempit', 'Sedang', 'Luas']}
+                onChange={v => onFiltersChange({ ...filters, motorParkingMin: v })}
+              />
+              <ScaleFilter
+                label="Parkir Mobil" icon={Car} value={filters.carParkingMin} levels={['Sempit', 'Sedang', 'Luas']}
+                onChange={v => onFiltersChange({ ...filters, carParkingMin: v })}
+              />
+            </div>
+          </div>
+
           {/* Suasana, waktu buka & mitra — bagian "Maps lengkap", khusus Nongkrong+ */}
           <div className="relative">
             {isFreeTier && (
@@ -220,6 +270,17 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
+          {/* Colokan — skala minimal (bagian "Maps lengkap") */}
+          <div>
+            <label className="block font-extrabold text-xs uppercase tracking-widest text-gray-400 mt-6 mb-3">
+              Colokan
+            </label>
+            <ScaleFilter
+              label="Colokan" icon={Zap} value={filters.outletsMin} levels={['Sedikit', 'Sedang', 'Banyak']}
+              onChange={v => onFiltersChange({ ...filters, outletsMin: v })}
+            />
+          </div>
+
           {/* Waktu Buka */}
           <div>
             <label className="block font-extrabold text-xs uppercase tracking-widest text-gray-400 mt-6 mb-3">
@@ -228,6 +289,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="grid grid-cols-2 md:grid-cols-1 gap-3 sm:gap-4">
               <button
                 onClick={() => onFiltersChange({ ...filters, openNow: !filters.openNow, openNight: false })}
+                title="Cafe yang sedang buka pada jam ini"
                 className="flex items-center gap-3 sm:gap-5 px-3 sm:px-5 py-3 sm:py-3.5 rounded-2xl w-full transition-all shadow-sm"
                 style={{
                   background: filters.openNow ? '#f3e8ff' : 'rgba(255,255,255,0.8)',
@@ -238,11 +300,15 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm" style={{ background: filters.openNow ? '#e9d5ff' : 'rgba(243, 244, 246, 0.8)' }}>
                   <Clock size={15} style={{ color: filters.openNow ? '#7c3aed' : '#9ca3af' }} />
                 </div>
-                <span className="text-xs sm:text-sm font-extrabold">Buka Sekarang</span>
+                <span className="flex flex-col items-start leading-tight min-w-0">
+                  <span className="text-xs sm:text-sm font-extrabold">Buka Sekarang</span>
+                  <span className="text-[10px] sm:text-xs font-medium opacity-70">Lagi buka jam ini</span>
+                </span>
                 {filters.openNow && <div className="ml-auto w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse hidden sm:block" />}
               </button>
               <button
                 onClick={() => onFiltersChange({ ...filters, openNight: !filters.openNight, openNow: false })}
+                title="Cafe yang buka sampai lewat jam 21.00 (termasuk 24 jam) — cocok buat kerja/nongkrong malam"
                 className="flex items-center gap-3 sm:gap-5 px-3 sm:px-5 py-3 sm:py-3.5 rounded-2xl w-full transition-all shadow-sm"
                 style={{
                   background: filters.openNight ? '#f3e8ff' : 'rgba(255,255,255,0.8)',
@@ -251,9 +317,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                 }}
               >
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm" style={{ background: filters.openNight ? '#e9d5ff' : 'rgba(243, 244, 246, 0.8)' }}>
-                  <Star size={15} style={{ color: filters.openNight ? '#7c3aed' : '#9ca3af' }} />
+                  <Moon size={15} style={{ color: filters.openNight ? '#7c3aed' : '#9ca3af' }} />
                 </div>
-                <span className="text-xs sm:text-sm font-extrabold">Buka Malam</span>
+                <span className="flex flex-col items-start leading-tight min-w-0">
+                  <span className="text-xs sm:text-sm font-extrabold">Buka Malam</span>
+                  <span className="text-[10px] sm:text-xs font-medium opacity-70">Buka sampai &gt;21.00</span>
+                </span>
                 {filters.openNight && <div className="ml-auto w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse hidden sm:block" />}
               </button>
             </div>
@@ -322,6 +391,10 @@ const Sidebar: React.FC<SidebarProps> = ({
               facilities: [],
               vibesMin: 5,
               vibesMax: 5,
+              areaMin: 0,
+              motorParkingMin: 0,
+              carParkingMin: 0,
+              outletsMin: 0,
               openNow: false,
               openNight: false,
               mitraSemejaKerja: false,

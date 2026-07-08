@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import MapView from './components/MapView';
 import CafeModal from './components/CafeModal';
 import { LoginModal } from './components/LoginModal';
+import AuthCallback from './components/AuthCallback';
 import { CafesLoadingOverlay, CafesErrorOverlay } from './components/CafesLoadingOverlay';
 import Seo from './components/Seo';
 import NotFound from './pages/NotFound';
@@ -21,6 +22,10 @@ const defaultFilters: FilterState = {
   facilities: [],
   vibesMin: 5,
   vibesMax: 5,
+  areaMin: 0,
+  motorParkingMin: 0,
+  carParkingMin: 0,
+  outletsMin: 0,
   openNow: false,
   openNight: false,
   mitraSemejaKerja: false,
@@ -28,7 +33,7 @@ const defaultFilters: FilterState = {
 
 function MapApp() {
   const { cafes, loading, error, refetch } = useCafes();
-  const { user, profile, signIn, landingUrl } = useAuth();
+  const { user, profile, signInWithGoogle, landingUrl } = useAuth();
   const navigate = useNavigate();
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [showLogin, setShowLogin] = useState(false);
@@ -61,6 +66,10 @@ function MapApp() {
       if (!allMatch) return false;
     }
     if (cafe.vibes > filters.vibesMin) return false;
+    if (cafe.scales.area < filters.areaMin) return false;
+    if (cafe.scales.motorParking < filters.motorParkingMin) return false;
+    if (cafe.scales.carParking < filters.carParkingMin) return false;
+    if (cafe.scales.outlets < filters.outletsMin) return false;
     if (filters.openNow && !cafe.isOpenNow) return false;
     if (filters.openNight && !cafe.isOpenNight) return false;
     if (filters.mitraSemejaKerja && !cafe.isMitraSemejaKerja) return false;
@@ -170,8 +179,7 @@ function MapApp() {
       {showLogin && (
         <LoginModal
           onClose={() => setShowLogin(false)}
-          onSignIn={signIn}
-          landingUrl={landingUrl}
+          onSignInWithGoogle={signInWithGoogle}
         />
       )}
     </div>
@@ -188,6 +196,7 @@ function App() {
         <Route index element={null} />
         <Route path="cafe/:slug" element={null} />
       </Route>
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

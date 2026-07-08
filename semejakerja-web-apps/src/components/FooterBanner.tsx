@@ -41,7 +41,7 @@ const FooterBanner: React.FC = () => {
                 </span>
               </div>
               <p className="text-sm leading-relaxed" style={{ color: '#c4b5fd' }}>
-                Bergabung dengan ribuan member, akses diskon eksklusif di cafe mitra kami.
+                Bergabung dengan ratusan member, akses diskon eksklusif di cafe mitra kami.
               </p>
             </div>
           </div>

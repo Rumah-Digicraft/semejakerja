@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import SpeedTest from '@cloudflare/speedtest';
 import { supabase } from '../lib/supabaseClient';
 import { haversineDistanceMeters } from '../lib/geo';
@@ -31,30 +31,35 @@ export type SpeedTestState =
   | { status: 'error'; reason: SpeedTestErrorReason };
 
 // ── Submit ke Supabase ───────────────────────────────────────────────────────
+// Nilai di-replace langsung di baris cafe lewat RPC submit_cafe_speedtest
+// (SECURITY DEFINER): server yang jaga cooldown GLOBAL 10 menit per cafe &
+// cek jarak ≤50 m. anon tak punya UPDATE cafes → RPC-lah gerbangnya.
 
 export interface SubmitSpeedTestData {
   cafeId: string;
   downloadMbps: number;
   uploadMbps: number;
   latencyMs?: number | null;
-  userLat: number;
-  userLng: number;
   distanceM: number;
-  gpsAccuracyM?: number | null;
 }
 
-async function submitSpeedTest(data: SubmitSpeedTestData) {
-  const { error } = await supabase.from('speed_tests').insert({
-    cafe_id: data.cafeId,
-    download_mbps: data.downloadMbps,
-    upload_mbps: data.uploadMbps,
-    latency_ms: data.latencyMs ?? null,
-    user_lat: data.userLat,
-    user_lng: data.userLng,
-    distance_m: data.distanceM,
-    gps_accuracy_m: data.gpsAccuracyM ?? null,
+export interface SubmitSpeedTestResult {
+  ok: boolean;
+  reason?: 'cooldown' | 'out_of_range' | 'not_found' | string;
+  cooldown_seconds?: number;
+  tested_at?: string;
+}
+
+async function submitSpeedTest(data: SubmitSpeedTestData): Promise<SubmitSpeedTestResult> {
+  const { data: res, error } = await supabase.rpc('submit_cafe_speedtest', {
+    p_cafe_id: data.cafeId,
+    p_download: data.downloadMbps,
+    p_upload: data.uploadMbps,
+    p_latency: data.latencyMs ?? null,
+    p_distance_m: data.distanceM,
   });
   if (error) throw new Error(error.message);
+  return (res ?? { ok: false, reason: 'unknown' }) as SubmitSpeedTestResult;
 }
 
 export function useSubmitSpeedTest() {
@@ -135,30 +140,32 @@ function geolocationErrorToReason(error: GeolocationPositionError): SpeedTestErr
 }
 
 // ── Cooldown (anti-spam) ─────────────────────────────────────────────────────
-// Prevents the same browser from repeatedly submitting speed tests for the
-// same cafe in quick succession. Does NOT limit different users testing the
-// same cafe at the same time — concurrent submissions from different people
-// are legitimate signal (WiFi speed genuinely varies with concurrent load).
+// Cooldown GLOBAL per cafe: begitu SIAPAPUN menjalankan tes, semua user tak
+// bisa tes lagi selama 10 menit. Sumber kebenarannya `cafe.wifiTestedAt` dari
+// DB (dijaga server via RPC), bukan localStorage — jadi berlaku lintas
+// user/device. `justTestedAt` cuma override optimistis sampai refetch datang.
 
 const COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
-const COOLDOWN_STORAGE_PREFIX = 'sk_speedtest_last_';
 
-function getCooldownRemainingMs(cafeId: string): number {
-  const raw = localStorage.getItem(COOLDOWN_STORAGE_PREFIX + cafeId);
-  if (!raw) return 0;
-  const remaining = COOLDOWN_MS - (Date.now() - Number(raw));
+function cooldownFromMs(testedMs: number): number {
+  if (!testedMs) return 0;
+  const remaining = COOLDOWN_MS - (Date.now() - testedMs);
   return remaining > 0 ? remaining : 0;
 }
 
-function markCooldownStart(cafeId: string) {
-  localStorage.setItem(COOLDOWN_STORAGE_PREFIX + cafeId, String(Date.now()));
+function parseTestedMs(wifiTestedAt: string | null, justTestedAt: number | null): number {
+  return Math.max(wifiTestedAt ? Date.parse(wifiTestedAt) : 0, justTestedAt ?? 0);
 }
 
 // ── Orchestrator hook ────────────────────────────────────────────────────────
 
 export function useSpeedTest(cafe: Cafe) {
+  const queryClient = useQueryClient();
   const [state, setState] = useState<SpeedTestState>({ status: 'idle' });
-  const [cooldownMs, setCooldownMs] = useState(() => getCooldownRemainingMs(cafe.id));
+  // Override optimistis: dipakai sampai refetch cafes membawa wifiTestedAt baru.
+  const [justTestedAt, setJustTestedAt] = useState<number | null>(null);
+  const [cooldownMs, setCooldownMs] = useState(() =>
+    cooldownFromMs(parseTestedMs(cafe.wifiTestedAt, null)));
   const submitMutation = useSubmitSpeedTest();
   const cafeIdRef = useRef(cafe.id);
   const isRunningRef = useRef(false);
@@ -167,19 +174,21 @@ export function useSpeedTest(cafe: Cafe) {
     if (cafeIdRef.current !== cafe.id) {
       cafeIdRef.current = cafe.id;
       isRunningRef.current = false;
+      setJustTestedAt(null);
       setState({ status: 'idle' });
     }
-    const tick = () => setCooldownMs(getCooldownRemainingMs(cafe.id));
+    const tick = () =>
+      setCooldownMs(cooldownFromMs(parseTestedMs(cafe.wifiTestedAt, justTestedAt)));
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [cafe.id]);
+  }, [cafe.id, cafe.wifiTestedAt, justTestedAt]);
 
   const runTest = useCallback(async () => {
     // Guards against double-click/rapid re-click firing a second test before
     // the button has re-rendered into its disabled state.
     if (isRunningRef.current) return;
-    if (getCooldownRemainingMs(cafe.id) > 0) return;
+    if (cooldownFromMs(parseTestedMs(cafe.wifiTestedAt, justTestedAt)) > 0) return;
     isRunningRef.current = true;
 
     try {
@@ -218,16 +227,14 @@ export function useSpeedTest(cafe: Cafe) {
       }
 
       setState({ status: 'submitting' });
+      let submitRes: SubmitSpeedTestResult;
       try {
-        await submitMutation.mutateAsync({
+        submitRes = await submitMutation.mutateAsync({
           cafeId: cafe.id,
           downloadMbps: result.downloadMbps,
           uploadMbps: result.uploadMbps,
           latencyMs: result.latencyMs,
-          userLat: latitude,
-          userLng: longitude,
           distanceM,
-          gpsAccuracyM: accuracy ?? null,
         });
       } catch (err) {
         setState({
@@ -237,13 +244,29 @@ export function useSpeedTest(cafe: Cafe) {
         return;
       }
 
-      markCooldownStart(cafe.id);
-      setCooldownMs(getCooldownRemainingMs(cafe.id));
+      // Server menolak (mis. user lain barusan tes → cooldown, atau di luar jangkauan).
+      if (!submitRes.ok) {
+        queryClient.invalidateQueries({ queryKey: ['cafes'] });
+        if (submitRes.reason === 'cooldown') {
+          const remainMs = (submitRes.cooldown_seconds ?? COOLDOWN_MS / 1000) * 1000;
+          setJustTestedAt(Date.now() - (COOLDOWN_MS - remainMs));
+          setState({ status: 'idle' });
+        } else if (submitRes.reason === 'out_of_range') {
+          setState({ status: 'error', reason: { kind: 'out-of-range', distanceM, accuracyM: accuracy ?? null } });
+        } else {
+          setState({ status: 'error', reason: { kind: 'submit-failed', message: 'Gagal menyimpan hasil' } });
+        }
+        return;
+      }
+
+      // Sukses: nilai baru sudah di baris cafe → refetch supaya headline update.
+      setJustTestedAt(Date.now());
+      queryClient.invalidateQueries({ queryKey: ['cafes'] });
       setState({ status: 'success', result });
     } finally {
       isRunningRef.current = false;
     }
-  }, [cafe.id, cafe.lat, cafe.lng, submitMutation]);
+  }, [cafe.id, cafe.lat, cafe.lng, cafe.wifiTestedAt, justTestedAt, submitMutation, queryClient]);
 
   const reset = useCallback(() => setState({ status: 'idle' }), []);
 

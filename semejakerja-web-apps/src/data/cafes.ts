@@ -1,7 +1,13 @@
-import type { Cafe } from '../types/cafe';
+import type { Cafe, CafeFacility } from '../types/cafe';
 
 // Mock/demo data — real data comes from Supabase via useCafes.
-const rawCafesData: Omit<Cafe, 'schedule' | 'clicks'>[] = [
+// facilities literal di bawah pakai 6 key lama; sisanya (amenity baru + scales)
+// diisi default di .map() supaya 12 entri tak perlu diubah.
+type MockFacilities = Pick<CafeFacility,
+  'wifi' | 'ac' | 'powerOutlets' | 'mushola' | 'motorParking' | 'carParking'>;
+const rawCafesData: (Omit<Cafe, 'schedule' | 'clicks' | 'scales' | 'facilities'
+  | 'wifiDownload' | 'wifiUpload' | 'wifiLatency' | 'wifiTestedAt'>
+  & { facilities: MockFacilities; wifiSpeed: number })[] = [
   {
     id: '1',
     name: 'Semeja Coffee Flagship',
@@ -341,8 +347,14 @@ const rawCafesData: Omit<Cafe, 'schedule' | 'clicks'>[] = [
   },
 ];
 
-export const cafesData: Cafe[] = rawCafesData.map((cafe) => ({
+export const cafesData: Cafe[] = rawCafesData.map(({ wifiSpeed, ...cafe }) => ({
   ...cafe,
+  facilities: { meetingRoom: false, outdoor: false, heavyMeal: false, ...cafe.facilities },
+  scales: { area: 0, motorParking: 0, carParking: 0, outlets: 0 },
+  wifiDownload: wifiSpeed,
+  wifiUpload: 0,
+  wifiLatency: null,
+  wifiTestedAt: null,
   schedule: [],
   clicks: 0,
 }));

@@ -215,6 +215,10 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeC
         if (!allMatch) return false;
       }
       if (cafe.vibes > filters.vibesMin) return false;
+      if (cafe.scales.area < filters.areaMin) return false;
+      if (cafe.scales.motorParking < filters.motorParkingMin) return false;
+      if (cafe.scales.carParking < filters.carParkingMin) return false;
+      if (cafe.scales.outlets < filters.outletsMin) return false;
       if (filters.openNow && !cafe.isOpenNow) return false;
       if (filters.openNight && !cafe.isOpenNight) return false;
       if (filters.mitraSemejaKerja && !cafe.isMitraSemejaKerja) return false;

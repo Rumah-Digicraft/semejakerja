@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
-import { parseOpenStatus } from '../lib/openHours';
-import type { Cafe, CafeCategory, CafeFacility, CafeTier, CafeRow } from '../types/cafe';
+import { parseOpenStatus, parseRangeStatus } from '../lib/openHours';
+import type { Cafe, CafeCategory, CafeFacility, CafeScale, CafeTier, CafeRow } from '../types/cafe';
 
 // ---------- helpers ----------
 
@@ -26,6 +26,9 @@ const DEFAULT_FACILITIES: CafeFacility = {
   mushola: false,
   motorParking: false,
   carParking: false,
+  meetingRoom: false,
+  outdoor: false,
+  heavyMeal: false,
 };
 
 // Peta chip editor admin lama (array string) → key objek client.
@@ -36,10 +39,13 @@ const LEGACY_FACILITY_MAP: Record<string, keyof CafeFacility> = {
   'Mushola': 'mushola',
   'Parkir Motor': 'motorParking',
   'Parkir Mobil': 'carParking',
+  'Meeting Room': 'meetingRoom',
+  'Outdoor': 'outdoor',
+  'Makanan Berat': 'heavyMeal',
 };
 
-// cafes.facilities di DB bisa objek 6-boolean (bentuk kanonik sejak
-// migration 015), string JSON, atau array string legacy — normalkan semua.
+// cafes.facilities di DB bisa objek boolean (bentuk kanonik sejak
+// migration 015/016), string JSON, atau array string legacy — normalkan semua.
 function normalizeFacilities(raw: unknown): CafeFacility {
   let value = raw;
   if (typeof value === 'string') {
@@ -62,9 +68,40 @@ function normalizeFacilities(raw: unknown): CafeFacility {
       mushola: Boolean(obj.mushola),
       motorParking: Boolean(obj.motorParking),
       carParking: Boolean(obj.carParking),
+      meetingRoom: Boolean(obj.meetingRoom),
+      outdoor: Boolean(obj.outdoor),
+      heavyMeal: Boolean(obj.heavyMeal),
     };
   }
   return DEFAULT_FACILITIES;
+}
+
+const DEFAULT_SCALES: CafeScale = {
+  area: 0,
+  motorParking: 0,
+  carParking: 0,
+  outlets: 0,
+};
+
+const clampScale = (v: unknown): number => Math.min(3, Math.max(0, Math.round(Number(v)) || 0));
+
+// cafes.scales di DB adalah jsonb { area, motorParking, carParking, outlets }
+// 0-3; baris lama bisa null / bentuk tak dikenal — normalkan & clamp.
+function normalizeScales(raw: unknown): CafeScale {
+  let value = raw;
+  if (typeof value === 'string') {
+    try { value = JSON.parse(value); } catch { return DEFAULT_SCALES; }
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    return {
+      area: clampScale(obj.area),
+      motorParking: clampScale(obj.motorParking),
+      carParking: clampScale(obj.carParking),
+      outlets: clampScale(obj.outlets),
+    };
+  }
+  return DEFAULT_SCALES;
 }
 
 // ---------- mapper ----------
@@ -94,6 +131,7 @@ function mapRowToCafe(row: CafeRow): Cafe {
   }
 
   let isOpenNow: boolean;
+  let isOpenNight: boolean;
   let todayStatus = row.open_hours ?? 'Jam buka tidak tersedia';
 
   if (schedule.length === 7) {
@@ -106,30 +144,20 @@ function mapRowToCafe(row: CafeRow): Cafe {
 
     const dayMap: Record<string, number> = { 'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4, 'Saturday': 5, 'Sunday': 6 };
     const dayIndex = dayMap[dayStr || 'Monday'];
-    
+
     const todayText = schedule[dayIndex] || '';
     todayStatus = todayText.split(': ').slice(1).join(': ') || todayText; // e.g. "09:00 - 22:00"
-    
-    if (todayText.toLowerCase().includes('tutup')) {
-      isOpenNow = false;
-    } else {
-      const match = todayText.match(/(\d{2})[:.](\d{2})\s*-\s*(\d{2})[:.](\d{2})/);
-      if (match) {
-        const startMins = parseInt(match[1]) * 60 + parseInt(match[2]);
-        const endMins = parseInt(match[3]) * 60 + parseInt(match[4]);
-        // Handle overnight open
-        if (endMins < startMins) {
-           isOpenNow = currentMins >= startMins || currentMins <= endMins;
-        } else {
-           isOpenNow = currentMins >= startMins && currentMins <= endMins;
-        }
-      } else {
-        // Fallback to old logic if regex fails
-        isOpenNow = parseOpenStatus(row.open_hours).isOpenNow;
-      }
-    }
+
+    // Derive BOTH open-now and open-night from today's schedule line, so the
+    // "Buka Malam" filter stays consistent with the hours actually shown.
+    // Only fall back to the summary open_hours when today's line is unparseable.
+    const status = parseRangeStatus(todayStatus, currentMins) ?? parseOpenStatus(row.open_hours);
+    isOpenNow = status.isOpenNow;
+    isOpenNight = status.isOpenNight;
   } else {
-    isOpenNow = parseOpenStatus(row.open_hours).isOpenNow;
+    const status = parseOpenStatus(row.open_hours);
+    isOpenNow = status.isOpenNow;
+    isOpenNight = status.isOpenNight;
   }
 
   return {
@@ -140,13 +168,17 @@ function mapRowToCafe(row: CafeRow): Cafe {
     lng: row.lng,
     rating: parseFloat(String(row.rating)) || 0,
     reviewCount: row.total_reviews ?? 0,
-    wifiSpeed: parseFloat(String(row.wifi_speed_mbps ?? '')) || 0,
+    wifiDownload: parseFloat(String(row.wifi_speed_mbps ?? '')) || 0,
+    wifiUpload: parseFloat(String(row.wifi_upload_mbps ?? '')) || 0,
+    wifiLatency: row.wifi_latency_ms != null ? Number(row.wifi_latency_ms) : null,
+    wifiTestedAt: (row.wifi_tested_at as string | null) ?? null,
     vibes: Math.min(5, Math.max(1, Math.round(Number(row.vibes)) || 3)),
     facilities: normalizeFacilities(row.facilities),
+    scales: normalizeScales(row.scales),
     openHours: todayStatus,
     schedule,
     isOpenNow: isOpenNow,
-    isOpenNight: parseOpenStatus(row.open_hours).isOpenNight,
+    isOpenNight: isOpenNight,
     isMitraSemejaKerja: tier === 'partner',
     address: row.address,
     description: '',
@@ -170,7 +202,8 @@ function mapRowToCafe(row: CafeRow): Cafe {
 // (~396 KB vs ~191 KB for 390 cafes), which mobile users pay on every load.
 const CAFE_COLUMNS =
   'id,name,lat,lng,rating,total_reviews,tier,is_partner,open_hours,weekday_text,' +
-  'address,price_level,phone,website,discount_value,clicks,facilities,vibes,wifi_speed_mbps';
+  'address,price_level,phone,website,discount_value,clicks,facilities,vibes,' +
+  'wifi_speed_mbps,wifi_upload_mbps,wifi_latency_ms,wifi_tested_at,scales';
 
 async function fetchCafes(): Promise<Cafe[]> {
   const { data, error } = await supabase

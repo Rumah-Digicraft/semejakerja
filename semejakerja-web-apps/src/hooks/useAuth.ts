@@ -105,8 +105,14 @@ export function useAuth() {
     },
   });
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+  // Google OAuth: redirects to Google, then back to /auth/callback which
+  // completes the session. Returns an error message only if kicking off the
+  // redirect fails (on success the browser navigates away).
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
     return error?.message ?? null;
   };
 
@@ -118,7 +124,7 @@ export function useAuth() {
     user,
     authReady,
     profile: profile ?? null,
-    signIn,
+    signInWithGoogle,
     signOut,
     landingUrl: LANDING_URL,
   };
