@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { usePagination } from '@/lib/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 import type { Cafe } from '@/types'
 import { Search, Star, ExternalLink, Edit2, Trash2, Plus, CheckCircle, Wifi } from 'lucide-react'
 
@@ -18,7 +20,6 @@ export default function DataKafePage() {
   const supabase = createClient()
   const router = useRouter()
   const [cafes, setCafes] = useState<Cafe[]>([])
-  const [testCounts, setTestCounts] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterTier, setFilterTier] = useState('all')
@@ -29,18 +30,8 @@ export default function DataKafePage() {
 
   useEffect(() => {
     const load = async () => {
-      // speed_tests cukup satu kolom untuk dihitung per kafe; kalau
-      // tabelnya membesar, ganti ke RPC group-by.
-      const [cafesRes, testsRes] = await Promise.all([
-        supabase.from('cafes').select('*').order('name'),
-        supabase.from('speed_tests').select('cafe_id'),
-      ])
+      const cafesRes = await supabase.from('cafes').select('*').order('name')
       setCafes(cafesRes.data ?? [])
-      const counts = new Map<string, number>()
-      for (const t of testsRes.data ?? []) {
-        counts.set(t.cafe_id, (counts.get(t.cafe_id) ?? 0) + 1)
-      }
-      setTestCounts(counts)
       setLoading(false)
     }
     load()
@@ -57,8 +48,13 @@ export default function DataKafePage() {
     })
   }, [cafes, search, filterTier, filterPartner])
 
+  const { page, setPage, pageCount, pageItems, pageSize, total } = usePagination(
+    filtered,
+    `${search}|${filterTier}|${filterPartner}`,
+  )
+
   const handleDelete = async (cafe: Cafe) => {
-    if (!confirm(`Hapus kafe "${cafe.name}" secara permanen? Data speedtest-nya ikut terhapus.`)) return
+    if (!confirm(`Hapus kafe "${cafe.name}" secara permanen?`)) return
     const { data, error } = await supabase.from('cafes').delete().eq('id', cafe.id).select('id')
     if (error) {
       showToast(error.code === '23503'
@@ -137,10 +133,10 @@ export default function DataKafePage() {
                 </tr>
               )) : filtered.length === 0 ? (
                 <tr><td colSpan={7} className="px-5 py-16 text-center text-slate-400">Tidak ada kafe ditemukan.</td></tr>
-              ) : filtered.map(cafe => {
+              ) : pageItems.map(cafe => {
                 const rating = Number(cafe.rating) || 0
                 const wifi = cafe.wifi_speed_mbps != null ? Number(cafe.wifi_speed_mbps) : null
-                const tests = testCounts.get(cafe.id) ?? 0
+                const wifiUp = cafe.wifi_upload_mbps != null ? Number(cafe.wifi_upload_mbps) : null
                 return (
                   <tr
                     key={cafe.id}
@@ -179,12 +175,9 @@ export default function DataKafePage() {
                       <div className="flex items-center gap-1.5">
                         {wifi != null ? (
                           <span className="inline-flex items-center gap-1 text-slate-700">
-                            <Wifi size={13} className="text-purple-500" /> {wifi} Mbps
+                            <Wifi size={13} className="text-purple-500" /> {wifi}{wifiUp != null ? ` / ${wifiUp}` : ''} Mbps
                           </span>
                         ) : <span className="text-slate-300">—</span>}
-                        {tests > 0 && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium">{tests} tes</span>
-                        )}
                       </div>
                     </td>
                     <td className="px-5 py-4">
@@ -203,6 +196,7 @@ export default function DataKafePage() {
             </tbody>
           </table>
         </div>
+        {!loading && <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="kafe" />}
       </div>
     </div>
   )

@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { usePagination } from '@/lib/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 import type { AddonSubscription, AddonDropin, Addon } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils/format'
 import { CheckCircle, XCircle, Download } from 'lucide-react'
@@ -20,6 +22,9 @@ export default function SubscribersPage() {
   const [toast, setToast] = useState('')
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
+
+  const subPg = usePagination(subs, filterAddon)
+  const dropinPg = usePagination(dropins, `${filterAddon}|${filterDate}`)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -126,7 +131,7 @@ export default function SubscribersPage() {
               <tbody className="divide-y divide-slate-50">
                 {loading ? Array.from({ length: 4 }).map((_, i) => <tr key={i}>{Array.from({ length: 6 }).map((_, j) => <td key={j} className="px-5 py-4"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>)}</tr>)
                   : subs.length === 0 ? <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-400">Belum ada subscriber.</td></tr>
-                  : subs.map(s => (
+                  : subPg.pageItems.map(s => (
                     <tr key={s.id} className="hover:bg-slate-50/50 transition">
                       <td className="px-5 py-4 font-medium text-slate-900">{s.user_id.slice(0, 8)}...</td>
                       <td className="px-5 py-4 text-slate-600">{s.addon?.name ?? '—'}</td>
@@ -154,7 +159,7 @@ export default function SubscribersPage() {
               <tbody className="divide-y divide-slate-50">
                 {loading ? Array.from({ length: 4 }).map((_, i) => <tr key={i}>{Array.from({ length: 7 }).map((_, j) => <td key={j} className="px-5 py-4"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>)}</tr>)
                   : dropins.length === 0 ? <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-400">Belum ada drop-in.</td></tr>
-                  : dropins.map(d => (
+                  : dropinPg.pageItems.map(d => (
                     <tr key={d.id} className="hover:bg-slate-50/50 transition">
                       <td className="px-5 py-4 font-medium text-slate-900">{d.participant_name ?? '—'}</td>
                       <td className="px-5 py-4 text-slate-500">{d.participant_wa ?? '—'}</td>
@@ -174,6 +179,9 @@ export default function SubscribersPage() {
             </table>
           )}
         </div>
+        {!loading && (tab === 'subscriptions'
+          ? <Pagination page={subPg.page} pageCount={subPg.pageCount} total={subPg.total} pageSize={subPg.pageSize} onPageChange={subPg.setPage} itemLabel="subscriber" />
+          : <Pagination page={dropinPg.page} pageCount={dropinPg.pageCount} total={dropinPg.total} pageSize={dropinPg.pageSize} onPageChange={dropinPg.setPage} itemLabel="drop-in" />)}
       </div>
     </div>
   )

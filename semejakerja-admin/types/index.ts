@@ -1,6 +1,8 @@
 // ── CAFE & MAPS ──────────────────────────────────────────────────────────
 // Bentuk yang sama dengan CafeFacility di semejakerja-web-apps —
-// 6 boolean camelCase, disimpan apa adanya di kolom jsonb cafes.facilities.
+// 9 boolean camelCase, disimpan apa adanya di kolom jsonb cafes.facilities.
+// powerOutlets/motorParking/carParking kini turunan dari `scales` (di-set
+// scale > 0 saat simpan) dan tidak lagi diedit sebagai chip.
 export interface CafeFacilities {
   wifi: boolean
   ac: boolean
@@ -8,6 +10,18 @@ export interface CafeFacilities {
   mushola: boolean
   motorParking: boolean
   carParking: boolean
+  meetingRoom: boolean
+  outdoor: boolean
+  heavyMeal: boolean
+}
+
+// Skala ordinal 0-3 (0 = tidak ada / belum ada info) di kolom jsonb
+// cafes.scales. Sama dengan CafeScale di semejakerja-web-apps.
+export interface CafeScales {
+  area: number
+  motorParking: number
+  carParking: number
+  outlets: number
 }
 
 export interface Cafe {
@@ -31,25 +45,18 @@ export interface Cafe {
   // selalu baca lewat normalizeFacilities() dari maps/cafes/lib.ts.
   facilities: CafeFacilities | null
   vibes: number
+  // Kecepatan internet (migration 017) — wifi_speed_mbps = DOWNLOAD.
+  // Diisi manual admin atau live speedtest publik (di-replace tiap update).
+  // wifi_tested_at = waktu pengukuran terakhir (dasar cooldown 10 mnt global).
   wifi_speed_mbps: number | null
+  wifi_upload_mbps: number | null
+  wifi_latency_ms: number | null
+  wifi_tested_at: string | null
+  // Baris lama bisa null / bentuk tak dikenal — selalu baca lewat
+  // normalizeScales() dari maps/cafes/lib.ts.
+  scales: CafeScales | null
   clicks: number
   top_review: string | null
-  created_at: string
-}
-
-// Baris tabel speed_tests (migration 005) — ditulis peta publik,
-// dibaca panel Speedtest di editor kafe. Numeric bisa datang sebagai
-// string dari PostgREST — bungkus Number() sebelum dihitung.
-export interface SpeedTest {
-  id: string
-  cafe_id: string
-  download_mbps: number
-  upload_mbps: number
-  latency_ms: number | null
-  user_lat: number
-  user_lng: number
-  distance_m: number
-  gps_accuracy_m: number | null
   created_at: string
 }
 

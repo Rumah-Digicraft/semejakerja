@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { AdminRole, AdminUser } from '@/types'
 import { ALL_ROLES } from '@/lib/access'
+import { usePagination } from '@/lib/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 import { formatDate } from '@/lib/utils/format'
 import { Plus, Loader2, X, Trash2, Save, ShieldCheck } from 'lucide-react'
 
@@ -33,6 +35,8 @@ export default function AdminsPage() {
   const [draftRoles, setDraftRoles] = useState<Record<string, AdminRole>>({})
 
   const [form, setForm] = useState({ email: '', role: 'maps_admin' as AdminRole })
+
+  const { page, setPage, pageCount, pageItems, pageSize, total } = usePagination(admins)
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
@@ -136,7 +140,7 @@ export default function AdminsPage() {
                 <tr>
                   <td colSpan={4} className="px-5 py-16 text-center text-slate-400">Belum ada admin terdaftar.</td>
                 </tr>
-              ) : admins.map(admin => {
+              ) : pageItems.map(admin => {
                 const isSelf = admin.user_id === selfId
                 const draft = draftRoles[admin.user_id] ?? admin.role
                 return (
@@ -188,6 +192,7 @@ export default function AdminsPage() {
             </tbody>
           </table>
         </div>
+        {!loading && <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="admin" />}
       </div>
 
       <p className="text-xs text-slate-400 mt-4">

@@ -3,16 +3,15 @@
 import { useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import type { CafeFacilities, SpeedTest } from '@/types'
+import type { CafeFacilities, CafeScales } from '@/types'
 import {
   type CafeDbPayload, type CafeFormValues, type WeekHours,
   DAY_LABELS, PURWOKERTO_CENTER,
   suggestOpenHours, toDbPayload, validateForm,
 } from './lib'
-import SpeedTestPanel from './SpeedTestPanel'
 import {
-  Bike, BookOpen, Car, Clock, Gauge, Info, Loader2, MapPin,
-  Save, Sparkles, Tag, Wifi, Wind, Zap,
+  Bike, BookOpen, Car, Clock, Gauge, Info, Loader2, MapPin, Maximize,
+  Presentation, Save, Sparkles, Tag, Trees, UtensilsCrossed, Wifi, Wind, Zap,
 } from 'lucide-react'
 
 const MapPicker = dynamic(() => import('@/components/MapPicker'), {
@@ -25,13 +24,23 @@ const MapPicker = dynamic(() => import('@/components/MapPicker'), {
 })
 
 // Label & ikon selaras dengan tampilan client (CafeModal facilityConfig).
+// Parkir & colokan dipindah ke SCALE_CONFIG (skala menggantikan toggle).
 const FACILITY_CONFIG: Array<{ key: keyof CafeFacilities; label: string; icon: React.ReactNode }> = [
   { key: 'wifi', label: 'WiFi Cepat', icon: <Wifi size={15} /> },
-  { key: 'powerOutlets', label: 'Banyak Colokan', icon: <Zap size={15} /> },
   { key: 'ac', label: 'AC Sejuk', icon: <Wind size={15} /> },
   { key: 'mushola', label: 'Mushola', icon: <BookOpen size={15} /> },
-  { key: 'motorParking', label: 'Parkir Motor', icon: <Bike size={15} /> },
-  { key: 'carParking', label: 'Parkir Mobil', icon: <Car size={15} /> },
+  { key: 'meetingRoom', label: 'Ruang Meeting', icon: <Presentation size={15} /> },
+  { key: 'outdoor', label: 'Area Outdoor', icon: <Trees size={15} /> },
+  { key: 'heavyMeal', label: 'Makanan Berat', icon: <UtensilsCrossed size={15} /> },
+]
+
+// Skala 0-3 berlabel (0 = tidak ada / belum ada info). Menggantikan toggle
+// parkir/colokan lama + menambah "Luas Area".
+const SCALE_CONFIG: Array<{ key: keyof CafeScales; label: string; icon: React.ReactNode; levels: [string, string, string, string] }> = [
+  { key: 'area', label: 'Luas Area', icon: <Maximize size={15} />, levels: ['Belum ada info', 'Kecil', 'Sedang', 'Luas'] },
+  { key: 'motorParking', label: 'Parkir Motor', icon: <Bike size={15} />, levels: ['Tidak ada', 'Sempit', 'Sedang', 'Luas'] },
+  { key: 'carParking', label: 'Parkir Mobil', icon: <Car size={15} />, levels: ['Tidak ada', 'Sempit', 'Sedang', 'Luas'] },
+  { key: 'outlets', label: 'Colokan', icon: <Zap size={15} />, levels: ['Tidak ada', 'Sedikit', 'Sedang', 'Banyak (tiap meja)'] },
 ]
 
 const PRICE_OPTIONS = [
@@ -62,13 +71,12 @@ function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: 
 
 interface CafeFormProps {
   initial: CafeFormValues
-  speedTests?: SpeedTest[]
   saving: boolean
   submitLabel: string
   onSubmit: (payload: CafeDbPayload) => void
 }
 
-export default function CafeForm({ initial, speedTests, saving, submitLabel, onSubmit }: CafeFormProps) {
+export default function CafeForm({ initial, saving, submitLabel, onSubmit }: CafeFormProps) {
   const router = useRouter()
   const [values, setValues] = useState<CafeFormValues>(initial)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -254,6 +262,35 @@ export default function CafeForm({ initial, speedTests, saving, submitLabel, onS
                 <span className="text-xs text-slate-400">Ramai</span>
               </div>
             </div>
+            {/* Skala 0-3: luas area, parkir motor/mobil, colokan */}
+            <div className="space-y-3">
+              {SCALE_CONFIG.map(s => {
+                const level = values.scales[s.key]
+                return (
+                  <div key={s.key}>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                        <span className="text-purple-500">{s.icon}</span> {s.label}
+                      </label>
+                      <span className="text-xs text-slate-400">{s.levels[level]}</span>
+                    </div>
+                    <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+                      {s.levels.map((lvl, n) => (
+                        <button
+                          key={n} type="button"
+                          onClick={() => set({ scales: { ...values.scales, [s.key]: n } })}
+                          className={`flex-1 h-9 text-xs font-medium transition border-l first:border-l-0 border-slate-200 ${
+                            level === n ? 'bg-purple-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'
+                          }`}
+                        >
+                          {n === 0 ? '–' : n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </SectionCard>
 
@@ -347,29 +384,45 @@ export default function CafeForm({ initial, speedTests, saving, submitLabel, onS
           </div>
         </SectionCard>
 
-        {/* ── Internet & Speedtest ── */}
-        <SectionCard icon={<Gauge size={16} />} title="Internet & Speedtest">
+        {/* ── Kecepatan Internet ── */}
+        <SectionCard icon={<Gauge size={16} />} title="Kecepatan Internet">
           <div className="space-y-4">
-            <div>
-              <label className={labelCls}>WiFi Speed (Mbps)</label>
-              <input
-                type="number" min={0} step="any" value={values.wifi_speed_mbps ?? ''}
-                onChange={e => set({ wifi_speed_mbps: e.target.value === '' ? null : Number(e.target.value) })}
-                className={inputCls} placeholder="mis. 35"
-              />
-              {err('wifi_speed_mbps')}
-              <p className="text-xs text-slate-400 mt-1">
-                Tampil di detail kafe publik (≥50 &quot;Super Cepat&quot;, ≥25 &quot;Stabil&quot;, di bawahnya &quot;Standar&quot;).
-              </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Download (Mbps)</label>
+                <input
+                  type="number" min={0} step="any" value={values.wifi_speed_mbps ?? ''}
+                  onChange={e => set({ wifi_speed_mbps: e.target.value === '' ? null : Number(e.target.value) })}
+                  className={inputCls} placeholder="mis. 35"
+                />
+                {err('wifi_speed_mbps')}
+              </div>
+              <div>
+                <label className={labelCls}>Upload (Mbps)</label>
+                <input
+                  type="number" min={0} step="any" value={values.wifi_upload_mbps ?? ''}
+                  onChange={e => set({ wifi_upload_mbps: e.target.value === '' ? null : Number(e.target.value) })}
+                  className={inputCls} placeholder="mis. 20"
+                />
+                {err('wifi_upload_mbps')}
+              </div>
             </div>
-            {speedTests ? (
-              <SpeedTestPanel
-                tests={speedTests}
-                onUseAverage={avg => set({ wifi_speed_mbps: avg })}
+            <div>
+              <label className={labelCls}>Latency (ms) — opsional</label>
+              <input
+                type="number" min={0} step="any" value={values.wifi_latency_ms ?? ''}
+                onChange={e => set({ wifi_latency_ms: e.target.value === '' ? null : Number(e.target.value) })}
+                className={inputCls} placeholder="mis. 18"
               />
-            ) : (
+            </div>
+            <p className="text-xs text-slate-400">
+              Download dipakai label di detail publik (≥50 &quot;Super Cepat&quot;, ≥25 &quot;Stabil&quot;, di bawahnya &quot;Standar&quot;).
+              Nilai ini di-replace otomatis kalau ada yang jalanin speedtest langsung di kafe.
+            </p>
+            {values.wifi_tested_at && (
               <p className="text-xs text-slate-400">
-                Statistik speedtest komunitas akan tampil di sini setelah kafe dibuat.
+                Terakhir diukur via speedtest publik:{' '}
+                {new Date(values.wifi_tested_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </p>
             )}
           </div>

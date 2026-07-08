@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAppSettings } from '@/lib/useAppSettings'
+import { usePagination } from '@/lib/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 import { formatDate, formatCurrency } from '@/lib/utils/format'
 import { 
   Check, X, Copy, Image as ImageIcon, Trash2, Plus, Settings, 
@@ -128,6 +130,8 @@ export default function SessionDetailPage() {
   }, [id, supabase])
 
   useEffect(() => { loadData() }, [loadData])
+
+  const { page, setPage, pageCount, pageItems, pageSize, total } = usePagination(participants)
 
   const handleCopyLink = () => {
     if (!session) return
@@ -349,9 +353,9 @@ export default function SessionDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {participants.map((p, idx) => (
+                  {pageItems.map((p, idx) => (
                     <tr key={p.id} className="hover:bg-slate-50/50 transition">
-                      <td className="p-4 text-slate-400 text-xs text-center">{idx + 1}</td>
+                      <td className="p-4 text-slate-400 text-xs text-center">{(page - 1) * pageSize + idx + 1}</td>
                       <td className="p-4">
                         <span className="font-semibold text-slate-900">{p.name}</span>
                         {p.phone && <span className="block text-xs text-slate-400">{p.phone}</span>}
@@ -392,6 +396,7 @@ export default function SessionDetailPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="peserta" />
           </div>
 
           <div className="space-y-6">
@@ -521,7 +526,7 @@ export default function SessionDetailPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {participants.map(p => (
+                {pageItems.map(p => (
                   <tr key={p.id} className="hover:bg-slate-50/50 transition">
                     <td className="p-4 font-semibold text-slate-900">{p.name}</td>
                     <td className="p-4">
@@ -562,6 +567,7 @@ export default function SessionDetailPage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="peserta" />
         </div>
       )}
 

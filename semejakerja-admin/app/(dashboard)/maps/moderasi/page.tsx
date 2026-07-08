@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { usePagination } from '@/lib/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 import type { CafeSubmission, CafeEdit, CafeReview, CafePhoto } from '@/types'
 import { formatDate } from '@/lib/utils/format'
 import { CheckCircle, XCircle, Clock, Loader2, MessageSquare, Image, MapPin, Edit } from 'lucide-react'
@@ -90,6 +92,8 @@ export default function ModerasiPage() {
 
   useEffect(() => { loadCounts(); loadTab() }, [loadCounts, loadTab])
 
+  const { page, setPage, pageCount, pageItems, pageSize, total } = usePagination(data, tab)
+
   const STATUS_STYLE: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-700',
     approved: 'bg-emerald-100 text-emerald-700',
@@ -155,7 +159,7 @@ export default function ModerasiPage() {
                 ))
               ) : data.length === 0 ? (
                 <tr><td colSpan={5} className="px-5 py-12 text-center text-slate-400">Tidak ada data.</td></tr>
-              ) : data.map(item => (
+              ) : pageItems.map(item => (
                 <tr key={item.id} className="hover:bg-slate-50/50 transition">
                   <td className="px-5 py-4">
                     <p className="font-medium text-slate-900">{item.submitter_name || item.reviewer_name || 'Anonim'}</p>
@@ -188,6 +192,7 @@ export default function ModerasiPage() {
             </tbody>
           </table>
         </div>
+        {!loading && <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="kontribusi" />}
       </div>
     </div>
   )

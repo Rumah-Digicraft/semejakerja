@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useAppSettings } from '@/lib/useAppSettings'
+import { usePagination } from '@/lib/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 import { formatDate, formatCurrency } from '@/lib/utils/format'
 import {
   Plus, Edit2, AlertTriangle, Loader2, X,
@@ -182,6 +184,11 @@ export default function SessionsPage() {
   const openSessions = sessions.filter(s => s.status === 'open').length
   const totalParticipants = sessions.reduce((acc, s) => acc + (s.participants?.length ?? 0), 0)
 
+  const { page, setPage, pageCount, pageItems, pageSize, total } = usePagination(
+    sessions,
+    `${filterSport}|${filterStatus}`,
+  )
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       {toast && (
@@ -249,7 +256,7 @@ export default function SessionsPage() {
             <CalendarDays size={40} className="mx-auto mb-3 text-slate-200" />
             <p>Tidak ada sesi ditemukan.</p>
           </div>
-        ) : sessions.map(session => {
+        ) : pageItems.map(session => {
           const sport = SPORT_CONFIG[session.sport_type]
           const participantCount = session.participants?.length ?? 0
           const paidCount = session.participants?.filter(p => p.payment_status === 'approved').length ?? 0
@@ -362,6 +369,12 @@ export default function SessionsPage() {
           )
         })}
       </div>
+
+      {!loading && sessions.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm mt-3 overflow-hidden">
+          <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="sesi" />
+        </div>
+      )}
 
       {/* Create / Edit Modal */}
       {showModal && (

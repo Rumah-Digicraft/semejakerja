@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { usePagination } from '@/lib/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 import { formatDate, formatDatetime, formatCurrency } from '@/lib/utils/format'
 import { CheckCircle, XCircle, Search, Download, UserCheck, Clock } from 'lucide-react'
 
@@ -150,6 +152,11 @@ export default function ParticipantsPage() {
     return !search || name.includes(search.toLowerCase()) || phone.includes(search.toLowerCase())
   })
 
+  const { page, setPage, pageCount, pageItems, pageSize, total } = usePagination(
+    filtered,
+    `${search}|${selectedSession}|${filterSport}|${filterStatus}`,
+  )
+
   // Mini stats
   const stats = {
     total: filtered.length,
@@ -267,7 +274,7 @@ export default function ParticipantsPage() {
                     Tidak ada peserta ditemukan.
                   </td>
                 </tr>
-              ) : filtered.map(p => (
+              ) : pageItems.map(p => (
                 <tr key={p.id} className="hover:bg-slate-50/50 transition">
                   {/* Peserta */}
                   <td className="px-5 py-4">
@@ -366,9 +373,7 @@ export default function ParticipantsPage() {
             </tbody>
           </table>
         </div>
-        <div className="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">
-          {filtered.length} peserta
-        </div>
+        {!loading && <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="peserta" />}
       </div>
     </div>
   )

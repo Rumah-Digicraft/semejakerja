@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { usePagination } from '@/lib/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 import type { Membership, UserProfile } from '@/types'
 import { formatDate, formatCurrency } from '@/lib/utils/format'
 import { Search, CheckCircle, XCircle, Loader2, GraduationCap, ChevronDown, CreditCard, Users, Clock, Eye, X, Phone, Briefcase, MapPin, CalendarClock, Tag, History } from 'lucide-react'
@@ -120,6 +122,11 @@ export default function MembersPage() {
     return true
   })
 
+  const { page, setPage, pageCount, pageItems, pageSize, total } = usePagination(
+    filtered,
+    `${search}|${filterTier}|${filterStatus}|${filterStudent}`,
+  )
+
   // Derived from members so the modal stays fresh after load() re-fetches
   const selected = selectedId ? members.find(m => m.profile.id === selectedId) : undefined
 
@@ -203,7 +210,7 @@ export default function MembersPage() {
                 <tr key={i}>{Array.from({ length: 6 }).map((_, j) => <td key={j} className="px-5 py-4"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>)}</tr>
               )) : filtered.length === 0 ? (
                 <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-400">Tidak ada member ditemukan.</td></tr>
-              ) : filtered.map(({ profile, membership }) => (
+              ) : pageItems.map(({ profile, membership }) => (
                 <tr key={profile.id} className="hover:bg-slate-50/50 transition">
                   <td className="px-5 py-4">
                     <button onClick={() => setSelectedId(profile.id)} className="text-left group">
@@ -289,7 +296,7 @@ export default function MembersPage() {
             </tbody>
           </table>
         </div>
-        <div className="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">{filtered.length} member</div>
+        {!loading && <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="member" />}
       </div>
 
       {selected && (

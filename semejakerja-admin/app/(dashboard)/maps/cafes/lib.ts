@@ -1,4 +1,4 @@
-import type { Cafe, CafeFacilities } from '@/types'
+import type { Cafe, CafeFacilities, CafeScales } from '@/types'
 
 // ── Jam operasional ─────────────────────────────────────────────────────
 // Data live weekday_text campur aduk: format Google Places Inggris+AM/PM
@@ -113,12 +113,14 @@ export function suggestOpenHours(week: WeekHours | null): string {
 // ── Facilities ──────────────────────────────────────────────────────────
 export const DEFAULT_FACILITIES: CafeFacilities = {
   wifi: false, ac: false, powerOutlets: false, mushola: false, motorParking: false, carParking: false,
+  meetingRoom: false, outdoor: false, heavyMeal: false,
 }
 
 // Peta chip editor lama (array string) → key objek client.
 const LEGACY_FACILITY_MAP: Record<string, keyof CafeFacilities> = {
   'WiFi': 'wifi', 'AC': 'ac', 'Stopkontak': 'powerOutlets', 'Mushola': 'mushola',
   'Parkir Motor': 'motorParking', 'Parkir Mobil': 'carParking',
+  'Meeting Room': 'meetingRoom', 'Outdoor': 'outdoor', 'Makanan Berat': 'heavyMeal',
 }
 
 export function normalizeFacilities(raw: unknown): CafeFacilities {
@@ -143,9 +145,36 @@ export function normalizeFacilities(raw: unknown): CafeFacilities {
       mushola: Boolean(obj.mushola),
       motorParking: Boolean(obj.motorParking),
       carParking: Boolean(obj.carParking),
+      meetingRoom: Boolean(obj.meetingRoom),
+      outdoor: Boolean(obj.outdoor),
+      heavyMeal: Boolean(obj.heavyMeal),
     }
   }
   return { ...DEFAULT_FACILITIES }
+}
+
+// ── Scales (skala ordinal 0-3) ──────────────────────────────────────────
+export const DEFAULT_SCALES: CafeScales = {
+  area: 0, motorParking: 0, carParking: 0, outlets: 0,
+}
+
+const clampScale = (v: unknown): number => Math.min(3, Math.max(0, Math.round(Number(v)) || 0))
+
+export function normalizeScales(raw: unknown): CafeScales {
+  let value = raw
+  if (typeof value === 'string') {
+    try { value = JSON.parse(value) } catch { return { ...DEFAULT_SCALES } }
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>
+    return {
+      area: clampScale(obj.area),
+      motorParking: clampScale(obj.motorParking),
+      carParking: clampScale(obj.carParking),
+      outlets: clampScale(obj.outlets),
+    }
+  }
+  return { ...DEFAULT_SCALES }
 }
 
 // ── Form values ↔ DB payload ────────────────────────────────────────────
@@ -163,12 +192,18 @@ export interface CafeFormValues {
   week: WeekHours | null // null = jadwal per-hari tidak diatur (weekday_text null)
   open_hours: string
   facilities: CafeFacilities
+  scales: CafeScales
   vibes: number
-  wifi_speed_mbps: number | null
+  wifi_speed_mbps: number | null // = download
+  wifi_upload_mbps: number | null
+  wifi_latency_ms: number | null
+  wifi_tested_at: string | null // read-only, ditampilkan tapi tak ditulis balik
 }
 
 // Kolom yang ditulis form ke tabel cafes. `location` (PostGIS legacy)
-// sengaja tidak pernah disertakan.
+// sengaja tidak pernah disertakan. `wifi_tested_at` juga TIDAK ditulis di
+// sini — hanya diisi RPC live speedtest, biar edit admin tak nge-block
+// cooldown publik.
 export interface CafeDbPayload {
   name: string
   address: string
@@ -183,8 +218,11 @@ export interface CafeDbPayload {
   weekday_text: string[] | null
   open_hours: string | null
   facilities: CafeFacilities
+  scales: CafeScales
   vibes: number
-  wifi_speed_mbps: number | null
+  wifi_speed_mbps: number | null // = download
+  wifi_upload_mbps: number | null
+  wifi_latency_ms: number | null
 }
 
 export const PURWOKERTO_CENTER: [number, number] = [-7.424, 109.23]
@@ -196,7 +234,8 @@ export function emptyFormValues(): CafeFormValues {
     tier: 'basic', is_partner: false,
     discount_value: null, price_level: 0,
     week: null, open_hours: '',
-    facilities: { ...DEFAULT_FACILITIES }, vibes: 3, wifi_speed_mbps: null,
+    facilities: { ...DEFAULT_FACILITIES }, scales: { ...DEFAULT_SCALES }, vibes: 3,
+    wifi_speed_mbps: null, wifi_upload_mbps: null, wifi_latency_ms: null, wifi_tested_at: null,
   }
 }
 
@@ -215,8 +254,12 @@ export function cafeToFormValues(cafe: Cafe): CafeFormValues {
     week: parseWeekdayText(cafe.weekday_text),
     open_hours: cafe.open_hours ?? '',
     facilities: normalizeFacilities(cafe.facilities),
+    scales: normalizeScales(cafe.scales),
     vibes: Math.min(5, Math.max(1, Math.round(Number(cafe.vibes)) || 3)),
     wifi_speed_mbps: cafe.wifi_speed_mbps != null ? Number(cafe.wifi_speed_mbps) : null,
+    wifi_upload_mbps: cafe.wifi_upload_mbps != null ? Number(cafe.wifi_upload_mbps) : null,
+    wifi_latency_ms: cafe.wifi_latency_ms != null ? Number(cafe.wifi_latency_ms) : null,
+    wifi_tested_at: cafe.wifi_tested_at ?? null,
   }
 }
 
@@ -234,9 +277,19 @@ export function toDbPayload(v: CafeFormValues): CafeDbPayload {
     price_level: v.price_level,
     weekday_text: v.week ? serializeWeekdayText(v.week) : null,
     open_hours: v.open_hours.trim() || null,
-    facilities: v.facilities,
+    // Option A: skala parkir/colokan sumber kebenaran; boolean lama
+    // diturunkan (scale > 0) supaya pembaca lama tetap konsisten.
+    facilities: {
+      ...v.facilities,
+      motorParking: v.scales.motorParking > 0,
+      carParking: v.scales.carParking > 0,
+      powerOutlets: v.scales.outlets > 0,
+    },
+    scales: v.scales,
     vibes: v.vibes,
     wifi_speed_mbps: v.wifi_speed_mbps,
+    wifi_upload_mbps: v.wifi_upload_mbps,
+    wifi_latency_ms: v.wifi_latency_ms,
   }
 }
 
@@ -254,7 +307,14 @@ export function validateForm(v: CafeFormValues): Record<string, string> {
     errors.discount_value = 'Diskon harus 0-100'
   }
   if (v.wifi_speed_mbps != null && v.wifi_speed_mbps <= 0) {
-    errors.wifi_speed_mbps = 'Kecepatan WiFi harus lebih dari 0'
+    errors.wifi_speed_mbps = 'Download harus lebih dari 0'
+  }
+  if (v.wifi_upload_mbps != null && v.wifi_upload_mbps <= 0) {
+    errors.wifi_upload_mbps = 'Upload harus lebih dari 0'
+  }
+  // Defensif — kontrol skala hanya bisa emit 0-3, tapi jaga sejajar CHECK DB.
+  if (Object.values(v.scales).some(n => n < 0 || n > 3)) {
+    errors.scales = 'Skala harus 0-3'
   }
   return errors
 }

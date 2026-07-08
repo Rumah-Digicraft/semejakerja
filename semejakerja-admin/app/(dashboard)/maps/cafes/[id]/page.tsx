@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { Cafe, SpeedTest } from '@/types'
+import type { Cafe } from '@/types'
 import CafeForm from '../CafeForm'
 import { type CafeDbPayload, cafeToFormValues } from '../lib'
 import { ArrowLeft, Gauge, MousePointerClick, Star, Trash2, Users } from 'lucide-react'
@@ -21,7 +21,6 @@ export default function EditCafePage() {
   const router = useRouter()
   const supabase = createClient()
   const [cafe, setCafe] = useState<Cafe | null>(null)
-  const [tests, setTests] = useState<SpeedTest[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -30,13 +29,9 @@ export default function EditCafePage() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   const load = useCallback(async () => {
-    const [cafeRes, testsRes] = await Promise.all([
-      supabase.from('cafes').select('*').eq('id', id).single(),
-      supabase.from('speed_tests').select('*').eq('cafe_id', id).order('created_at', { ascending: false }).limit(200),
-    ])
+    const cafeRes = await supabase.from('cafes').select('*').eq('id', id).single()
     if (cafeRes.error || !cafeRes.data) setNotFound(true)
     else setCafe(cafeRes.data)
-    setTests(testsRes.data ?? [])
     setLoading(false)
   }, [id])
 
@@ -56,7 +51,7 @@ export default function EditCafePage() {
 
   const handleDelete = async () => {
     if (!cafe) return
-    if (!confirm(`Hapus kafe "${cafe.name}" secara permanen? Data speedtest-nya ikut terhapus.`)) return
+    if (!confirm(`Hapus kafe "${cafe.name}" secara permanen?`)) return
     const { data, error } = await supabase.from('cafes').delete().eq('id', id).select('id')
     if (error) {
       showToast(error.code === '23503'
@@ -98,7 +93,10 @@ export default function EditCafePage() {
     { icon: <Star size={13} className="text-amber-400" />, label: rating > 0 ? `${rating.toFixed(1)} rating` : 'Belum ada rating' },
     { icon: <Users size={13} className="text-blue-400" />, label: `${cafe.total_reviews ?? 0} ulasan` },
     { icon: <MousePointerClick size={13} className="text-emerald-400" />, label: `${cafe.clicks ?? 0} klik` },
-    { icon: <Gauge size={13} className="text-purple-400" />, label: `${tests.length} speedtest` },
+    {
+      icon: <Gauge size={13} className="text-purple-400" />,
+      label: cafe.wifi_speed_mbps != null ? `${Number(cafe.wifi_speed_mbps).toFixed(0)} Mbps ↓` : 'Speed belum ada',
+    },
   ]
 
   return (
@@ -135,7 +133,6 @@ export default function EditCafePage() {
 
       <CafeForm
         initial={cafeToFormValues(cafe)}
-        speedTests={tests}
         saving={saving}
         submitLabel="Simpan Perubahan"
         onSubmit={handleUpdate}

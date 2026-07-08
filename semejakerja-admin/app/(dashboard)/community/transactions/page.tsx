@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { usePagination } from '@/lib/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 import type { Membership, UserProfile } from '@/types'
 import { formatDatetime, formatCurrency } from '@/lib/utils/format'
 import { Search, CheckCircle, XCircle, Wallet, Clock, Receipt, Tag } from 'lucide-react'
@@ -73,6 +75,11 @@ export default function TransactionsPage() {
     if (filterStatus !== 'all' && r.status !== filterStatus) return false
     return true
   })
+
+  const { page, setPage, pageCount, pageItems, pageSize, total } = usePagination(
+    filtered,
+    `${search}|${filterTier}|${filterStatus}`,
+  )
 
   const totalRevenue = rows.filter(r => r.status === 'active' && r.price_paid).reduce((sum, r) => sum + r.price_paid, 0)
   const pendingCount = rows.filter(r => r.status === 'pending_payment').length
@@ -153,7 +160,7 @@ export default function TransactionsPage() {
                 <tr key={i}>{Array.from({ length: 7 }).map((_, j) => <td key={j} className="px-5 py-4"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>)}</tr>
               )) : filtered.length === 0 ? (
                 <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-400">Tidak ada transaksi ditemukan.</td></tr>
-              ) : filtered.map(row => (
+              ) : pageItems.map(row => (
                 <tr key={row.id} className="hover:bg-slate-50/50 transition">
                   <td className="px-5 py-4">
                     <p className="font-medium text-slate-900">{row.profile?.full_name ?? 'Nama belum diisi'}</p>
@@ -201,7 +208,7 @@ export default function TransactionsPage() {
             </tbody>
           </table>
         </div>
-        <div className="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">{filtered.length} transaksi</div>
+        {!loading && <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="transaksi" />}
       </div>
     </div>
   )
