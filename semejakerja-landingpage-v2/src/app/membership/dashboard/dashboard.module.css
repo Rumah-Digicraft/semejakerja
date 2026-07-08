@@ -479,6 +479,46 @@
   box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.1);
 }
 
+/* Disabled email field (linked to Google) */
+.emailField {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.emailField svg {
+  position: absolute;
+  left: var(--space-3);
+  pointer-events: none;
+}
+
+.emailInput {
+  padding-left: calc(var(--space-4) + 26px);
+  background-color: var(--color-gray-100);
+  color: var(--color-gray-500);
+  cursor: not-allowed;
+}
+
+.emailInput:focus {
+  border-color: var(--color-gray-200);
+  background-color: var(--color-gray-100);
+  box-shadow: none;
+}
+
+.emailNote {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-gray-400);
+}
+
+/* Email value in the read view (with Google logo) */
+.emailValue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
 .formError {
   background-color: #FEE2E2;
   color: #B91C1C;

@@ -108,6 +108,20 @@
 .promoSuccess { color: var(--color-emerald-600, #059669); }
 .promoError { color: #DC2626; }
 
+.checkoutError {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: #FEE2E2;
+  border: 1px solid #F87171;
+  color: #B91C1C;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-4);
+}
+
 /* Payment Instructions */
 .paymentBox {
   background: var(--color-gray-50);

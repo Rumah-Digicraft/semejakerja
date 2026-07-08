@@ -33,6 +33,7 @@ function CheckoutContent() {
   const [promoMsg, setPromoMsg] = useState("");
   const [promoStatus, setPromoStatus] = useState<"idle" | "success" | "error">("idle");
   const [discountPercent, setDiscountPercent] = useState(0);
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -98,6 +99,7 @@ function CheckoutContent() {
   const handleCheckout = async () => {
     if (!user) return;
     setSubmitting(true);
+    setErrorMsg("");
 
     try {
       // Atomic server-side checkout: prices, promo validation, duplicate
@@ -110,16 +112,28 @@ function CheckoutContent() {
       });
 
       if (error) {
-        console.error("Checkout error:", error);
+        // Log fields explicitly — the dev overlay renders a bare
+        // PostgrestError as "{}", hiding the real cause.
+        console.error(
+          "Checkout error:",
+          error.message,
+          "| code:",
+          error.code,
+          "| details:",
+          error.details,
+          "| hint:",
+          error.hint
+        );
         // RAISE EXCEPTION messages from the RPC are user-facing Indonesian
-        alert(error.message || "Gagal memproses. Coba lagi.");
+        // (e.g. "Kamu masih punya pembayaran yang menunggu verifikasi admin").
+        setErrorMsg(error.message || "Gagal memproses. Coba lagi.");
       } else {
         alert("Pembayaran berhasil disubmit! Admin akan memverifikasi dalam 1x24 jam.");
         router.push("/");
       }
     } catch (err) {
-      console.error(err);
-      alert("Terjadi kesalahan.");
+      console.error("Checkout exception:", err);
+      setErrorMsg("Terjadi kesalahan tak terduga. Coba lagi.");
     } finally {
       setSubmitting(false);
     }
@@ -158,8 +172,15 @@ function CheckoutContent() {
                 <div className={styles.bankHolder}>a.n Semeja Kerja Purwokerto</div>
               </div>
 
-              <button 
-                onClick={handleCheckout} 
+              {errorMsg && (
+                <div className={styles.checkoutError}>
+                  <AlertCircle size={18} className="flex-shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              <button
+                onClick={handleCheckout}
                 disabled={submitting}
                 className={`btn btn--primary ${styles.submitBtn}`}
               >

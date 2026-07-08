@@ -492,10 +492,17 @@ img {
   100% { background-position: 0% 50%; }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .animate-float { animation: float 3s ease-in-out infinite; }
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 .animate-fade-in-up { animation: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-fade-in { animation: fade-in 0.6s ease forwards; }
+/* Spinner utility (lucide <Loader2 className="animate-spin" />) — this project
+   isn't Tailwind, so the spin keyframe/utility must be defined here. */
+.animate-spin { animation: spin 0.8s linear infinite; }
 
 /* --- Responsive Grid Helpers --- */
 .grid {

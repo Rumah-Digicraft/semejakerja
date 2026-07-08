@@ -24,6 +24,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import GoogleIcon from "@/app/components/GoogleIcon";
 import { STUDENT_MEMBERSHIP_ENABLED } from "@/lib/flags";
 import {
   benefitsForTier,
@@ -83,6 +84,7 @@ export default function DashboardPage() {
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [memberships, setMemberships] = useState<Membership[]>([]);
@@ -96,10 +98,13 @@ export default function DashboardPage() {
       router.replace("/auth/login?next=/membership/dashboard");
       return;
     }
+    setUserId(user.id);
     setEmail(user.email ?? null);
 
+    // maybeSingle(): a missing profile row returns null (not an error) — the DB
+    // trigger normally creates it, but this stays resilient if it hasn't.
     const [{ data: profileData }, { data: membershipData }] = await Promise.all([
-      supabase.from("user_profiles").select("*").eq("id", user.id).single(),
+      supabase.from("user_profiles").select("*").eq("id", user.id).maybeSingle(),
       supabase
         .from("memberships")
         .select("*")
@@ -188,6 +193,7 @@ export default function DashboardPage() {
           {/* Profile card */}
           <ProfileCard
             profile={profile}
+            userId={userId}
             email={email}
             onSaved={loadData}
             supabase={supabase}
@@ -344,16 +350,20 @@ export default function DashboardPage() {
 
 function ProfileCard({
   profile,
+  userId,
   email,
   onSaved,
   supabase,
 }: {
   profile: UserProfile | null;
+  userId: string | null;
   email: string | null;
   onSaved: () => void | Promise<void>;
   supabase: ReturnType<typeof createClient>;
 }) {
-  const [editing, setEditing] = useState(false);
+  // Nudge new (OAuth) members whose profile is still empty to fill it in.
+  const profileIncomplete = !profile?.full_name || !profile?.phone;
+  const [editing, setEditing] = useState(profileIncomplete);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -378,23 +388,32 @@ function ProfileCard({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    const id = profile?.id ?? userId;
+    if (!id) {
+      setError("Sesi tidak ditemukan. Coba muat ulang halaman.");
+      return;
+    }
     setSaving(true);
     setError("");
 
-    const { error: updateError } = await supabase
+    // upsert (not update): creates the row if it doesn't exist yet, otherwise
+    // updates it. Covers members who don't have a user_profiles row.
+    const { error: saveError } = await supabase
       .from("user_profiles")
-      .update({
-        full_name: form.full_name,
-        nickname: form.nickname,
-        occupation: form.occupation,
-        city: form.city,
-        phone: form.phone,
-      })
-      .eq("id", profile.id);
+      .upsert(
+        {
+          id,
+          full_name: form.full_name,
+          nickname: form.nickname,
+          occupation: form.occupation,
+          city: form.city,
+          phone: form.phone,
+        },
+        { onConflict: "id" }
+      );
 
-    if (updateError) {
-      setError(`Gagal menyimpan: ${updateError.message}`);
+    if (saveError) {
+      setError(`Gagal menyimpan: ${saveError.message}`);
       setSaving(false);
       return;
     }
@@ -418,6 +437,26 @@ function ProfileCard({
       {editing ? (
         <form onSubmit={handleSave} className={styles.form}>
           {error && <div className={styles.formError}>{error}</div>}
+
+          <div className={styles.formGroup}>
+            <label className={styles.label} htmlFor="profile-email">
+              Email
+            </label>
+            <div className={styles.emailField}>
+              <GoogleIcon size={18} />
+              <input
+                id="profile-email"
+                type="email"
+                className={`${styles.input} ${styles.emailInput}`}
+                value={email ?? ""}
+                disabled
+                readOnly
+              />
+            </div>
+            <p className={styles.emailNote}>
+              Terhubung dengan akun Google — tidak bisa diubah.
+            </p>
+          </div>
 
           {(
             [
@@ -514,7 +553,15 @@ function ProfileCard({
               <dt>
                 <Mail size={15} /> Email
               </dt>
-              <dd>{email || "—"}</dd>
+              <dd className={styles.emailValue}>
+                {email ? (
+                  <>
+                    <GoogleIcon size={14} /> {email}
+                  </>
+                ) : (
+                  "—"
+                )}
+              </dd>
             </div>
             <div className={styles.metaRow}>
               <dt>
