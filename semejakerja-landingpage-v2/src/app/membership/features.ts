@@ -16,7 +16,6 @@ export const features: Feature[] = [
   { name: "Real-time slot ketersediaan WFC", nyantai: false, nongkrong: true, serius: true },
   { name: "Crowdsource Maps (submit/edit data)", nyantai: false, nongkrong: true, serius: true },
   { name: "Diskon 10% di Cafe Mitra", nyantai: false, nongkrong: true, serius: true },
-  { name: "Early access gallery update WFC", nyantai: false, nongkrong: true, serius: true },
   { name: "Priority booking Semeja Moves", nyantai: false, nongkrong: false, serius: true },
   { name: "1 sesi Badminton gratis/bln", nyantai: false, nongkrong: false, serius: true },
   { name: "Akses event eksklusif member", nyantai: false, nongkrong: false, serius: true },
