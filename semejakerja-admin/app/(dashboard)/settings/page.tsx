@@ -16,7 +16,7 @@ const DOMAIN_FIELDS: DomainField[] = [
     key: 'landing_url',
     label: 'Domain Landing Page',
     desc: 'Dipakai untuk link publik join Semeja Moves, register, & membership.',
-    placeholder: 'https://semejakerja.pages.dev',
+    placeholder: 'https://semejakerja.com',
   },
   {
     key: 'moves_url',

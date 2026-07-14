@@ -29,7 +29,7 @@ export const homeFaqs: Faq[] = [
   },
   {
     q: "Gimana cara gabung Semeja Kerja?",
-    a: "Gratis dan gampang: klik tombol gabung di semejakerja.pages.dev atau lewat linktr.ee/semejakerja, lalu masuk grup komunitas. Info jadwal WFC bareng, Semeja Moves, Talks, dan English selalu diumumkan lewat grup dan Instagram @semejakerja.",
+    a: "Gratis dan gampang: klik tombol gabung di semejakerja.com atau lewat linktr.ee/semejakerja, lalu masuk grup komunitas. Info jadwal WFC bareng, Semeja Moves, Talks, dan English selalu diumumkan lewat grup dan Instagram @semejakerja.",
   },
   {
     q: "Apakah ada membership berbayar?",
@@ -37,6 +37,6 @@ export const homeFaqs: Faq[] = [
   },
   {
     q: "Di mana bisa lihat rekomendasi cafe buat WFC di Purwokerto?",
-    a: "Buka peta interaktif kami di semeja-cafe.pages.dev — ada 350+ cafe di Purwokerto lengkap dengan rating, jam buka, kisaran harga, dan fasilitas seperti Wi-Fi, colokan, dan mushola.",
+    a: "Buka peta interaktif kami di kafe.semejakerja.com — ada 350+ cafe di Purwokerto lengkap dengan rating, jam buka, kisaran harga, dan fasilitas seperti Wi-Fi, colokan, dan mushola.",
   },
 ];

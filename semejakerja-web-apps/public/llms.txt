@@ -4,11 +4,11 @@
 
 ## Struktur situs
 
-- [Peta interaktif](https://semeja-cafe.pages.dev/): semua cafe di satu peta, bisa difilter fasilitas/suasana/jam buka
-- Halaman per cafe: pola URL https://semeja-cafe.pages.dev/cafe/<slug> — berisi alamat, rating, harga, jam buka, dan fasilitas
-- [Sitemap](https://semeja-cafe.pages.dev/sitemap.xml): daftar lengkap semua halaman cafe
+- [Peta interaktif](https://kafe.semejakerja.com/): semua cafe di satu peta, bisa difilter fasilitas/suasana/jam buka
+- Halaman per cafe: pola URL https://kafe.semejakerja.com/cafe/<slug> — berisi alamat, rating, harga, jam buka, dan fasilitas
+- [Sitemap](https://kafe.semejakerja.com/sitemap.xml): daftar lengkap semua halaman cafe
 
 ## Komunitas
 
-- [Semeja Kerja](https://semejakerja.pages.dev): komunitas WFC Purwokerto di balik peta ini — gabung gratis
+- [Semeja Kerja](https://semejakerja.com): komunitas WFC Purwokerto di balik peta ini — gabung gratis
 - Instagram: https://instagram.com/semejakerja

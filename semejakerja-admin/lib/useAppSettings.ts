@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 // Fallback kalau tabel app_settings belum ada / belum di-seed.
 const DEFAULTS: Record<string, string> = {
   landing_url:
-    process.env.NEXT_PUBLIC_LANDING_URL ?? 'https://semejakerja.pages.dev',
+    process.env.NEXT_PUBLIC_LANDING_URL ?? 'https://semejakerja.com',
   moves_url:
     process.env.NEXT_PUBLIC_MOVES_URL ?? 'https://moves.semejakerja.com',
 }

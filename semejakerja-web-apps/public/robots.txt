@@ -19,4 +19,4 @@ User-Agent: DuckAssistBot
 User-Agent: cohere-ai
 Allow: /
 
-Sitemap: https://semeja-cafe.pages.dev/sitemap.xml
+Sitemap: https://kafe.semejakerja.com/sitemap.xml

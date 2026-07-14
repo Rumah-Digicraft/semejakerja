@@ -2,9 +2,9 @@
 // Used by layout metadata, robots.ts, sitemap.ts, and JSON-LD builders.
 
 export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://semejakerja.pages.dev";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://semejakerja.com";
 
-export const MAPS_URL = "https://semeja-cafe.pages.dev";
+export const MAPS_URL = "https://kafe.semejakerja.com";
 
 export const SITE_NAME = "Semeja Kerja";
 

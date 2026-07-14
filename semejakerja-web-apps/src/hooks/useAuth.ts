@@ -32,7 +32,7 @@ export function mapsAccess(
 
 const LANDING_URL =
   (import.meta.env.VITE_LANDING_URL as string | undefined) ??
-  'https://semejakerja.pages.dev';
+  'https://semejakerja.com';
 
 /**
  * Google-only user auth for the public map (minimal integration).

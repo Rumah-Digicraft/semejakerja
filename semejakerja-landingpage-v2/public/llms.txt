@@ -4,17 +4,17 @@
 
 ## Halaman utama
 
-- [Beranda](https://semejakerja.pages.dev/): cerita komunitas, statistik, cafe basecamp, FAQ
-- [Maps Kafe](https://semejakerja.pages.dev/maps): pengantar peta cafe interaktif
-- [Membership](https://semejakerja.pages.dev/membership): tier Nyantai (gratis), Nongkrong (Maps lengkap + diskon 10% cafe mitra), Mode Serius (semua fitur + benefit Semeja Moves)
-- [Semeja Moves](https://semejakerja.pages.dev/moves): olahraga bareng (badminton & padel) tiap weekend
-- [Semeja Talks](https://semejakerja.pages.dev/talks): seminar & workshop komunitas
-- [Semeja English](https://semejakerja.pages.dev/english): klub belajar Bahasa Inggris tiap Sabtu
-- [Dokumentasi](https://semejakerja.pages.dev/dokumentasi): galeri kegiatan
+- [Beranda](https://semejakerja.com/): cerita komunitas, statistik, cafe basecamp, FAQ
+- [Maps Kafe](https://semejakerja.com/maps): pengantar peta cafe interaktif
+- [Membership](https://semejakerja.com/membership): tier Nyantai (gratis), Nongkrong (Maps lengkap + diskon 10% cafe mitra), Mode Serius (semua fitur + benefit Semeja Moves)
+- [Semeja Moves](https://semejakerja.com/moves): olahraga bareng (badminton & padel) tiap weekend
+- [Semeja Talks](https://semejakerja.com/talks): seminar & workshop komunitas
+- [Semeja English](https://semejakerja.com/english): klub belajar Bahasa Inggris tiap Sabtu
+- [Dokumentasi](https://semejakerja.com/dokumentasi): galeri kegiatan
 
 ## Peta cafe interaktif
 
-- [Peta Cafe Purwokerto](https://semeja-cafe.pages.dev): direktori 350+ cafe ramah-WFC di Purwokerto dengan rating, jam buka, kisaran harga, dan fasilitas (Wi-Fi, colokan, mushola, parkir). Setiap cafe punya halaman sendiri di pola URL https://semeja-cafe.pages.dev/cafe/<slug>.
+- [Peta Cafe Purwokerto](https://kafe.semejakerja.com): direktori 350+ cafe ramah-WFC di Purwokerto dengan rating, jam buka, kisaran harga, dan fasilitas (Wi-Fi, colokan, mushola, parkir). Setiap cafe punya halaman sendiri di pola URL https://kafe.semejakerja.com/cafe/<slug>.
 
 ## Kontak
 

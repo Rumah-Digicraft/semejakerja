@@ -1,8 +1,8 @@
 // Site-wide SEO constants, shared by <Seo/> and scripts/prerender.ts
 // (imported by Node type stripping — keep dependency-free).
 
-export const SITE_URL = 'https://semeja-cafe.pages.dev';
-export const LANDING_URL = 'https://semejakerja.pages.dev';
+export const SITE_URL = 'https://kafe.semejakerja.com';
+export const LANDING_URL = 'https://semejakerja.com';
 
 export const SITE_NAME = 'Peta Cafe Purwokerto — Semeja Kerja';
 
