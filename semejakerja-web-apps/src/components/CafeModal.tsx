@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   X, Star, Wifi, Zap, Wind, BookOpen, Bike, Car,
   CheckCircle2, Gauge, Tag,
-  Coffee, MapPin, Phone, ExternalLink,
+  Coffee, MapPin, Share2, Check, ExternalLink,
   Pencil, MessageSquare, Camera, Users,
   ChevronDown, ChevronUp, Lock, Crown, LogIn,
   Presentation, Trees, UtensilsCrossed, Maximize,
@@ -11,6 +11,7 @@ import type { Cafe, CafeReview } from '../types/cafe';
 import type { MapsAccess } from '../hooks/useAuth';
 import { ContributeModal, type ContributeType } from './contribute/ContributeModal';
 import { useCafeReviews } from '../hooks/useCafeReviews';
+import { cafeSlug } from '../lib/slug';
 import SpeedTestButton from './SpeedTestButton';
 
 interface CafeModalProps {
@@ -193,6 +194,27 @@ function CommunityReviews({ cafeId, canWrite, onWriteReview }: { cafeId: string;
 const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestLogin, landingUrl }) => {
   const [contributeType, setContributeType] = useState<ContributeType | null>(null);
   const [showHours, setShowHours] = useState(false);
+  const [shared, setShared] = useState(false);
+
+  // Salin link detail cafe ke clipboard (URL /cafe/:slug adalah sumber kebenaran).
+  const handleShare = async () => {
+    const url = `${window.location.origin}/cafe/${cafeSlug(cafe)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Fallback bila Clipboard API tak tersedia (mis. konteks non-HTTPS).
+      const el = document.createElement('textarea');
+      el.value = url;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
+    setShared(true);
+    setTimeout(() => setShared(false), 2000);
+  };
 
   const isGuest = access === 'guest';
   const hasFullMaps = access === 'full';
@@ -219,11 +241,10 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
 
   return (
     <>
-      {/* Backdrop. No backdrop-blur: it fades in while the map is still
-          flying to the tapped cafe, and re-blurring the animating map
-          janks on phones. */}
-      <div className="fixed inset-0 z-40 md:hidden bg-black/40" onClick={onClose} />
-      <div className="fixed inset-0 z-40 hidden md:block" onClick={onClose} />
+      {/* No backdrop on any breakpoint. Mobile is a half-height bottom sheet and
+          desktop a floating side panel — both leave the map uncovered so it stays
+          pannable/zoomable and the cafe pins visible while the detail is open.
+          Close with the X button. */}
 
       {/* Panel:
           - Mobile: fixed bottom sheet (slides up from bottom)
@@ -232,10 +253,10 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
       <div
         className={[
           'glass-panel flex flex-col animate-slide-in-right overflow-hidden',
-          // Mobile: bottom sheet
-          'fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl max-h-[90vh]',
-          // Desktop: right floating panel
-          'md:absolute md:top-[120px] md:bottom-6 md:right-6 md:left-auto md:w-[380px] md:rounded-3xl md:max-h-none',
+          // Mobile: half-height bottom sheet — leaves the map visible/pannable above it
+          'fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl h-[50vh]',
+          // Desktop: right floating panel (height driven by top/bottom)
+          'md:absolute md:top-[120px] md:bottom-6 md:right-6 md:left-auto md:w-[380px] md:rounded-3xl md:h-auto',
         ].join(' ')}
         onClick={e => e.stopPropagation()}
       >
@@ -558,10 +579,16 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
           {/* Primary actions */}
           <div className="flex gap-2 p-4 pb-2">
             <button
-              onClick={() => cafe.phone && window.open(`tel:${cafe.phone}`)}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 bg-purple-100/50 text-purple-700 border border-purple-200"
+              onClick={handleShare}
+              className={[
+                'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 border',
+                shared
+                  ? 'bg-emerald-100/70 text-emerald-700 border-emerald-200'
+                  : 'bg-purple-100/50 text-purple-700 border-purple-200',
+              ].join(' ')}
             >
-              <Phone size={14} /> Hubungi
+              {shared ? <Check size={14} /> : <Share2 size={14} />}
+              {shared ? 'Link Tersalin' : 'Share Cafe'}
             </button>
             <button
               onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${cafe.lat},${cafe.lng}`)}

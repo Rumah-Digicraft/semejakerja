@@ -94,9 +94,10 @@ function MapApp() {
     }
 
     navigate(selectedCafe?.id === cafe.id ? '/' : `/cafe/${cafeSlug(cafe)}`);
-    // On mobile the sidebar covers the screen, so close it when a cafe is
-    // picked. On desktop it's a side panel that can stay open.
-    if (window.innerWidth < 768) setSidebarOpen(false);
+    // Close the filter when opening a cafe on any screen where the two
+    // floating panels can't sit side by side (they'd overlap below ~820px,
+    // e.g. iPad portrait at 768px). Wide desktops keep both open.
+    if (window.innerWidth < 820) setSidebarOpen(false);
   }, [selectedCafe, navigate]);
 
   return (
@@ -161,12 +162,6 @@ function MapApp() {
         onRequestLogin={() => setShowLogin(true)}
         landingUrl={landingUrl}
       />
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
       {selectedCafe && (
         <CafeModal
           cafe={selectedCafe}

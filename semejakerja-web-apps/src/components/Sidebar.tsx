@@ -132,8 +132,9 @@ const Sidebar: React.FC<SidebarProps> = ({
           isOpen
             ? 'translate-y-0 md:translate-x-0'
             : 'translate-y-full md:translate-y-0 md:-translate-x-[calc(100%+2rem)]',
-          // Mobile max height
-          'max-h-[85vh] md:max-h-none',
+          // Mobile: half-height sheet so the map (and cafe pins) stay visible
+          // and pannable above it. Desktop: height driven by top/bottom.
+          'h-[50vh] md:h-auto',
         ].join(' ')}
       >
         {/* Sidebar Header */}

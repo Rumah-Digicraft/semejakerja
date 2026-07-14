@@ -48,8 +48,9 @@ const MapControls: React.FC<{
 
   return (
     <>
-      {/* Custom Map Controls */}
-      <div className="absolute right-4 sm:right-6 top-32 sm:top-36 flex flex-col gap-2 z-[400]">
+      {/* Custom Map Controls — on phones sit below the search bar (which spans
+          most of the width) so the two don't overlap. */}
+      <div className="absolute right-4 sm:right-6 top-40 sm:top-36 flex flex-col gap-2 z-[400]">
         <button
           onClick={() => map.zoomIn()}
           title="Zoom In"
@@ -107,7 +108,18 @@ const MapControls: React.FC<{
 const FlyToCafe: React.FC<{ cafe: Cafe | null }> = ({ cafe }) => {
   const map = useMap();
   React.useEffect(() => {
-    if (cafe) map.flyTo([cafe.lat, cafe.lng], 16, { animate: true, duration: 1.2 });
+    if (!cafe) return;
+    const zoom = 16;
+    // On phones the detail sheet covers the lower ~50vh, so nudge the map
+    // target down (center below the pin) to keep the tapped cafe in the
+    // visible upper strip instead of behind the sheet.
+    if (window.innerWidth < 768) {
+      const pt = map.project([cafe.lat, cafe.lng], zoom);
+      const target = map.unproject(pt.add([0, map.getSize().y * 0.25]), zoom);
+      map.flyTo(target, zoom, { animate: true, duration: 1.2 });
+    } else {
+      map.flyTo([cafe.lat, cafe.lng], zoom, { animate: true, duration: 1.2 });
+    }
   }, [cafe, map]);
   return null;
 };
