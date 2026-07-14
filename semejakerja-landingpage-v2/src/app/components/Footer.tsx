@@ -27,7 +27,7 @@ const quickLinks = [
   { href: "/maps", label: "Maps Kafe" },
   { href: "/moves", label: "Semeja Moves" },
   { href: "/membership", label: "Membership" },
-  { href: "/dokumentasi", label: "Dokumentasi WFC" },
+  // { href: "/dokumentasi", label: "Dokumentasi WFC" }, // di-hide sementara — jangan dihapus
 ];
 
 export default function Footer() {

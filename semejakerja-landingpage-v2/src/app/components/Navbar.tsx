@@ -26,7 +26,7 @@ const navLinks: NavLink[] = [
     ],
   },
   { href: "/membership", label: "Membership" },
-  { href: "/dokumentasi", label: "Dokumentasi WFC" },
+  // { href: "/dokumentasi", label: "Dokumentasi WFC" }, // di-hide sementara — jangan dihapus
 ];
 
 export default function Navbar() {
