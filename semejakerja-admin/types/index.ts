@@ -159,7 +159,7 @@ export interface Membership {
   user_profile?: UserProfile
 }
 
-export type PromoCodeType = 'student' | 'event' | 'community' | 'partner'
+export type PromoCodeType = 'student' | 'event' | 'community' | 'partner' | 'launch'
 
 export interface PromoCode {
   id: string
@@ -171,6 +171,7 @@ export interface PromoCode {
   locked_to_user_id: string | null
   expires_at: string | null
   is_active: boolean
+  campaign_id: string | null
   created_by: string | null
   created_at: string
 }
@@ -182,6 +183,62 @@ export interface PromoCodeUsage {
   membership_id: string | null
   used_at: string
   user_profile?: UserProfile
+}
+
+// ── CAMPAIGNS ────────────────────────────────────────────────────────────
+export type CampaignObjective =
+  | 'launch' | 'membership_growth' | 'event' | 'partner' | 'moves_fill' | 'seasonal' | 'other'
+export type CampaignStatus = 'draft' | 'active' | 'ended'
+export type CampaignTargetMetric = 'signups' | 'revenue'
+
+export interface Campaign {
+  id: string
+  name: string
+  objective: CampaignObjective
+  description: string | null
+  target_metric: CampaignTargetMetric | null
+  target_value: number | null
+  budget: number | null
+  starts_at: string | null
+  ends_at: string | null
+  status: CampaignStatus
+  // Launch mode (muka publik di halaman Pricing)
+  is_launch: boolean
+  is_published: boolean
+  discount_percent: number | null
+  quota: number | null
+  code_valid_days: number
+  headline: string | null
+  subheadline: string | null
+  cta_label: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type CampaignLeadStatus = 'registered' | 'redeemed'
+
+export interface CampaignLead {
+  id: string
+  campaign_id: string
+  user_id: string
+  tier_interest: string | null
+  promo_code_id: string | null
+  status: CampaignLeadStatus
+  email_sent_at: string | null
+  created_at: string
+  user_profile?: UserProfile
+  promo_code?: PromoCode
+}
+
+// Ringkasan statistik/ROI per campaign (dihitung di client dari
+// promo_codes -> promo_code_usages -> memberships).
+export interface CampaignStats {
+  code_count: number
+  redemptions: number      // sum(used_count) kode di campaign ini
+  lead_count: number
+  total_discount: number   // rupiah diskon yang diberikan
+  total_revenue: number    // rupiah price_paid membership ter-atribusi
 }
 
 // ── SEMEJA MOVES (Data uses semejamoves-web-apps) ────────────────────────

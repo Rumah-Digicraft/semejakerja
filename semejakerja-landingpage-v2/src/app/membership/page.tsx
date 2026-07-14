@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, X } from "lucide-react";
 import styles from "./membership.module.css";
 import { features } from "./features";
+import LaunchBanner from "./LaunchBanner";
 
 export default function MembershipPage() {
   const [isAnnual, setIsAnnual] = useState(false);
@@ -39,6 +40,9 @@ export default function MembershipPage() {
           </div>
         </div>
       </section>
+
+      {/* Launch campaign — hanya tampil kalau ada campaign launch LIVE */}
+      <LaunchBanner />
 
       {/* Pricing Section */}
       <section className={styles.pricingSection}>
@@ -76,7 +80,6 @@ export default function MembershipPage() {
                 <li className={styles.featureItem}><Check size={18} className={styles.featureIcon} /> <strong>Semua fitur Nyantai</strong></li>
                 <li className={styles.featureItem}><Check size={18} className={styles.featureIcon} /> Maps lengkap (filter, ketersediaan)</li>
                 <li className={styles.featureItem}><Check size={18} className={styles.featureIcon} /> <strong>Diskon 10% di Cafe Mitra</strong></li>
-                <li className={styles.featureItem}><Check size={18} className={styles.featureIcon} /> Early access gallery update</li>
                 <li className={styles.featureItem}><Check size={18} className={styles.featureIcon} /> Badge profil (Nongkrong)</li>
               </ul>
               <Link href={`/membership/checkout${linkParams}&tier=nongkrong`} className={`btn btn--primary ${styles.actionBtn}`}>
