@@ -31,6 +31,8 @@ npm run lint     # eslint
 
 Because this uses `output: "export"`, avoid features that require a Node server at runtime: no Route Handlers/API routes, no server actions, no on-demand SSR/ISR, no dynamic `next/image` optimization. Auth and data go through the **client** Supabase SDK. Keep all interactivity client-side.
 
+Server-side **payment logic (DOKU Checkout)** therefore lives in **Supabase Edge Functions** (`semejakerja-admin/supabase/functions/`), called from the browser via `supabase.functions.invoke(...)`. `membership/checkout/page.tsx` invokes `doku-create-payment` and redirects to DOKU; `membership/checkout/status` polls the payment then forwards to `membership/dashboard`. DOKU is the live payment method (replaced the manual bank-transfer flow).
+
 ## Env
 
 `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (both public — safe to expose since there's no server side).

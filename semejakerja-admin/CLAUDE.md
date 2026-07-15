@@ -33,12 +33,14 @@ npm run lint     # eslint
 - `lib/utils.ts` — `cn()`; `lib/utils/format.ts` — formatting helpers.
 - `types/index.ts` — **canonical domain types** for the ecosystem (cafes, contributions, moderation, moves, etc.).
 - `supabase/migrations/` — **the source-of-truth DB schema for all apps in the monorepo.** Add new schema changes here as numbered SQL migrations (`00N_description.sql`).
+- `supabase/functions/` — **Supabase Edge Functions (Deno).** DOKU payment gateway: `doku-create-payment` + `doku-webhook` (+ `_shared/doku.ts`). Deploy via `supabase functions deploy <name>` (the webhook needs `--no-verify-jwt`). Secrets: `DOKU_CLIENT_ID` (`BRN-...`) / `DOKU_SECRET_KEY` (`SK-...`) / `DOKU_ENV`. This folder is **excluded from `next build`** via `tsconfig.json` `exclude` — it's Deno, not Next; don't remove that exclude or the build fails on Deno globals.
 
 ## Key domain notes
 
 - **Moderation model**: community contributions arrive as `CafeSubmission` (new cafe), `CafeEdit` (suggested edits), `CafeReview`, and `CafePhoto`, each with `status: 'pending' | 'approved' | 'rejected'` and reviewer metadata. The moderation screen approves/rejects these into the live `cafes` table.
 - `cafes.facilities` is a 6-boolean object (`wifi`, `ac`, `powerOutlets`, `mushola`, `motorParking`, `carParking`) — canonical since migration 015 and shared with `semejakerja-web-apps`. Legacy rows may still hold a string array; always read via `normalizeFacilities()` in `app/(dashboard)/maps/cafes/lib.ts`.
 - `SUPABASE_SERVICE_ROLE_KEY` is a **server-only** secret — only use it in server code (`lib/supabase/server.ts` / route handlers), never expose it to the client.
+- **Payments (membership) run on DOKU Checkout, live in production.** Members pay via the landing-page checkout → `doku-create-payment` edge function → DOKU → `doku-webhook` activates the membership. `payment_transactions` (migration 022, with a `sandbox`/`production` `environment` marker) is the payment audit trail; the authoritative price/promo logic lives in the `create_membership_checkout` RPC (keep prices in sync with the landing pages). The **Transaksi Membership** page (`community/transactions`) can delete rows via the `admin_delete_membership` RPC (migration 026). New tables need explicit `GRANT ... TO service_role` (see migrations 012/023) or edge-function writes get "permission denied".
 
 ## Env
 

@@ -14,7 +14,8 @@ Digital ecosystem for **Semeja Kerja**, a WFC (Work From Cafe) community in Purw
 
 ## Shared conventions
 
-- **Backend is Supabase** across every app (Postgres + Auth + RLS). There is one shared Supabase project — the SQL migrations live in `semejakerja-admin/supabase/migrations/`. Treat that folder as the source of truth for the DB schema.
+- **Backend is Supabase** across every app (Postgres + Auth + RLS). There is one shared Supabase project — the SQL migrations live in `semejakerja-admin/supabase/migrations/`. Treat that folder as the source of truth for the DB schema. **Supabase Edge Functions** (Deno) also live under `semejakerja-admin/supabase/functions/` — currently the DOKU payment gateway.
+- **Payments run on DOKU Checkout** (live in production since Jul 2026). Membership checkout on the landing page calls an edge function that creates the DOKU payment; a webhook edge function activates the membership. Replaced the old manual bank-transfer + admin-verify flow.
 - **Env vars** are per-project `.env.local` (git-ignored). Vite apps use `VITE_*`; Next.js apps use `NEXT_PUBLIC_*` (+ a server-only `SUPABASE_SERVICE_ROLE_KEY` in admin). See each project's `.env` example.
 - **The `cafes` table is shared** by web-apps and admin, but each app declares its own TypeScript type for it and they intentionally differ (see per-project docs). Do not assume one shape maps cleanly onto the other.
 - **macOS AppleDouble junk**: files prefixed `._` (and `.DS_Store`) are macOS metadata, already git-ignored. Never edit or commit them.
