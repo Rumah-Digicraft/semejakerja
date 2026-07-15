@@ -4,7 +4,7 @@ import {
   MapPin, ExternalLink, Coffee, Wifi, Clock, Target, Users, Moon, Zap, ArrowDown,
 } from "lucide-react";
 import styles from "./maps.module.css";
-import OpenNowStrip from "./OpenNowStrip";
+import CafeSections from "./CafeSections";
 import ScrollReveal from "../components/ScrollReveal";
 import JsonLd from "../components/JsonLd";
 import { breadcrumbSchema, webPageSchema } from "@/lib/schema";
@@ -123,8 +123,8 @@ export default function MapsPage() {
         </div>
       </section>
 
-      {/* Buka Sekarang — live from Supabase */}
-      <OpenNowStrip />
+      {/* Buka Sekarang + Cafe 24 Jam — live from Supabase */}
+      <CafeSections />
 
       {/* Mood */}
       <section className={styles.moodSection}>

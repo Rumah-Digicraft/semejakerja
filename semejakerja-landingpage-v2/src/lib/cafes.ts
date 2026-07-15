@@ -18,6 +18,12 @@ export interface OpenCafe {
   open: OpenInfo;
 }
 
+/** The two live strips shown on /maps, from a single fetch (no overlap). */
+export interface CafeStrips {
+  openNow: OpenCafe[]; // open right now, EXCLUDING 24-hour places
+  open24h: OpenCafe[]; // always-open (24 jam) places
+}
+
 // Deep-link into the interactive map's cafe modal. Mirrors cafeSlug() in
 // semejakerja-web-apps/src/lib/slug.ts (name + 8-char id prefix).
 function cafeSlug(name: string, id: string): string {
@@ -92,11 +98,34 @@ const COLUMNS =
   "id,name,rating,total_reviews,open_hours,weekday_text,address," +
   "price_level,facilities,wifi_speed_mbps,tier,is_partner";
 
+function toOpenCafe(row: CafeRow): OpenCafe {
+  const wifi = parseFloat(String(row.wifi_speed_mbps ?? "")) || 0;
+  return {
+    id: row.id,
+    name: row.name,
+    slug: cafeSlug(row.name, row.id),
+    rating: parseFloat(String(row.rating ?? "")) || 0,
+    reviewCount: row.total_reviews ?? 0,
+    area: localityFromAddress(row.address),
+    priceLabel: PRICE_LABEL[row.price_level ?? 0] ?? PRICE_LABEL[0],
+    wifiDownload: wifi,
+    hasWifi: hasFacility(row.facilities, "wifi", "WiFi"),
+    hasOutlets: hasFacility(row.facilities, "powerOutlets", "Stopkontak"),
+    isPartner: row.tier === "partner" || row.tier === "sponsor" || !!row.is_partner,
+    open: computeOpenInfo(row.open_hours, row.weekday_text),
+  };
+}
+
 /**
- * Fetches cafes, keeps only the ones open right now (Asia/Jakarta), and returns
- * the `limit` most-reviewed of them — the "Buka Sekarang" strip.
+ * Fetches cafes once and splits them into the two /maps strips. Rows arrive
+ * ordered by popularity (total_reviews desc), so filter+slice keeps the most
+ * popular of each. The lists are disjoint: a 24-jam cafe never appears in
+ * "Buka Sekarang".
  */
-export async function fetchOpenNowCafes(limit = 7): Promise<OpenCafe[]> {
+export async function fetchCafeStrips(
+  openNowLimit = 7,
+  alwaysOpenLimit = 7,
+): Promise<CafeStrips> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("cafes")
@@ -105,27 +134,12 @@ export async function fetchOpenNowCafes(limit = 7): Promise<OpenCafe[]> {
 
   if (error) throw new Error(error.message);
 
-  const rows = (data ?? []) as unknown as CafeRow[];
+  const cafes = ((data ?? []) as unknown as CafeRow[]).map(toOpenCafe);
 
-  return rows
-    .map((row): OpenCafe => {
-      const open = computeOpenInfo(row.open_hours, row.weekday_text);
-      const wifi = parseFloat(String(row.wifi_speed_mbps ?? "")) || 0;
-      return {
-        id: row.id,
-        name: row.name,
-        slug: cafeSlug(row.name, row.id),
-        rating: parseFloat(String(row.rating ?? "")) || 0,
-        reviewCount: row.total_reviews ?? 0,
-        area: localityFromAddress(row.address),
-        priceLabel: PRICE_LABEL[row.price_level ?? 0] ?? PRICE_LABEL[0],
-        wifiDownload: wifi,
-        hasWifi: hasFacility(row.facilities, "wifi", "WiFi"),
-        hasOutlets: hasFacility(row.facilities, "powerOutlets", "Stopkontak"),
-        isPartner: row.tier === "partner" || row.tier === "sponsor" || !!row.is_partner,
-        open,
-      };
-    })
-    .filter((cafe) => cafe.open.isOpenNow)
-    .slice(0, limit);
+  return {
+    open24h: cafes.filter((c) => c.open.is24h).slice(0, alwaysOpenLimit),
+    openNow: cafes
+      .filter((c) => c.open.isOpenNow && !c.open.is24h)
+      .slice(0, openNowLimit),
+  };
 }

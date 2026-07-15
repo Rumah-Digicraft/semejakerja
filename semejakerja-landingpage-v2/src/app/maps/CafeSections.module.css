@@ -3,6 +3,14 @@
   background: var(--color-background);
 }
 
+/* Dark "night" variant for the Cafe 24 Jam strip. */
+.sectionDark {
+  background: var(--color-primary);
+  background-image:
+    radial-gradient(circle at 12% 15%, rgba(240, 199, 51, 0.1) 0%, transparent 45%),
+    radial-gradient(circle at 90% 85%, rgba(90, 45, 138, 0.4) 0%, transparent 50%);
+}
+
 .header {
   display: flex;
   align-items: flex-end;
@@ -44,6 +52,16 @@
   }
 }
 
+.sectionDark .label {
+  color: var(--color-accent);
+}
+.sectionDark .title {
+  color: white;
+}
+.sectionDark .subtitle {
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .arrows {
   display: none;
   gap: var(--space-2);
@@ -72,6 +90,17 @@
   box-shadow: var(--shadow-md);
 }
 
+.sectionDark .arrow {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+.sectionDark .arrow:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-primary);
+}
+
 @media (min-width: 768px) {
   .arrows {
     display: flex;
@@ -91,6 +120,22 @@
 
 .track::-webkit-scrollbar {
   display: none;
+}
+
+/* --- Empty state --- */
+.empty {
+  padding: var(--space-8);
+  border-radius: var(--radius-2xl);
+  background: white;
+  border: 1px dashed var(--color-gray-200);
+  color: var(--color-gray-500);
+  font-size: var(--text-base);
+  text-align: center;
+}
+.sectionDark .empty {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 /* --- Card --- */
@@ -281,6 +326,63 @@ a.card:hover {
 
 a.card:hover .cta {
   color: var(--color-primary);
+}
+
+/* --- "See all" trailing card --- */
+.seeAll {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  background: var(--color-background-alt);
+  border: 2px dashed var(--color-gray-300);
+  box-shadow: none;
+}
+
+a.seeAll:hover {
+  border-color: var(--color-primary);
+  background: white;
+}
+
+.seeAllIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-accent);
+  transition: transform var(--transition-base);
+}
+
+a.seeAll:hover .seeAllIcon {
+  transform: translateX(4px);
+}
+
+.seeAllText {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-primary);
+  max-width: 70%;
+  line-height: 1.4;
+}
+
+.sectionDark .seeAll {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.sectionDark a.seeAll:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--color-accent);
+}
+.sectionDark .seeAllIcon {
+  background: var(--color-accent);
+  color: var(--color-primary);
+}
+.sectionDark .seeAllText {
+  color: white;
 }
 
 /* --- Fallback --- */
