@@ -6,7 +6,7 @@ import { usePagination } from '@/lib/usePagination'
 import { Pagination } from '@/components/ui/pagination'
 import type { Membership, UserProfile } from '@/types'
 import { formatDate, formatCurrency } from '@/lib/utils/format'
-import { Search, CheckCircle, XCircle, Loader2, GraduationCap, ChevronDown, CreditCard, Users, Clock, Eye, X, Phone, Briefcase, MapPin, CalendarClock, Tag, History } from 'lucide-react'
+import { Search, CheckCircle, XCircle, Loader2, GraduationCap, ChevronDown, CreditCard, Users, Clock, Eye, X, Phone, Mail, Briefcase, MapPin, CalendarClock, Tag, History } from 'lucide-react'
 
 const TIER_LABELS: Record<string, { label: string; color: string }> = {
   nyantai: { label: 'Nyantai', color: 'bg-slate-100 text-slate-600' },
@@ -56,6 +56,15 @@ export default function MembersPage() {
     const { data: profiles } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false })
     const { data: memberships } = await supabase.from('memberships').select('*').order('created_at', { ascending: false })
 
+    // Email tinggal di auth.users (diisi Google OAuth), bukan user_profiles —
+    // RPC admin-only mengembalikan pasangan (user_id, email). Kalau migrasi 027
+    // belum jalan, error diabaikan diam-diam dan kolom email tampil "—".
+    const { data: emailRows } = await supabase.rpc('admin_list_member_emails')
+    const emailMap: Record<string, string> = {}
+    ;(emailRows as { user_id: string; email: string | null }[] | null)?.forEach(r => {
+      if (r.email) emailMap[r.user_id] = r.email
+    })
+
     // Per user, prefer the row that actually drives their access: an active
     // membership first, else the newest row (pending/expired/cancelled).
     const memberMap: Record<string, Membership> = {}
@@ -69,7 +78,7 @@ export default function MembersPage() {
     })
 
     const rows: MemberRow[] = (profiles ?? []).map(p => ({
-      profile: p,
+      profile: { ...p, email: emailMap[p.id] },
       membership: memberMap[p.id],
       history: historyMap[p.id] ?? [],
     }))
@@ -114,7 +123,9 @@ export default function MembersPage() {
   const filtered = members.filter(m => {
     const name = (m.profile.full_name ?? '').toLowerCase()
     const phone = (m.profile.phone ?? '').toLowerCase()
-    if (search && !name.includes(search.toLowerCase()) && !phone.includes(search.toLowerCase())) return false
+    const email = (m.profile.email ?? '').toLowerCase()
+    const q = search.toLowerCase()
+    if (search && !name.includes(q) && !phone.includes(q) && !email.includes(q)) return false
     if (filterTier !== 'all' && m.membership?.tier !== filterTier) return false
     if (filterStatus !== 'all' && (m.membership?.status ?? 'none') !== filterStatus) return false
     if (filterStudent === 'student' && !m.profile.is_student) return false
@@ -169,7 +180,7 @@ export default function MembersPage() {
         <div className="flex flex-wrap gap-2">
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama / no WA..." className="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm w-48 focus:outline-none focus:ring-2 focus:ring-purple-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama / email / no WA..." className="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm w-56 focus:outline-none focus:ring-2 focus:ring-purple-400" />
           </div>
           <select value={filterTier} onChange={e => setFilterTier(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none">
             <option value="all">Semua Tier</option>
@@ -198,6 +209,7 @@ export default function MembersPage() {
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
               <tr>
                 <th className="px-5 py-3.5 font-medium">Anggota</th>
+                <th className="px-5 py-3.5 font-medium">Email</th>
                 <th className="px-5 py-3.5 font-medium">Tier Membership</th>
                 <th className="px-5 py-3.5 font-medium">Status</th>
                 <th className="px-5 py-3.5 font-medium">Bergabung</th>
@@ -207,9 +219,9 @@ export default function MembersPage() {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {loading ? Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 6 }).map((_, j) => <td key={j} className="px-5 py-4"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>)}</tr>
+                <tr key={i}>{Array.from({ length: 7 }).map((_, j) => <td key={j} className="px-5 py-4"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>)}</tr>
               )) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-400">Tidak ada member ditemukan.</td></tr>
+                <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-400">Tidak ada member ditemukan.</td></tr>
               ) : pageItems.map(({ profile, membership }) => (
                 <tr key={profile.id} className="hover:bg-slate-50/50 transition">
                   <td className="px-5 py-4">
@@ -217,6 +229,11 @@ export default function MembersPage() {
                       <p className="font-medium text-slate-900 group-hover:text-purple-600 transition">{profile.full_name ?? 'Nama belum diisi'}</p>
                       <p className="text-xs text-slate-400">{profile.phone ?? '—'}</p>
                     </button>
+                  </td>
+                  <td className="px-5 py-4">
+                    {profile.email ? (
+                      <a href={`mailto:${profile.email}`} className="text-slate-600 hover:text-purple-600 hover:underline break-all">{profile.email}</a>
+                    ) : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-5 py-4">
                     {membership ? (
@@ -339,6 +356,14 @@ export default function MembersPage() {
             <div className="p-6 space-y-3 border-b border-slate-100">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Profil</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center gap-2.5 text-slate-600 sm:col-span-2">
+                  <Mail size={15} className="text-slate-400 flex-shrink-0" />
+                  {selected.profile.email ? (
+                    <a href={`mailto:${selected.profile.email}`} className="text-purple-600 font-medium hover:underline break-all">
+                      {selected.profile.email}
+                    </a>
+                  ) : '—'}
+                </div>
                 <div className="flex items-center gap-2.5 text-slate-600">
                   <Phone size={15} className="text-slate-400 flex-shrink-0" />
                   {selected.profile.phone ? (
