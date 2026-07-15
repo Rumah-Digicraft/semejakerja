@@ -58,6 +58,14 @@ body {
   width: 100vw;
 }
 
+/* Crawler-only prerendered block (injected before #root by scripts/prerender.ts).
+   Hidden via this render-blocking stylesheet so it never flashes before the JS
+   bundle boots and mounts the map; it stays in the raw HTML for no-JS crawlers.
+   main.tsx also removes it from the DOM once React takes over. */
+#seo-content {
+  display: none;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 4px;

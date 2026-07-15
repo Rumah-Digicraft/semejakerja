@@ -1,7 +1,10 @@
 .container {
   padding: calc(var(--navbar-height) + var(--space-10)) 0 var(--space-20) 0;
   background-color: var(--color-background);
-  min-height: 100vh;
+  /* Height follows content. A previous `min-height: 100vh` forced the wrapper
+     to a full viewport regardless of content, leaving a large empty gap below
+     the cards before the footer on mobile (stacked content is shorter than the
+     screen). The footer sits directly below the content instead. */
 }
 
 .title {
@@ -83,15 +86,21 @@
 .promoInputGroup {
   display: flex;
   gap: var(--space-2);
+  align-items: stretch;
 }
 
 .promoInput {
-  flex-grow: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-gray-200);
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
   text-transform: uppercase;
+}
+
+.promoInputGroup :global(.btn) {
+  flex-shrink: 0;
 }
 
 .promoInput:focus {
