@@ -24,6 +24,9 @@ function CheckoutContent() {
   
   const tierParam = searchParams.get("tier") || "nongkrong";
   const periodParam = searchParams.get("period") || "bulanan";
+  // While DOKU is still in sandbox, the live checkout keeps the old manual
+  // flow by default; append ?pay=doku to test the DOKU flow safely on live.
+  const dokuMode = searchParams.get("pay") === "doku";
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -102,6 +105,39 @@ function CheckoutContent() {
     setErrorMsg("");
 
     try {
+      // --- DOKU flow (guarded by ?pay=doku during sandbox testing) ---
+      // The edge function prices server-side, creates the DOKU payment,
+      // and returns a payment_url we redirect the member to.
+      if (dokuMode) {
+        const { data, error } = await supabase.functions.invoke("doku-create-payment", {
+          body: {
+            tier: tierParam,
+            period: periodParam,
+            promo_code: promoStatus === "success" ? promoCode.trim() : null,
+            return_url: `${window.location.origin}/membership/checkout/status`,
+          },
+        });
+
+        if (error) {
+          // invoke() flags any non-2xx as error; the real message is in the body.
+          let msg = "Gagal memproses pembayaran. Coba lagi.";
+          try {
+            const body = await error.context.json();
+            if (body?.error) msg = body.error;
+          } catch { /* ignore parse error */ }
+          setErrorMsg(msg);
+          return;
+        }
+
+        if (data?.payment_url) {
+          window.location.href = data.payment_url; // ke halaman bayar DOKU
+          return;
+        }
+        setErrorMsg("Tidak dapat memulai pembayaran. Coba lagi.");
+        return;
+      }
+
+      // --- Legacy manual-transfer flow (default until DOKU goes live) ---
       // Atomic server-side checkout: prices, promo validation, duplicate
       // guard, and used_count increment all happen inside the RPC
       // (migration 008: create_membership_checkout).
@@ -159,18 +195,29 @@ function CheckoutContent() {
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Informasi Pembayaran</h2>
               
-              <div className={styles.paymentWarning}>
-                <AlertCircle size={20} className="flex-shrink-0" />
-                <div>
-                  Silakan transfer tepat sesuai nominal <strong>Rp {finalPrice.toLocaleString("id-ID")}</strong> ke rekening di bawah ini. Akun akan diaktifkan maksimal 1x24 jam setelah konfirmasi.
+              {dokuMode ? (
+                <div className={styles.paymentWarning}>
+                  <AlertCircle size={20} className="flex-shrink-0" />
+                  <div>
+                    Kamu akan diarahkan ke halaman pembayaran <strong>DOKU</strong> untuk membayar <strong>Rp {finalPrice.toLocaleString("id-ID")}</strong> (VA, e-wallet, QRIS, dll). Membership aktif otomatis setelah pembayaran berhasil.
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className={styles.paymentWarning}>
+                    <AlertCircle size={20} className="flex-shrink-0" />
+                    <div>
+                      Silakan transfer tepat sesuai nominal <strong>Rp {finalPrice.toLocaleString("id-ID")}</strong> ke rekening di bawah ini. Akun akan diaktifkan maksimal 1x24 jam setelah konfirmasi.
+                    </div>
+                  </div>
 
-              <div className={styles.paymentBox}>
-                <div className={styles.bankName}>Bank BCA</div>
-                <div className={styles.bankAccount}>123-456-7890</div>
-                <div className={styles.bankHolder}>a.n Semeja Kerja Purwokerto</div>
-              </div>
+                  <div className={styles.paymentBox}>
+                    <div className={styles.bankName}>Bank BCA</div>
+                    <div className={styles.bankAccount}>123-456-7890</div>
+                    <div className={styles.bankHolder}>a.n Semeja Kerja Purwokerto</div>
+                  </div>
+                </>
+              )}
 
               {errorMsg && (
                 <div className={styles.checkoutError}>
@@ -187,7 +234,7 @@ function CheckoutContent() {
                 {submitting ? (
                   <><Loader2 size={18} className="animate-spin" /> Memproses...</>
                 ) : (
-                  <><CheckCircle size={18} /> Saya Sudah Transfer</>
+                  <><CheckCircle size={18} /> {dokuMode ? "Bayar dengan DOKU" : "Saya Sudah Transfer"}</>
                 )}
               </button>
             </div>
