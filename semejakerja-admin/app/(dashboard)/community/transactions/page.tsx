@@ -6,7 +6,7 @@ import { usePagination } from '@/lib/usePagination'
 import { Pagination } from '@/components/ui/pagination'
 import type { Membership, UserProfile } from '@/types'
 import { formatDatetime, formatCurrency } from '@/lib/utils/format'
-import { Search, CheckCircle, XCircle, Wallet, Clock, Receipt, Tag } from 'lucide-react'
+import { Search, CheckCircle, XCircle, Wallet, Clock, Receipt, Tag, Trash2 } from 'lucide-react'
 
 const TIER_LABELS: Record<string, { label: string; color: string }> = {
   nyantai: { label: 'Nyantai', color: 'bg-slate-100 text-slate-600' },
@@ -64,6 +64,20 @@ export default function TransactionsPage() {
       return
     }
     showToast(action === 'approve' ? 'Berhasil: Pembayaran dikonfirmasi!' : 'Pembayaran ditolak')
+    load()
+  }
+
+  const handleDelete = async (row: TransactionRow) => {
+    const name = row.profile?.full_name ?? 'transaksi ini'
+    const tier = TIER_LABELS[row.tier]?.label ?? row.tier
+    if (!window.confirm(`Hapus transaksi "${name}" (${tier})?\nTindakan ini PERMANEN dan tidak bisa dibatalkan.`)) return
+    // SECURITY DEFINER RPC: cek admin, bersihin usage promo, hapus membership.
+    const { error } = await supabase.rpc('admin_delete_membership', { p_membership_id: row.id })
+    if (error) {
+      showToast(`Gagal menghapus: ${error.message}`)
+      return
+    }
+    showToast('Transaksi dihapus')
     load()
   }
 
@@ -186,22 +200,31 @@ export default function TransactionsPage() {
                   </td>
                   <td className="px-5 py-4 text-xs text-slate-500">{formatDatetime(row.created_at)}</td>
                   <td className="px-5 py-4">
-                    {row.status === 'pending_payment' ? (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handlePayment(row.id, 'approve')}
-                          className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-medium flex items-center gap-1 transition w-max"
-                        >
-                          <CheckCircle size={12} /> Konfirmasi
-                        </button>
-                        <button
-                          onClick={() => handlePayment(row.id, 'reject')}
-                          className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-medium flex items-center gap-1 transition w-max"
-                        >
-                          <XCircle size={12} /> Tolak
-                        </button>
-                      </div>
-                    ) : <span className="text-slate-300 text-xs">—</span>}
+                    <div className="flex items-center gap-2">
+                      {row.status === 'pending_payment' && (
+                        <>
+                          <button
+                            onClick={() => handlePayment(row.id, 'approve')}
+                            className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-medium flex items-center gap-1 transition w-max"
+                          >
+                            <CheckCircle size={12} /> Konfirmasi
+                          </button>
+                          <button
+                            onClick={() => handlePayment(row.id, 'reject')}
+                            className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-medium flex items-center gap-1 transition w-max"
+                          >
+                            <XCircle size={12} /> Tolak
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => handleDelete(row)}
+                        title="Hapus transaksi permanen"
+                        className="px-3 py-1.5 bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-lg text-xs font-medium flex items-center gap-1 transition w-max"
+                      >
+                        <Trash2 size={12} /> Hapus
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
