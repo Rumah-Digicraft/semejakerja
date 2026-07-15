@@ -1,20 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { Check, X } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import styles from "./membership.module.css";
 import { features } from "./features";
 import LaunchBanner from "./LaunchBanner";
 
+const TIER_RANK: Record<string, number> = { nyantai: 0, nongkrong: 1, mode_serius: 2 };
+
 export default function MembershipPage() {
   const [isAnnual, setIsAnnual] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [currentTier, setCurrentTier] = useState<string | null>(null);
+
+  // Deteksi plan aktif user (kalau login) → tandai "Plan Saya" &
+  // sembunyikan tier di bawah plan-nya di kartu Pricing.
+  useEffect(() => {
+    const supabase = createClient();
+    async function loadPlan() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setLoggedIn(true);
+      const { data } = await supabase
+        .from("memberships")
+        .select("tier, status, expires_at")
+        .eq("user_id", user.id)
+        .eq("status", "active");
+      let best: string | null = null;
+      for (const m of (data ?? []) as { tier: string; expires_at: string | null }[]) {
+        if (m.expires_at && new Date(m.expires_at) < new Date()) continue;
+        if (best === null || TIER_RANK[m.tier] > TIER_RANK[best]) best = m.tier;
+      }
+      setCurrentTier(best ?? "nyantai");
+    }
+    loadPlan();
+  }, []);
 
   // Pricing based on Triwulan vs Bulanan (Triwulan is 3 months)
   const priceNongkrong = isAnnual ? "47.000" : "19.000";
   const priceSerius = isAnnual ? "77.000" : "31.000";
   const periodLabel = isAnnual ? "/triwulan" : "/bln";
   const linkParams = isAnnual ? "?period=triwulan" : "?period=bulanan";
+
+  // Tombol tiap tier menyesuaikan plan aktif user:
+  //  - tier == plan aktif  → "Plan Saya" (hijau, non-klik, info)
+  //  - tier < plan aktif   → disembunyikan
+  //  - tier > plan aktif / belum login → CTA default (fallback)
+  const planButton = (tier: string, fallback: ReactNode): ReactNode => {
+    if (!loggedIn) return fallback;
+    const cur = currentTier ?? "nyantai";
+    if (tier === cur) {
+      return <span className={`btn btn--secondary ${styles.actionBtn} ${styles.planSaya}`}>✓ Plan Saya</span>;
+    }
+    if (TIER_RANK[tier] < TIER_RANK[cur]) return null;
+    return fallback;
+  };
 
   return (
     <div className={styles.page}>
@@ -29,7 +71,7 @@ export default function MembershipPage() {
           <p className={styles.subtitle}>
             Dapatkan benefit maksimal untuk produktivitas kerjamu. Bergabung dengan komunitas WFC terbesar di Purwokerto.
           </p>
-          
+
           <div className={styles.billingToggle}>
             <span className={!isAnnual ? styles.toggleLabelActive : styles.toggleLabel} onClick={() => setIsAnnual(false)}>Bulanan</span>
             <label className={styles.switch}>
@@ -48,7 +90,7 @@ export default function MembershipPage() {
       <section className={styles.pricingSection}>
         <div className="container">
           <div className={styles.pricingGrid}>
-            
+
             {/* Nyantai */}
             <div className={styles.pricingCard}>
               <h2 className={styles.tierName}>Nyantai</h2>
@@ -61,9 +103,11 @@ export default function MembershipPage() {
                 <li className={styles.featureItem}><Check size={18} className={styles.featureIcon} /> Maps basic (nama, alamat)</li>
                 <li className={styles.featureItem}><Check size={18} className={styles.featureIcon} /> Update reguler WFC</li>
               </ul>
-              <Link href="/auth/register" className={`btn btn--secondary ${styles.actionBtn}`}>
-                Gabung Gratis
-              </Link>
+              {planButton("nyantai", (
+                <Link href="/auth/register" className={`btn btn--secondary ${styles.actionBtn}`}>
+                  Gabung Gratis
+                </Link>
+              ))}
             </div>
 
             {/* Nongkrong */}
@@ -82,9 +126,11 @@ export default function MembershipPage() {
                 <li className={styles.featureItem}><Check size={18} className={styles.featureIcon} /> <strong>Diskon 10% di Cafe Mitra</strong></li>
                 <li className={styles.featureItem}><Check size={18} className={styles.featureIcon} /> Badge profil (Nongkrong)</li>
               </ul>
-              <Link href={`/membership/checkout${linkParams}&tier=nongkrong`} className={`btn btn--primary ${styles.actionBtn}`}>
-                Pilih Nongkrong
-              </Link>
+              {planButton("nongkrong", (
+                <Link href={`/membership/checkout${linkParams}&tier=nongkrong`} className={`btn btn--primary ${styles.actionBtn}`}>
+                  Pilih Nongkrong
+                </Link>
+              ))}
             </div>
 
             {/* Mode Serius */}
@@ -103,9 +149,11 @@ export default function MembershipPage() {
                 <li className={styles.featureItem}><Check size={18} className={styles.featureIcon} /> Akses event eksklusif member</li>
                 <li className={styles.featureItem}><Check size={18} className={styles.featureIcon} /> Badge profil (Mode Serius)</li>
               </ul>
-              <Link href={`/membership/checkout${linkParams}&tier=mode_serius`} className={`btn btn--secondary ${styles.actionBtn}`}>
-                Pilih Mode Serius
-              </Link>
+              {planButton("mode_serius", (
+                <Link href={`/membership/checkout${linkParams}&tier=mode_serius`} className={`btn btn--secondary ${styles.actionBtn}`}>
+                  Pilih Mode Serius
+                </Link>
+              ))}
             </div>
 
           </div>
@@ -117,7 +165,7 @@ export default function MembershipPage() {
         <div className="container">
           <h2 className={styles.sectionTitle}>Bandingkan Fitur</h2>
           <p className={styles.sectionSubtitle}>Detail lengkap apa saja yang kamu dapatkan di tiap tier membership.</p>
-          
+
           <div className={styles.comparisonTableWrapper}>
             <table className={styles.comparisonTable}>
               <thead>

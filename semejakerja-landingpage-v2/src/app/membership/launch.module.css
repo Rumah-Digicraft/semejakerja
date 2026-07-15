@@ -157,10 +157,16 @@
 }
 
 .select {
-  padding: 0.65rem 0.8rem;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0.65rem 2.4rem 0.65rem 0.9rem;
   border-radius: var(--radius-lg, 14px);
   border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.08);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  background-size: 14px;
   color: #fff;
   font-size: 0.9rem;
 }
