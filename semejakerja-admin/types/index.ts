@@ -185,6 +185,14 @@ export interface PromoCodeUsage {
   user_profile?: UserProfile
 }
 
+// Email allow-list untuk sebuah promo. Tanpa baris = kode terbuka untuk semua.
+export interface PromoCodeAllowedEmail {
+  id: string
+  code_id: string
+  email: string
+  created_at: string
+}
+
 // ── CAMPAIGNS ────────────────────────────────────────────────────────────
 export type CampaignObjective =
   | 'launch' | 'membership_growth' | 'event' | 'partner' | 'moves_fill' | 'seasonal' | 'other'

@@ -7,7 +7,16 @@ import type { PromoCode, Campaign } from '@/types'
 import { formatDate, generatePromoCode } from '@/lib/utils/format'
 import { usePagination } from '@/lib/usePagination'
 import { Pagination } from '@/components/ui/pagination'
-import { Plus, Tag, Copy, Loader2, X, Infinity as InfinityIcon } from 'lucide-react'
+import { Plus, Tag, Copy, Loader2, X, Infinity as InfinityIcon, Lock, Mail, Trash2 } from 'lucide-react'
+
+// Parse teks bebas (dipisah koma / spasi / baris baru / titik koma) jadi
+// daftar email unik, lowercase, tanpa duplikat.
+const parseEmails = (raw: string): string[] =>
+  Array.from(new Set(
+    raw.split(/[\s,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean),
+  ))
+
+const isValidEmail = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)
 
 const TYPE_COLORS: Record<string, string> = {
   student: 'bg-blue-100 text-blue-700',
@@ -21,6 +30,7 @@ export default function PromoCodesPage() {
   const supabase = createClient()
   const [codes, setCodes] = useState<PromoCode[]>([])
   const [campaigns, setCampaigns] = useState<Pick<Campaign, 'id' | 'name'>[]>([])
+  const [emailsByCode, setEmailsByCode] = useState<Map<string, string[]>>(new Map())
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -29,6 +39,11 @@ export default function PromoCodesPage() {
   const [filterActive, setFilterActive] = useState('all')
   const [filterCampaign, setFilterCampaign] = useState('all')
 
+  // Modal kelola email untuk kode yang sudah ada
+  const [emailModal, setEmailModal] = useState<{ id: string; code: string } | null>(null)
+  const [emailInput, setEmailInput] = useState('')
+  const [emailBusy, setEmailBusy] = useState(false)
+
   const [form, setForm] = useState({
     code: '',
     type: 'community' as PromoCode['type'],
@@ -36,18 +51,27 @@ export default function PromoCodesPage() {
     max_usage: '' as string | number,
     expires_at: '',
     campaign_id: '' as string,
+    allowed_emails: '',
   })
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: codeRows }, { data: campRows }] = await Promise.all([
+    const [{ data: codeRows }, { data: campRows }, { data: emailRows }] = await Promise.all([
       supabase.from('promo_codes').select('*').order('created_at', { ascending: false }),
       supabase.from('campaigns').select('id, name').order('created_at', { ascending: false }),
+      supabase.from('promo_code_allowed_emails').select('code_id, email'),
     ])
     setCodes((codeRows ?? []) as PromoCode[])
     setCampaigns((campRows ?? []) as Pick<Campaign, 'id' | 'name'>[])
+    const map = new Map<string, string[]>()
+    for (const row of (emailRows ?? []) as { code_id: string; email: string }[]) {
+      const list = map.get(row.code_id) ?? []
+      list.push(row.email)
+      map.set(row.code_id, list)
+    }
+    setEmailsByCode(map)
     setLoading(false)
   }, [])
 
@@ -72,8 +96,14 @@ export default function PromoCodesPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validasi email allow-list dulu (kalau diisi) sebelum menyentuh DB
+    const emails = parseEmails(form.allowed_emails)
+    const invalid = emails.filter(e => !isValidEmail(e))
+    if (invalid.length) { showToast('Email tidak valid: ' + invalid.join(', ')); return }
+
     setSaving(true)
-    const { error } = await supabase.from('promo_codes').insert({
+    const { data: created, error } = await supabase.from('promo_codes').insert({
       code: form.code.toUpperCase(),
       type: form.type,
       discount_percent: form.discount_percent,
@@ -81,12 +111,27 @@ export default function PromoCodesPage() {
       expires_at: form.expires_at || null,
       campaign_id: form.campaign_id || null,
       is_active: true,
-    })
+    }).select('id').single()
+    if (error || !created) {
+      setSaving(false)
+      showToast('Gagal buat kode: ' + (error?.message ?? 'unknown'))
+      return
+    }
+    if (emails.length) {
+      const { error: emailErr } = await supabase.from('promo_code_allowed_emails')
+        .insert(emails.map(email => ({ code_id: created.id, email })))
+      if (emailErr) {
+        setSaving(false)
+        showToast('Kode dibuat, tapi email gagal disimpan: ' + emailErr.message)
+        setShowModal(false)
+        load()
+        return
+      }
+    }
     setSaving(false)
-    if (error) { showToast('Gagal buat kode: ' + error.message); return }
-    showToast('Promo code berhasil dibuat!')
+    showToast(emails.length ? `Kode dibuat, dibatasi ke ${emails.length} email` : 'Promo code berhasil dibuat!')
     setShowModal(false)
-    setForm({ code: '', type: 'community', discount_percent: 10, max_usage: '', expires_at: '', campaign_id: '' })
+    setForm({ code: '', type: 'community', discount_percent: 10, max_usage: '', expires_at: '', campaign_id: '', allowed_emails: '' })
     load()
   }
 
@@ -106,6 +151,46 @@ export default function PromoCodesPage() {
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code)
     showToast('Kode disalin!')
+  }
+
+  const currentEmails = emailModal ? (emailsByCode.get(emailModal.id) ?? []) : []
+
+  const handleAddEmails = async () => {
+    if (!emailModal) return
+    const parsed = parseEmails(emailInput)
+    const invalid = parsed.filter(e => !isValidEmail(e))
+    if (invalid.length) { showToast('Email tidak valid: ' + invalid.join(', ')); return }
+    const fresh = parsed.filter(e => !currentEmails.includes(e))
+    if (!fresh.length) { showToast('Email sudah ada di daftar'); return }
+    setEmailBusy(true)
+    const { error } = await supabase.from('promo_code_allowed_emails')
+      .insert(fresh.map(email => ({ code_id: emailModal.id, email })))
+    setEmailBusy(false)
+    if (error) { showToast('Gagal tambah email: ' + error.message); return }
+    setEmailsByCode(prev => {
+      const next = new Map(prev)
+      next.set(emailModal.id, [...currentEmails, ...fresh])
+      return next
+    })
+    setEmailInput('')
+    showToast(`${fresh.length} email ditambahkan`)
+  }
+
+  const handleRemoveEmail = async (email: string) => {
+    if (!emailModal) return
+    setEmailBusy(true)
+    const { error } = await supabase.from('promo_code_allowed_emails')
+      .delete().eq('code_id', emailModal.id).eq('email', email)
+    setEmailBusy(false)
+    if (error) { showToast('Gagal hapus email: ' + error.message); return }
+    setEmailsByCode(prev => {
+      const next = new Map(prev)
+      const remaining = currentEmails.filter(e => e !== email)
+      if (remaining.length) next.set(emailModal.id, remaining)
+      else next.delete(emailModal.id)
+      return next
+    })
+    showToast('Email dihapus')
   }
 
   return (
@@ -169,6 +254,14 @@ export default function PromoCodesPage() {
                       <div>
                         <code className="font-mono font-bold text-slate-800 tracking-wide">{code.code}</code>
                         <span className={`ml-0 block w-fit mt-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${TYPE_COLORS[code.type] ?? 'bg-slate-100 text-slate-600'}`}>{code.type}</span>
+                        {(emailsByCode.get(code.id)?.length ?? 0) > 0 && (
+                          <span
+                            title={`Khusus: ${emailsByCode.get(code.id)!.join(', ')}`}
+                            className="mt-1 inline-flex items-center gap-1 w-fit px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-700"
+                          >
+                            <Lock size={9} /> {emailsByCode.get(code.id)!.length} EMAIL
+                          </span>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -197,6 +290,7 @@ export default function PromoCodesPage() {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center justify-end gap-1.5">
                       <button onClick={() => copyCode(code.code)} title="Salin kode" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><Copy size={14} /></button>
+                      <button onClick={() => { setEmailModal({ id: code.id, code: code.code }); setEmailInput('') }} title="Kelola email yang boleh pakai" className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-400"><Mail size={14} /></button>
                       <button onClick={() => handleToggle(code.id, code.is_active)} className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${code.is_active ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>{code.is_active ? 'Off' : 'On'}</button>
                       <button onClick={() => handleDelete(code.id, code.code)} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-red-50 text-red-500 hover:bg-red-100 transition">Hapus</button>
                     </div>
@@ -258,6 +352,19 @@ export default function PromoCodesPage() {
                   {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+                  <Lock size={13} className="text-rose-400" /> Batasi ke email tertentu (opsional)
+                </label>
+                <textarea
+                  value={form.allowed_emails}
+                  onChange={e => setForm({ ...form, allowed_emails: e.target.value })}
+                  rows={2}
+                  placeholder="a@email.com, b@email.com"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 resize-y"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Kosongkan = boleh dipakai siapa saja. Pisah beberapa email dengan koma / spasi / baris baru. Dicek dari email akun yang login.</p>
+              </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-sm">Batal</button>
                 <button type="submit" disabled={saving} className="px-5 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-xl text-sm font-medium flex items-center gap-2">
@@ -265,6 +372,47 @@ export default function PromoCodesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manage allowed-emails modal */}
+      {emailModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2"><Lock size={18} className="text-rose-500" /> Email yang boleh pakai</h2>
+              <button onClick={() => setEmailModal(null)} className="p-2 rounded-lg hover:bg-slate-100"><X size={18} /></button>
+            </div>
+            <p className="text-sm text-slate-500 mb-4">Kode <code className="font-mono font-bold text-slate-700">{emailModal.code}</code>. {currentEmails.length ? 'Hanya email di bawah yang bisa menebus kode ini.' : 'Belum dibatasi — saat ini boleh dipakai siapa saja.'}</p>
+
+            <div className="flex gap-2 mb-4">
+              <input
+                value={emailInput}
+                onChange={e => setEmailInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddEmails() } }}
+                placeholder="tambah@email.com"
+                className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+              />
+              <button onClick={handleAddEmails} disabled={emailBusy || !emailInput.trim()} className="px-4 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl text-sm font-medium flex items-center gap-1.5">
+                {emailBusy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Tambah
+              </button>
+            </div>
+
+            <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-100">
+              {currentEmails.length === 0 ? (
+                <div className="px-4 py-8 text-center text-slate-400 text-sm">Belum ada email. Kode terbuka untuk semua.</div>
+              ) : currentEmails.map(email => (
+                <div key={email} className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-sm text-slate-700 truncate">{email}</span>
+                  <button onClick={() => handleRemoveEmail(email)} disabled={emailBusy} className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 disabled:opacity-50 shrink-0"><Trash2 size={15} /></button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <button onClick={() => setEmailModal(null)} className="px-5 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-medium text-slate-700">Selesai</button>
+            </div>
           </div>
         </div>
       )}

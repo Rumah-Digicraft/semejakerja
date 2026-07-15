@@ -24,9 +24,6 @@ function CheckoutContent() {
   
   const tierParam = searchParams.get("tier") || "nongkrong";
   const periodParam = searchParams.get("period") || "bulanan";
-  // While DOKU is still in sandbox, the live checkout keeps the old manual
-  // flow by default; append ?pay=doku to test the DOKU flow safely on live.
-  const dokuMode = searchParams.get("pay") === "doku";
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -71,31 +68,26 @@ function CheckoutContent() {
   const handleApplyPromo = async () => {
     if (!promoCode) return;
 
-    // Best-effort preview from the real promo_codes table (RLS: public may
-    // read active codes). The checkout RPC re-validates authoritatively.
-    const { data: promo } = await supabase
-      .from("promo_codes")
-      .select("code, type, discount_percent, expires_at, max_usage, used_count")
-      .ilike("code", promoCode.trim())
-      .eq("is_active", true)
-      .maybeSingle();
+    // Preview lewat RPC preview_promo_code (SECURITY DEFINER). RPC ini juga
+    // memeriksa batasan email tanpa membocorkan daftarnya ke client. Checkout
+    // RPC tetap memvalidasi ulang secara otoritatif saat bayar.
+    const { data, error } = await supabase.rpc("preview_promo_code", {
+      p_code: promoCode.trim(),
+    });
 
-    const expired = promo?.expires_at && new Date(promo.expires_at) <= new Date();
-    const usedUp = promo?.max_usage != null && promo.used_count >= promo.max_usage;
-
-    if (!promo || expired || usedUp) {
+    if (error || !data?.valid) {
       setDiscountPercent(0);
       setPromoStatus("error");
-      setPromoMsg("Kode promo tidak valid atau kadaluarsa");
+      setPromoMsg(data?.reason || "Kode promo tidak valid atau kadaluarsa");
       return;
     }
 
-    setDiscountPercent(promo.discount_percent);
+    setDiscountPercent(data.discount_percent);
     setPromoStatus("success");
     setPromoMsg(
-      promo.type === "student" && STUDENT_MEMBERSHIP_ENABLED
-        ? `Promo pelajar berhasil! Diskon ${promo.discount_percent}% (khusus mahasiswa terverifikasi)`
-        : `Promo berhasil digunakan! Diskon ${promo.discount_percent}%`
+      data.type === "student" && STUDENT_MEMBERSHIP_ENABLED
+        ? `Promo pelajar berhasil! Diskon ${data.discount_percent}% (khusus mahasiswa terverifikasi)`
+        : `Promo berhasil digunakan! Diskon ${data.discount_percent}%`
     );
   };
 
@@ -105,68 +97,33 @@ function CheckoutContent() {
     setErrorMsg("");
 
     try {
-      // --- DOKU flow (guarded by ?pay=doku during sandbox testing) ---
-      // The edge function prices server-side, creates the DOKU payment,
-      // and returns a payment_url we redirect the member to.
-      if (dokuMode) {
-        const { data, error } = await supabase.functions.invoke("doku-create-payment", {
-          body: {
-            tier: tierParam,
-            period: periodParam,
-            promo_code: promoStatus === "success" ? promoCode.trim() : null,
-            return_url: `${window.location.origin}/membership/checkout/status`,
-          },
-        });
-
-        if (error) {
-          // invoke() flags any non-2xx as error; the real message is in the body.
-          let msg = "Gagal memproses pembayaran. Coba lagi.";
-          try {
-            const body = await error.context.json();
-            if (body?.error) msg = body.error;
-          } catch { /* ignore parse error */ }
-          setErrorMsg(msg);
-          return;
-        }
-
-        if (data?.payment_url) {
-          window.location.href = data.payment_url; // ke halaman bayar DOKU
-          return;
-        }
-        setErrorMsg("Tidak dapat memulai pembayaran. Coba lagi.");
-        return;
-      }
-
-      // --- Legacy manual-transfer flow (default until DOKU goes live) ---
-      // Atomic server-side checkout: prices, promo validation, duplicate
-      // guard, and used_count increment all happen inside the RPC
-      // (migration 008: create_membership_checkout).
-      const { error } = await supabase.rpc("create_membership_checkout", {
-        p_tier: tierParam,
-        p_period: periodParam,
-        p_promo_code: promoStatus === "success" ? promoCode.trim() : null,
+      // Server-side: price via create_membership_checkout RPC, create the
+      // DOKU payment, and return a payment_url we redirect the member to.
+      const { data, error } = await supabase.functions.invoke("doku-create-payment", {
+        body: {
+          tier: tierParam,
+          period: periodParam,
+          promo_code: promoStatus === "success" ? promoCode.trim() : null,
+          return_url: `${window.location.origin}/membership/checkout/status`,
+        },
       });
 
       if (error) {
-        // Log fields explicitly — the dev overlay renders a bare
-        // PostgrestError as "{}", hiding the real cause.
-        console.error(
-          "Checkout error:",
-          error.message,
-          "| code:",
-          error.code,
-          "| details:",
-          error.details,
-          "| hint:",
-          error.hint
-        );
-        // RAISE EXCEPTION messages from the RPC are user-facing Indonesian
-        // (e.g. "Kamu masih punya pembayaran yang menunggu verifikasi admin").
-        setErrorMsg(error.message || "Gagal memproses. Coba lagi.");
-      } else {
-        alert("Pembayaran berhasil disubmit! Admin akan memverifikasi dalam 1x24 jam.");
-        router.push("/");
+        // invoke() flags any non-2xx as error; the real message is in the body.
+        let msg = "Gagal memproses pembayaran. Coba lagi.";
+        try {
+          const body = await error.context.json();
+          if (body?.error) msg = body.error;
+        } catch { /* ignore parse error */ }
+        setErrorMsg(msg);
+        return;
       }
+
+      if (data?.payment_url) {
+        window.location.href = data.payment_url; // ke halaman bayar DOKU
+        return;
+      }
+      setErrorMsg("Tidak dapat memulai pembayaran. Coba lagi.");
     } catch (err) {
       console.error("Checkout exception:", err);
       setErrorMsg("Terjadi kesalahan tak terduga. Coba lagi.");
@@ -195,29 +152,12 @@ function CheckoutContent() {
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Informasi Pembayaran</h2>
               
-              {dokuMode ? (
-                <div className={styles.paymentWarning}>
-                  <AlertCircle size={20} className="flex-shrink-0" />
-                  <div>
-                    Kamu akan diarahkan ke halaman pembayaran <strong>DOKU</strong> untuk membayar <strong>Rp {finalPrice.toLocaleString("id-ID")}</strong> (VA, e-wallet, QRIS, dll). Membership aktif otomatis setelah pembayaran berhasil.
-                  </div>
+              <div className={styles.paymentWarning}>
+                <AlertCircle size={20} className="flex-shrink-0" />
+                <div>
+                  Kamu akan diarahkan ke halaman pembayaran <strong>DOKU</strong> untuk membayar <strong>Rp {finalPrice.toLocaleString("id-ID")}</strong> (VA, e-wallet, QRIS, dll). Membership aktif otomatis setelah pembayaran berhasil.
                 </div>
-              ) : (
-                <>
-                  <div className={styles.paymentWarning}>
-                    <AlertCircle size={20} className="flex-shrink-0" />
-                    <div>
-                      Silakan transfer tepat sesuai nominal <strong>Rp {finalPrice.toLocaleString("id-ID")}</strong> ke rekening di bawah ini. Akun akan diaktifkan maksimal 1x24 jam setelah konfirmasi.
-                    </div>
-                  </div>
-
-                  <div className={styles.paymentBox}>
-                    <div className={styles.bankName}>Bank BCA</div>
-                    <div className={styles.bankAccount}>123-456-7890</div>
-                    <div className={styles.bankHolder}>a.n Semeja Kerja Purwokerto</div>
-                  </div>
-                </>
-              )}
+              </div>
 
               {errorMsg && (
                 <div className={styles.checkoutError}>
@@ -234,7 +174,7 @@ function CheckoutContent() {
                 {submitting ? (
                   <><Loader2 size={18} className="animate-spin" /> Memproses...</>
                 ) : (
-                  <><CheckCircle size={18} /> {dokuMode ? "Bayar dengan DOKU" : "Saya Sudah Transfer"}</>
+                  <><CheckCircle size={18} /> Bayar dengan DOKU</>
                 )}
               </button>
             </div>
