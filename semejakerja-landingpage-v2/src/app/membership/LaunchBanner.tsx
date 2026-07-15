@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Rocket, Loader2, Copy, Check, ArrowRight, Flame, Clock } from "lucide-react";
 import styles from "./launch.module.css";
 
-// Bentuk baris dari view publik `active_launch_campaign` (migration 018).
+// Bentuk baris dari view publik `active_launch_campaign` (migration 018/021).
 interface LaunchCampaign {
   id: string;
   name: string;
@@ -13,10 +13,11 @@ interface LaunchCampaign {
   subheadline: string | null;
   cta_label: string | null;
   discount_percent: number | null;
-  quota: number | null;
+  quota: number | null; // dipakai sebagai TARGET lunak, bukan cap
   starts_at: string | null;
   ends_at: string | null;
   registered_count: number;
+  joined_count: number; // lead 'redeemed' = sudah pakai kode buat bayar
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -49,7 +50,7 @@ export default function LaunchBanner() {
   const [error, setError] = useState("");
   const [tier, setTier] = useState("nongkrong");
   const [copied, setCopied] = useState(false);
-  const [registered, setRegistered] = useState(0);
+  const [joined, setJoined] = useState(0);
 
   // Muat awal: campaign aktif + sesi login.
   useEffect(() => {
@@ -61,7 +62,7 @@ export default function LaunchBanner() {
         .maybeSingle();
       const camp = (data as LaunchCampaign | null) ?? null;
       setCampaign(camp);
-      if (camp) setRegistered(camp.registered_count);
+      if (camp) setJoined(camp.joined_count);
       const { data: { session } } = await supabase.auth.getSession();
       setLoggedIn(!!session);
       setLoading(false);
@@ -69,8 +70,8 @@ export default function LaunchBanner() {
     load();
   }, []);
 
-  // "War": poll jumlah pendaftar tiap 7 detik supaya slot kelihatan
-  // kebakar real-time. Kalau campaign sudah tidak aktif → sembunyikan.
+  // Momentum: poll jumlah yang SUDAH GABUNG (bayar) tiap 7 detik.
+  // Kalau campaign tidak aktif lagi → sembunyikan.
   useEffect(() => {
     if (!campaign) return;
     const supabase = createClient();
@@ -78,10 +79,10 @@ export default function LaunchBanner() {
     const t = setInterval(async () => {
       const { data } = await supabase
         .from("active_launch_campaign")
-        .select("registered_count")
+        .select("joined_count")
         .eq("id", id)
         .maybeSingle();
-      if (data) setRegistered((data as { registered_count: number }).registered_count);
+      if (data) setJoined((data as { joined_count: number }).joined_count);
       else setCampaign(null);
     }, 7000);
     return () => clearInterval(t);
@@ -95,18 +96,10 @@ export default function LaunchBanner() {
 
   const discount = campaign.discount_percent ?? 0;
   const loginHref = `/auth/login?next=${encodeURIComponent("/membership")}`;
-
-  // Sisa slot + level urgensi (war).
-  const remaining = campaign.quota != null ? Math.max(campaign.quota - registered, 0) : null;
-  const ratio = campaign.quota ? (remaining as number) / campaign.quota : 1;
-  const full = remaining !== null && remaining <= 0;
-  const critical = remaining !== null && !full && ratio <= 0.1;
-  const low = remaining !== null && !full && !critical && ratio <= 0.3;
-  const pct = campaign.quota ? Math.min((registered / campaign.quota) * 100, 100) : 0;
-  const warClass = full ? styles.warFull : critical ? styles.warCritical : low ? styles.warLow : "";
-
   const ended = !!cd?.ended;
-  const closed = ended || full;
+
+  // Progress menuju target (quota = target lunak, bukan cap).
+  const pct = campaign.quota ? Math.min((joined / campaign.quota) * 100, 100) : 0;
 
   const handleRegister = async () => {
     setSubmitting(true);
@@ -122,7 +115,8 @@ export default function LaunchBanner() {
       return;
     }
     setCode((data as { code: string }).code);
-    setRegistered((r) => r + 1); // optimistis; poll akan sinkron
+    // Sengaja TIDAK menaikkan `joined` di sini — daftar != bayar.
+    // Counter naik hanya saat orang benar-benar pakai kodenya (redeemed).
   };
 
   const copyCode = () => {
@@ -167,22 +161,23 @@ export default function LaunchBanner() {
               )}
               {ended && <p className={styles.endedNote}>Pendaftaran sudah ditutup.</p>}
 
-              {/* War: sisa slot + progress */}
-              {campaign.quota != null && (
-                <div className={`${styles.war} ${warClass}`}>
-                  <div className={styles.warRow}>
-                    <span className={styles.warText}>
-                      {(critical || low) && <Flame size={15} className={styles.warFlame} />}
-                      {full ? "Kuota penuh" : `Sisa ${remaining} slot`}
-                    </span>
-                    <span className={styles.warCount}>{registered} / {campaign.quota}</span>
-                  </div>
+              {/* Momentum: berapa yang sudah gabung (bayar) */}
+              <div className={styles.war}>
+                <div className={styles.warRow}>
+                  <span className={styles.warText}>
+                    <Flame size={15} className={styles.warFlame} />
+                    {joined > 0 ? `${joined} orang sudah gabung!` : "Jadi yang pertama gabung!"}
+                  </span>
+                  {campaign.quota != null && (
+                    <span className={styles.warCount}>{joined} / target {campaign.quota}</span>
+                  )}
+                </div>
+                {campaign.quota != null && (
                   <div className={styles.quotaBar}>
                     <div className={styles.quotaFill} style={{ width: `${pct}%` }} />
                   </div>
-                  {critical && !full && <span className={styles.warHype}>🔥 Buruan, hampir habis!</span>}
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             <div className={styles.right}>
@@ -203,8 +198,8 @@ export default function LaunchBanner() {
                     Pilih paket di bawah, lalu masukkan kode ini saat checkout.
                   </p>
                 </div>
-              ) : closed ? (
-                <p className={styles.full}>{ended ? "Waktu pendaftaran habis ⏰" : "Kuota pendaftar sudah penuh 🙏"}</p>
+              ) : ended ? (
+                <p className={styles.full}>Waktu pendaftaran habis ⏰</p>
               ) : !loggedIn ? (
                 <a href={loginHref} className={styles.cta}>
                   Login untuk daftar <ArrowRight size={16} />

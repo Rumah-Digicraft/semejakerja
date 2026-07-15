@@ -208,6 +208,7 @@ export interface Campaign {
   discount_percent: number | null
   quota: number | null
   code_valid_days: number
+  grace_days: number
   headline: string | null
   subheadline: string | null
   cta_label: string | null

@@ -43,7 +43,7 @@ export default function CampaignDetailPage() {
       status: camp.status, starts_at: toDateInput(camp.starts_at), ends_at: toDateInput(camp.ends_at),
       target_metric: camp.target_metric ?? 'signups', target_value: camp.target_value ?? '',
       budget: camp.budget ?? '', discount_percent: camp.discount_percent ?? 30,
-      quota: camp.quota ?? '', code_valid_days: camp.code_valid_days ?? 14,
+      quota: camp.quota ?? '', code_valid_days: camp.code_valid_days ?? 14, grace_days: camp.grace_days ?? 3,
       headline: camp.headline ?? '', subheadline: camp.subheadline ?? '',
       cta_label: camp.cta_label ?? 'Daftar sekarang',
     })
@@ -110,6 +110,7 @@ export default function CampaignDetailPage() {
       discount_percent: form.discount_percent === '' ? null : Number(form.discount_percent),
       quota: form.quota === '' ? null : Number(form.quota),
       code_valid_days: Number(form.code_valid_days) || 14,
+      grace_days: Number(form.grace_days) || 3,
       headline: form.headline || null, subheadline: form.subheadline || null,
       cta_label: form.cta_label || null,
     }).eq('id', id)
@@ -248,8 +249,8 @@ export default function CampaignDetailPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div><label className={label}>Diskon (%)</label><input type="number" min={1} max={100} className={input} value={form.discount_percent as string} onChange={e => set('discount_percent', e.target.value)} /></div>
-                <div><label className={label}>Kuota</label><input type="number" min={1} placeholder="∞" className={input} value={form.quota as string} onChange={e => set('quota', e.target.value)} /></div>
-                <div><label className={label}>Kode berlaku (hari)</label><input type="number" min={1} className={input} value={form.code_valid_days as string} onChange={e => set('code_valid_days', e.target.value)} /></div>
+                <div><label className={label}>Target gabung</label><input type="number" min={1} placeholder="opsional" className={input} value={form.quota as string} onChange={e => set('quota', e.target.value)} /></div>
+                <div><label className={label}>Grace kode (hari)</label><input type="number" min={0} className={input} value={form.grace_days as string} onChange={e => set('grace_days', e.target.value)} /></div>
               </div>
               <div><label className={label}>Headline</label><input className={input} placeholder="Jadi Founding Member Semeja Kerja" value={form.headline as string} onChange={e => set('headline', e.target.value)} /></div>
               <div><label className={label}>Subheadline</label><textarea className={input} rows={2} placeholder="Daftar sekarang, dapat diskon 30% seumur membership." value={form.subheadline as string} onChange={e => set('subheadline', e.target.value)} /></div>
