@@ -7,7 +7,7 @@ import type { PromoCode, Campaign } from '@/types'
 import { formatDate, generatePromoCode } from '@/lib/utils/format'
 import { usePagination } from '@/lib/usePagination'
 import { Pagination } from '@/components/ui/pagination'
-import { Plus, Tag, Copy, Loader2, X, Infinity as InfinityIcon, Lock, Mail, Trash2 } from 'lucide-react'
+import { Plus, Tag, Copy, Loader2, X, Infinity as InfinityIcon, Lock, Mail, Trash2, Pencil } from 'lucide-react'
 
 // Parse teks bebas (dipisah koma / spasi / baris baru / titik koma) jadi
 // daftar email unik, lowercase, tanpa duplikat.
@@ -43,6 +43,9 @@ export default function PromoCodesPage() {
   const [emailModal, setEmailModal] = useState<{ id: string; code: string } | null>(null)
   const [emailInput, setEmailInput] = useState('')
   const [emailBusy, setEmailBusy] = useState(false)
+
+  // null = mode buat baru; ada id = mode edit kode yang sudah ada
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     code: '',
@@ -94,24 +97,63 @@ export default function PromoCodesPage() {
   const { page, setPage, pageCount, pageItems, pageSize, total } =
     usePagination(filtered, `${filterType}|${filterActive}|${filterCampaign}`)
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const resetForm = () =>
+    setForm({ code: '', type: 'community', discount_percent: 10, max_usage: '', expires_at: '', campaign_id: '', allowed_emails: '' })
+
+  const openCreate = () => {
+    setEditingId(null)
+    resetForm()
+    setShowModal(true)
+  }
+
+  const openEdit = (code: PromoCode) => {
+    setEditingId(code.id)
+    setForm({
+      code: code.code,
+      type: code.type,
+      discount_percent: code.discount_percent,
+      max_usage: code.max_usage ?? '',
+      expires_at: code.expires_at ? code.expires_at.slice(0, 10) : '',
+      campaign_id: code.campaign_id ?? '',
+      allowed_emails: '', // email dikelola lewat tombol ✉️ terpisah
+    })
+    setShowModal(true)
+  }
+
+  const closeModal = () => { setShowModal(false); setEditingId(null) }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validasi email allow-list dulu (kalau diisi) sebelum menyentuh DB
-    const emails = parseEmails(form.allowed_emails)
-    const invalid = emails.filter(e => !isValidEmail(e))
-    if (invalid.length) { showToast('Email tidak valid: ' + invalid.join(', ')); return }
-
-    setSaving(true)
-    const { data: created, error } = await supabase.from('promo_codes').insert({
+    const payload = {
       code: form.code.toUpperCase(),
       type: form.type,
       discount_percent: form.discount_percent,
       max_usage: form.max_usage === '' ? null : Number(form.max_usage),
       expires_at: form.expires_at || null,
       campaign_id: form.campaign_id || null,
-      is_active: true,
-    }).select('id').single()
+    }
+
+    // ── Mode edit: update kolom, email tidak disentuh (pakai tombol ✉️) ──
+    if (editingId) {
+      setSaving(true)
+      const { error } = await supabase.from('promo_codes').update(payload).eq('id', editingId)
+      setSaving(false)
+      if (error) { showToast('Gagal update kode: ' + error.message); return }
+      showToast('Promo code diperbarui!')
+      closeModal()
+      load()
+      return
+    }
+
+    // ── Mode buat baru: validasi email allow-list dulu sebelum menyentuh DB ──
+    const emails = parseEmails(form.allowed_emails)
+    const invalid = emails.filter(e => !isValidEmail(e))
+    if (invalid.length) { showToast('Email tidak valid: ' + invalid.join(', ')); return }
+
+    setSaving(true)
+    const { data: created, error } = await supabase.from('promo_codes')
+      .insert({ ...payload, is_active: true }).select('id').single()
     if (error || !created) {
       setSaving(false)
       showToast('Gagal buat kode: ' + (error?.message ?? 'unknown'))
@@ -123,15 +165,15 @@ export default function PromoCodesPage() {
       if (emailErr) {
         setSaving(false)
         showToast('Kode dibuat, tapi email gagal disimpan: ' + emailErr.message)
-        setShowModal(false)
+        closeModal()
         load()
         return
       }
     }
     setSaving(false)
     showToast(emails.length ? `Kode dibuat, dibatasi ke ${emails.length} email` : 'Promo code berhasil dibuat!')
-    setShowModal(false)
-    setForm({ code: '', type: 'community', discount_percent: 10, max_usage: '', expires_at: '', campaign_id: '', allowed_emails: '' })
+    closeModal()
+    resetForm()
     load()
   }
 
@@ -221,7 +263,7 @@ export default function PromoCodesPage() {
             <option value="active">Aktif</option>
             <option value="inactive">Nonaktif</option>
           </select>
-          <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition shadow-sm">
+          <button onClick={openCreate} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition shadow-sm">
             <Plus size={16} /> Buat Kode
           </button>
         </div>
@@ -290,6 +332,7 @@ export default function PromoCodesPage() {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center justify-end gap-1.5">
                       <button onClick={() => copyCode(code.code)} title="Salin kode" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><Copy size={14} /></button>
+                      <button onClick={() => openEdit(code)} title="Edit detail promo" className="p-1.5 rounded-lg hover:bg-purple-50 text-purple-400"><Pencil size={14} /></button>
                       <button onClick={() => { setEmailModal({ id: code.id, code: code.code }); setEmailInput('') }} title="Kelola email yang boleh pakai" className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-400"><Mail size={14} /></button>
                       <button onClick={() => handleToggle(code.id, code.is_active)} className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${code.is_active ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>{code.is_active ? 'Off' : 'On'}</button>
                       <button onClick={() => handleDelete(code.id, code.code)} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-red-50 text-red-500 hover:bg-red-100 transition">Hapus</button>
@@ -308,10 +351,10 @@ export default function PromoCodesPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-bold text-slate-900">Buat Promo Code</h2>
-              <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-slate-100"><X size={18} /></button>
+              <h2 className="text-xl font-bold text-slate-900">{editingId ? 'Edit Promo Code' : 'Buat Promo Code'}</h2>
+              <button onClick={closeModal} className="p-2 rounded-lg hover:bg-slate-100"><X size={18} /></button>
             </div>
-            <form onSubmit={handleCreate} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Kode</label>
                 <div className="flex gap-2">
@@ -352,23 +395,27 @@ export default function PromoCodesPage() {
                   {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1.5">
-                  <Lock size={13} className="text-rose-400" /> Batasi ke email tertentu (opsional)
-                </label>
-                <textarea
-                  value={form.allowed_emails}
-                  onChange={e => setForm({ ...form, allowed_emails: e.target.value })}
-                  rows={2}
-                  placeholder="a@email.com, b@email.com"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 resize-y"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">Kosongkan = boleh dipakai siapa saja. Pisah beberapa email dengan koma / spasi / baris baru. Dicek dari email akun yang login.</p>
-              </div>
+              {editingId ? (
+                <p className="text-[11px] text-slate-400 -mt-1">Daftar email khusus diatur lewat tombol ✉️ di baris kode.</p>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Lock size={13} className="text-rose-400" /> Batasi ke email tertentu (opsional)
+                  </label>
+                  <textarea
+                    value={form.allowed_emails}
+                    onChange={e => setForm({ ...form, allowed_emails: e.target.value })}
+                    rows={2}
+                    placeholder="a@email.com, b@email.com"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 resize-y"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">Kosongkan = boleh dipakai siapa saja. Pisah beberapa email dengan koma / spasi / baris baru. Dicek dari email akun yang login.</p>
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-sm">Batal</button>
+                <button type="button" onClick={closeModal} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-sm">Batal</button>
                 <button type="submit" disabled={saving} className="px-5 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-xl text-sm font-medium flex items-center gap-2">
-                  {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Buat Kode
+                  {saving ? <Loader2 size={15} className="animate-spin" /> : (editingId ? <Pencil size={15} /> : <Plus size={15} />)} {editingId ? 'Simpan Perubahan' : 'Buat Kode'}
                 </button>
               </div>
             </form>
