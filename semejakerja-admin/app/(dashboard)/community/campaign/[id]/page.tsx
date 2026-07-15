@@ -205,7 +205,7 @@ export default function CampaignDetailPage() {
           <h2 className="font-bold text-slate-800 mb-4">Pengaturan Umum</h2>
           <div className="space-y-4">
             <div><label className={label}>Nama</label><input className={input} value={form.name as string} onChange={e => set('name', e.target.value)} /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><label className={label}>Objective</label>
                 <select className={input + ' bg-white'} value={form.objective as string} onChange={e => set('objective', e.target.value)}>
                   {OBJECTIVE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -218,7 +218,7 @@ export default function CampaignDetailPage() {
               </div>
             </div>
             <div><label className={label}>Deskripsi (internal)</label><textarea className={input} rows={2} value={form.description as string} onChange={e => set('description', e.target.value)} /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><label className={label}>Mulai</label><input type="date" className={input} value={form.starts_at as string} onChange={e => set('starts_at', e.target.value)} /></div>
               <div><label className={label}>Selesai</label>
                 <input type="date" className={input} value={form.ends_at as string} onChange={e => set('ends_at', e.target.value)} />
@@ -227,7 +227,7 @@ export default function CampaignDetailPage() {
                 ) : null}
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div><label className={label}>Metrik target</label>
                 <select className={input + ' bg-white'} value={form.target_metric as string} onChange={e => set('target_metric', e.target.value)}>
                   <option value="signups">Pendaftar</option>
@@ -246,7 +246,7 @@ export default function CampaignDetailPage() {
             <h2 className="font-bold text-slate-800 mb-1 flex items-center gap-2"><Rocket size={16} className="text-fuchsia-500" /> Konten Launch</h2>
             <p className="text-xs text-slate-400 mb-4">Tampil di halaman Pricing saat campaign LIVE.</p>
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div><label className={label}>Diskon (%)</label><input type="number" min={1} max={100} className={input} value={form.discount_percent as string} onChange={e => set('discount_percent', e.target.value)} /></div>
                 <div><label className={label}>Kuota</label><input type="number" min={1} placeholder="∞" className={input} value={form.quota as string} onChange={e => set('quota', e.target.value)} /></div>
                 <div><label className={label}>Kode berlaku (hari)</label><input type="number" min={1} className={input} value={form.code_valid_days as string} onChange={e => set('code_valid_days', e.target.value)} /></div>

@@ -234,3 +234,122 @@
     transform: rotate(360deg);
   }
 }
+
+/* ── Countdown ── */
+.countdown {
+  margin-top: 1.25rem;
+}
+
+.cdLead {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 0.5rem;
+}
+
+.cdBoxes {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.cdBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 3rem;
+  padding: 0.45rem 0.4rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.cdNum {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.cdLabel {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 0.2rem;
+}
+
+.cdSep {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 0.45rem;
+}
+
+.endedNote {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ── War: sisa slot ── */
+.war {
+  margin-top: 1.25rem;
+}
+
+.warRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.warText {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.warCount {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+
+.warFlame {
+  color: var(--color-accent, #f0c733);
+}
+
+.warHype {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ffb4b4;
+}
+
+/* Level urgensi — mewarnai bar + teks + api */
+.warLow .quotaFill { background: #f0c733; }
+.warLow .warFlame { color: #f0c733; }
+
+.warCritical .quotaFill {
+  background: #ef4444;
+  animation: warpulse 1s ease-in-out infinite;
+}
+.warCritical .warText { color: #ffd9d9; }
+.warCritical .warFlame { color: #ef4444; }
+
+.warFull .quotaFill { background: rgba(255, 255, 255, 0.35); }
+.warFull .warText { color: rgba(255, 255, 255, 0.7); }
+
+@keyframes warpulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
