@@ -8,6 +8,11 @@ import type { User } from "@supabase/supabase-js";
 import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import styles from "./checkout.module.css";
 
+// Biaya layanan flat per transaksi. Sinkron dengan v_service_fee di
+// migration 028 (RPC create_membership_checkout) — server yang otoritatif,
+// ini hanya untuk tampilan ringkasan di checkout.
+const SERVICE_FEE = 1000;
+
 // Using Suspense boundary for useSearchParams
 export default function CheckoutPage() {
   return (
@@ -50,8 +55,8 @@ function CheckoutContent() {
 
   // Pricing Logic
   const getBasePrice = () => {
-    if (tierParam === "nongkrong") return periodParam === "triwulan" ? 47000 : 19000;
-    if (tierParam === "mode_serius") return periodParam === "triwulan" ? 77000 : 31000;
+    if (tierParam === "nongkrong") return periodParam === "triwulan" ? 100000 : 40000;
+    if (tierParam === "mode_serius") return periodParam === "triwulan" ? 150000 : 60000;
     return 0;
   };
 
@@ -64,6 +69,7 @@ function CheckoutContent() {
   const basePrice = getBasePrice();
   const discountAmount = Math.floor(basePrice * (discountPercent / 100));
   const finalPrice = basePrice - discountAmount;
+  const totalPayable = finalPrice + SERVICE_FEE;
 
   const handleApplyPromo = async () => {
     if (!promoCode) return;
@@ -155,7 +161,7 @@ function CheckoutContent() {
               <div className={styles.paymentWarning}>
                 <AlertCircle size={20} className="flex-shrink-0" />
                 <div>
-                  Kamu akan diarahkan ke halaman pembayaran <strong>DOKU</strong> untuk membayar <strong>Rp {finalPrice.toLocaleString("id-ID")}</strong> (VA, e-wallet, QRIS, dll). Membership aktif otomatis setelah pembayaran berhasil.
+                  Kamu akan diarahkan ke halaman pembayaran <strong>DOKU</strong> untuk membayar <strong>Rp {totalPayable.toLocaleString("id-ID")}</strong> (VA, e-wallet, QRIS, dll). Membership aktif otomatis setelah pembayaran berhasil.
                 </div>
               </div>
 
@@ -205,9 +211,14 @@ function CheckoutContent() {
                 </div>
               )}
 
+              <div className={styles.summaryRow}>
+                <span>Biaya Layanan</span>
+                <strong>Rp {SERVICE_FEE.toLocaleString("id-ID")}</strong>
+              </div>
+
               <div className={styles.summaryTotal}>
                 <span>Total Bayar</span>
-                <span>Rp {finalPrice.toLocaleString("id-ID")}</span>
+                <span>Rp {totalPayable.toLocaleString("id-ID")}</span>
               </div>
 
               <div className={styles.promoSection}>

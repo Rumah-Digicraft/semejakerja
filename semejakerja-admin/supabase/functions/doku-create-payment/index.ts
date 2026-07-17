@@ -44,7 +44,11 @@ Deno.serve(async (req) => {
     }
 
     const membershipId = checkout.membership_id as string;
-    const amount = checkout.final_price as number;
+    // total_amount = harga membership (final_price) + biaya layanan (service_fee).
+    // Itu yang ditagih DOKU. price_paid di memberships tetap final_price (bersih).
+    // Fallback ke final_price agar aman bila RPC lama belum ter-deploy.
+    const serviceFee = (checkout.service_fee ?? 0) as number;
+    const amount = (checkout.total_amount ?? checkout.final_price) as number;
 
     // --- Langkah 3: catat transaksi baru (pakai service role) ---
     // Nulis ke payment_transactions hanya boleh lewat service role (RLS memblok member).
@@ -61,6 +65,7 @@ Deno.serve(async (req) => {
       membership_id: membershipId,
       invoice_number: invoiceNumber,
       amount,
+      service_fee: serviceFee,
       status: "pending",
       environment: dokuEnv,
     });

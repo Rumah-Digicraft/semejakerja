@@ -7,7 +7,7 @@ import { canAccessPath } from '@/lib/access'
 import { formatCurrency, formatDate } from '@/lib/utils/format'
 import {
   Users, Store, CalendarDays, TrendingUp, Clock, AlertTriangle,
-  CheckCircle, XCircle, Loader2
+  CheckCircle, XCircle, Loader2, Receipt
 } from 'lucide-react'
 
 interface Stats {
@@ -15,6 +15,7 @@ interface Stats {
   totalCafes: number
   movesSessionsThisMonth: number
   revenueThisMonth: number
+  serviceFeeTotal: number
 }
 
 interface PendingItem {
@@ -27,7 +28,7 @@ interface PendingItem {
 
 export default function DashboardPage() {
   const supabase = createClient()
-  const [stats, setStats] = useState<Stats>({ activeMembers: 0, totalCafes: 0, movesSessionsThisMonth: 0, revenueThisMonth: 0 })
+  const [stats, setStats] = useState<Stats>({ activeMembers: 0, totalCafes: 0, movesSessionsThisMonth: 0, revenueThisMonth: 0, serviceFeeTotal: 0 })
   const [pending, setPending] = useState<PendingItem[]>([])
   const [role, setRole] = useState<AdminRole | null>(null)
   const [loading, setLoading] = useState(true)
@@ -48,7 +49,7 @@ export default function DashboardPage() {
       const now = new Date()
       const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
 
-      const nextStats: Stats = { activeMembers: 0, totalCafes: 0, movesSessionsThisMonth: 0, revenueThisMonth: 0 }
+      const nextStats: Stats = { activeMembers: 0, totalCafes: 0, movesSessionsThisMonth: 0, revenueThisMonth: 0, serviceFeeTotal: 0 }
       let moderasiItems: PendingItem[] = []
       let ktmItems: PendingItem[] = []
       let participantItems: PendingItem[] = []
@@ -69,6 +70,12 @@ export default function DashboardPage() {
             sublabel: k.full_name ?? 'Anggota baru',
             time: formatDate(k.created_at),
           }))
+        })())
+        tasks.push((async () => {
+          // Akumulasi biaya layanan (fee flat/transaksi) via RPC SECURITY DEFINER
+          // — payment_transactions RLS memblok baca lintas-user dari client.
+          const { data } = await supabase.rpc('admin_service_fee_total')
+          nextStats.serviceFeeTotal = (data as number | null) ?? 0
         })())
         tasks.push((async () => {
           const { data } = await supabase.from('memberships').select('id, user_profiles(full_name), created_at').eq('status', 'pending_payment').limit(3)
@@ -136,6 +143,7 @@ export default function DashboardPage() {
 
   const statCards = [
     { show: can('/community'), label: 'Member Aktif', value: stats.activeMembers.toLocaleString(), icon: <Users size={20} />, color: 'text-purple-600', bg: 'bg-purple-50', desc: 'Membership aktif saat ini' },
+    { show: can('/community'), label: 'Biaya Layanan Terkumpul', value: formatCurrency(stats.serviceFeeTotal), icon: <Receipt size={20} />, color: 'text-teal-600', bg: 'bg-teal-50', desc: 'Total fee dari transaksi sukses' },
     { show: can('/maps'), label: 'Total Kafe', value: stats.totalCafes.toLocaleString(), icon: <Store size={20} />, color: 'text-blue-600', bg: 'bg-blue-50', desc: 'Kafe terdaftar di Maps' },
     { show: can('/moves'), label: 'Sesi Moves', value: stats.movesSessionsThisMonth.toLocaleString(), icon: <CalendarDays size={20} />, color: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Sesi bulan ini' },
     { show: can('/lapkeu'), label: 'Revenue Bulan Ini', value: formatCurrency(stats.revenueThisMonth), icon: <TrendingUp size={20} />, color: 'text-amber-600', bg: 'bg-amber-50', desc: 'Estimasi dari cashflow' },
