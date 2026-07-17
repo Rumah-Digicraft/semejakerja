@@ -88,6 +88,9 @@ export default function DashboardPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  // URL halaman bayar DOKU dari transaksi pending → dipakai banner untuk
+  // MELANJUTKAN pembayaran yang sama (bukan bikin checkout baru).
+  const [pendingPayUrl, setPendingPayUrl] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     const {
@@ -103,17 +106,37 @@ export default function DashboardPage() {
 
     // maybeSingle(): a missing profile row returns null (not an error) — the DB
     // trigger normally creates it, but this stays resilient if it hasn't.
-    const [{ data: profileData }, { data: membershipData }] = await Promise.all([
-      supabase.from("user_profiles").select("*").eq("id", user.id).maybeSingle(),
-      supabase
-        .from("memberships")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false }),
-    ]);
+    const [{ data: profileData }, { data: membershipData }, { data: txData }] =
+      await Promise.all([
+        supabase.from("user_profiles").select("*").eq("id", user.id).maybeSingle(),
+        supabase
+          .from("memberships")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+        // Transaksi DOKU yang masih pending (RLS: member baca miliknya sendiri).
+        supabase
+          .from("payment_transactions")
+          .select("payment_url, expires_at, created_at")
+          .eq("user_id", user.id)
+          .eq("status", "pending")
+          .order("created_at", { ascending: false }),
+      ]);
 
     setProfile((profileData as UserProfile) ?? null);
     setMemberships((membershipData as Membership[]) ?? []);
+
+    // Link bayar DOKU untuk dilanjutkan: utamakan yang belum kedaluwarsa,
+    // jatuh ke transaksi ber-URL terbaru kalau semua sudah lewat (DOKU akan
+    // menampilkan halaman "kedaluwarsa" yang jelas ketimbang jalur buntu).
+    const tx =
+      (txData as { payment_url: string | null; expires_at: string | null }[] | null) ?? [];
+    const fresh = tx.find(
+      (t) => t.payment_url && (!t.expires_at || new Date(t.expires_at).getTime() > Date.now())
+    );
+    const latestWithUrl = tx.find((t) => t.payment_url);
+    setPendingPayUrl((fresh ?? latestWithUrl)?.payment_url ?? null);
+
     setLoading(false);
   }, [router, supabase]);
 
@@ -170,16 +193,22 @@ export default function DashboardPage() {
           <div className={styles.pendingBanner}>
             <AlertTriangle size={22} className={styles.pendingIcon} />
             <div className={styles.pendingBody}>
-              <strong>Pembayaran menunggu verifikasi admin</strong>
+              <strong>Pembayaran belum selesai</strong>
               <p>
-                Kamu punya {pending.length} pesanan membership{" "}
+                Kamu punya pesanan membership{" "}
                 <b>{pending.map((m) => tierLabels[m.tier]).join(", ")}</b> yang
-                belum diverifikasi. Selesaikan transfer sesuai instruksi, lalu
-                admin akan mengaktifkan membership-mu.
+                belum dibayar. Lanjutkan pembayaran di DOKU — membership-mu aktif
+                otomatis setelah pembayaran berhasil.
               </p>
-              <Link href="/membership/checkout" className={styles.pendingLink}>
-                Lihat instruksi pembayaran <ArrowRight size={14} />
-              </Link>
+              {pendingPayUrl ? (
+                <a href={pendingPayUrl} className={styles.pendingLink}>
+                  Lanjutkan pembayaran <ArrowRight size={14} />
+                </a>
+              ) : (
+                <Link href="/membership" className={styles.pendingLink}>
+                  Buat pembayaran baru <ArrowRight size={14} />
+                </Link>
+              )}
             </div>
           </div>
         )}
