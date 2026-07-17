@@ -55,8 +55,8 @@ function CheckoutContent() {
 
   // Pricing Logic
   const getBasePrice = () => {
-    if (tierParam === "nongkrong") return periodParam === "triwulan" ? 100000 : 40000;
-    if (tierParam === "mode_serius") return periodParam === "triwulan" ? 150000 : 60000;
+    if (tierParam === "nongkrong") return periodParam === "triwulan" ? 90000 : 36000;
+    if (tierParam === "mode_serius") return periodParam === "triwulan" ? 135000 : 54000;
     return 0;
   };
 

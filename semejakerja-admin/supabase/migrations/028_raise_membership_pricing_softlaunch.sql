@@ -7,11 +7,12 @@
 -- NOT here — it lives in campaigns.discount_percent (managed from admin)
 -- and is applied on top of v_base by this RPC at checkout time.
 --
---   Nongkrong   — bulanan 19000 → 40000, triwulan 47000  → 100000
---   Mode Serius — bulanan 31000 → 60000, triwulan 77000  → 150000
+--   Nongkrong   — bulanan 19000 → 36000, triwulan 47000  → 90000
+--   Mode Serius — bulanan 31000 → 54000, triwulan 77000  → 135000
+--   (struktur: Mode Serius = 1.5× Nongkrong; triwulan = 2.5× bulanan)
 --
--- After a 50% launch code:
---   Nongkrong   — 20000 / 50000 ；Mode Serius — 30000 / 75000
+-- After a 50% launch code (sebelum +Rp1.000 service fee):
+--   Nongkrong   — 18000 / 45000 ；Mode Serius — 27000 / 67500
 --
 -- NOTE: this raises the price for buyers WITHOUT a launch code too —
 -- they pay the full new base. That is intentional (raise the sticker,
@@ -66,10 +67,10 @@ BEGIN
 
   -- Base price table (soft-launch repricing — migration 028).
   v_base := CASE
-    WHEN p_tier = 'nongkrong'   AND p_period = 'bulanan'  THEN 40000
-    WHEN p_tier = 'nongkrong'   AND p_period = 'triwulan' THEN 100000
-    WHEN p_tier = 'mode_serius' AND p_period = 'bulanan'  THEN 60000
-    WHEN p_tier = 'mode_serius' AND p_period = 'triwulan' THEN 150000
+    WHEN p_tier = 'nongkrong'   AND p_period = 'bulanan'  THEN 36000
+    WHEN p_tier = 'nongkrong'   AND p_period = 'triwulan' THEN 90000
+    WHEN p_tier = 'mode_serius' AND p_period = 'bulanan'  THEN 54000
+    WHEN p_tier = 'mode_serius' AND p_period = 'triwulan' THEN 135000
   END;
   v_expires := now() + CASE WHEN p_period = 'triwulan'
                             THEN interval '3 months'
