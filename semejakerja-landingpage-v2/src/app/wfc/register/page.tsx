@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
+import OAuthButtons from "../../auth/OAuthButtons";
 import styles from "./register.module.css";
 
 // Local mirror of the admin `Form` shape (types aren't shared across apps).
@@ -55,9 +56,18 @@ interface SubmitResult {
 const isAnswerable = (t: FormQuestionType) => t !== "section";
 
 // ── The form itself ─────────────────────────────────────────────
-function FormRunner({ form }: { form: FormRow }) {
+function FormRunner({ form, userEmail }: { form: FormRow; userEmail: string | null }) {
   const supabase = createClient();
-  const [answers, setAnswers] = useState<Answers>({});
+  // Prefill pertanyaan email dengan email Google yang sudah terverifikasi.
+  const [answers, setAnswers] = useState<Answers>(() => {
+    const init: Answers = {};
+    if (userEmail) {
+      for (const q of form.questions) {
+        if (q.type === "email") init[q.id] = userEmail;
+      }
+    }
+    return init;
+  });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [result, setResult] = useState<SubmitResult | null>(null);
@@ -134,11 +144,11 @@ function FormRunner({ form }: { form: FormRow }) {
 
         <div className={styles.accountBox}>
           <p className={styles.accountHint}>
-            Biar makin update info event &amp; dapat promo member, bikin akun
-            Semeja Kerja dulu yuk — gratis ✨
+            Sekalian aktifin membership Semeja Kerja buat benefit diskon di cafe
+            partner &amp; akses Semeja Moves 👀
           </p>
-          <Link href="/auth/register" className={`btn btn--secondary ${styles.accountButton}`}>
-            Buat akun gratis
+          <Link href="/membership" className={`btn btn--secondary ${styles.accountButton}`}>
+            Lihat membership
           </Link>
         </div>
       </div>
@@ -273,20 +283,61 @@ function FormRunner({ form }: { form: FormRow }) {
   );
 }
 
-// ── Loader: fetch form by token ─────────────────────────────────
+// ── Gate login: form wajib login Google dulu ────────────────────
+function LoginGate({ form, token }: { form: FormRow; token: string }) {
+  const next = `/wfc/register?token=${token}`;
+  return (
+    <>
+      <div className={styles.header}>
+        <h1 className={styles.title}>{form.title}</h1>
+        {form.cafe_name && (
+          <p className={styles.subtitle}>Kolaborasi dengan {form.cafe_name}</p>
+        )}
+      </div>
+      <div className={styles.gateCard}>
+        <div className={styles.gateEmoji}>🔒</div>
+        <h2 className={styles.gateTitle}>Login dulu buat daftar</h2>
+        <p className={styles.gateText}>
+          Pendaftaran event ini pakai akun Semeja Kerja (gratis). Login pakai
+          Google dulu ya, nanti langsung lanjut isi formnya.
+        </p>
+        <div className={styles.gateAuth}>
+          <OAuthButtons next={next} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Loader: cek sesi + ambil form by token ──────────────────────
 function RegisterContent() {
   const token = useSearchParams().get("token");
   const [form, setForm] = useState<FormRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authState, setAuthState] = useState<"loading" | "in" | "out">("loading");
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    async function load() {
+    const supabase = createClient();
+
+    // Auth: cek sesi awal + dengarkan perubahan (mis. balik dari OAuth).
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthState(data.session ? "in" : "out");
+      setUserEmail(data.session?.user?.email ?? null);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthState(session ? "in" : "out");
+      setUserEmail(session?.user?.email ?? null);
+    });
+
+    // Form: RLS hanya expose form status='open' ke publik (migration 030).
+    async function loadForm() {
       if (!token) {
         setLoading(false);
         return;
       }
-      const supabase = createClient();
-      // RLS only exposes status='open' forms to anon (migration 030).
       const { data } = await supabase
         .from("forms")
         .select("*")
@@ -296,10 +347,12 @@ function RegisterContent() {
       if (data) setForm(data as FormRow);
       setLoading(false);
     }
-    load();
+    loadForm();
+
+    return () => subscription.unsubscribe();
   }, [token]);
 
-  if (loading) {
+  if (loading || authState === "loading") {
     return (
       <div className={styles.loadingWrap}>
         <Loader2 size={32} className={styles.spinner} />
@@ -320,7 +373,12 @@ function RegisterContent() {
     );
   }
 
-  return <FormRunner form={form} />;
+  // Wajib login Google dulu sebelum bisa buka/isi form.
+  if (authState === "out") {
+    return <LoginGate form={form} token={token ?? ""} />;
+  }
+
+  return <FormRunner form={form} userEmail={userEmail} />;
 }
 
 export default function WfcRegisterPage() {

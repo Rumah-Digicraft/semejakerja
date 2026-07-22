@@ -257,3 +257,40 @@
 .accountButton {
   width: 100%;
 }
+
+/* ── Gate login (Google wajib sebelum isi form) ── */
+.gateCard {
+  background: white;
+  border-radius: var(--radius-2xl);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--color-gray-100);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gateEmoji {
+  font-size: 2.5rem;
+  margin-bottom: var(--space-3);
+}
+
+.gateTitle {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-gray-900);
+  margin-bottom: var(--space-2);
+}
+
+.gateText {
+  font-size: var(--text-sm);
+  color: var(--color-gray-500);
+  line-height: 1.6;
+  margin-bottom: var(--space-6);
+}
+
+.gateAuth {
+  width: 100%;
+  max-width: 320px;
+}
