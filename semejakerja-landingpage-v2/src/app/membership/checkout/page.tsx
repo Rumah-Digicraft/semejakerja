@@ -161,7 +161,7 @@ function CheckoutContent() {
               <div className={styles.paymentWarning}>
                 <AlertCircle size={20} className="flex-shrink-0" />
                 <div>
-                  Kamu akan diarahkan ke halaman pembayaran <strong>DOKU</strong> untuk membayar <strong>Rp {totalPayable.toLocaleString("id-ID")}</strong> (VA, e-wallet, QRIS, dll). Membership aktif otomatis setelah pembayaran berhasil.
+                  Kamu akan diarahkan ke halaman pembayaran <strong>DOKU</strong> untuk membayar <strong>Rp {totalPayable.toLocaleString("id-ID")}</strong> (QRIS). Membership aktif otomatis setelah pembayaran berhasil.
                 </div>
               </div>
 
