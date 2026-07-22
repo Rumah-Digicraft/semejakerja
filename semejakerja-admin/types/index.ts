@@ -250,6 +250,60 @@ export interface CampaignStats {
   total_revenue: number    // rupiah price_paid membership ter-atribusi
 }
 
+// ── FORMS (Form builder WFC Bareng Strangers) ────────────────────────────
+export type FormStatus = 'draft' | 'open' | 'closed'
+
+// Tipe pertanyaan form builder. 'section' = blok info statis (tanpa jawaban),
+// sisanya menampung jawaban. 'radio'/'checkbox'/'dropdown' pakai `options`.
+export type FormQuestionType =
+  | 'short_text' | 'paragraph' | 'radio' | 'checkbox'
+  | 'dropdown' | 'email' | 'phone' | 'section'
+
+export interface FormQuestion {
+  id: string          // dibuat client (crypto.randomUUID) — jawaban di-key oleh id ini
+  type: FormQuestionType
+  label: string
+  help?: string       // teks bantuan / deskripsi di bawah label
+  required?: boolean
+  options?: string[]  // untuk radio / checkbox / dropdown
+}
+
+export interface Form {
+  id: string
+  title: string
+  description: string | null
+  cafe_name: string | null
+  questions: FormQuestion[]
+  quota: number | null
+  whatsapp_group_url: string | null
+  whatsapp_group_label: string | null
+  success_message: string | null
+  status: FormStatus
+  token: string
+  // Tampilkan di landing page (homepage + /wfc). Terpisah dari `status`:
+  // status=open mengatur penerimaan pendaftaran, show_on_landing mengatur
+  // apakah event dipajang publik. Field event opsional untuk kartu landing.
+  show_on_landing: boolean
+  event_date: string | null
+  location: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+// Jawaban keyed by FormQuestion.id → string (text/radio/dropdown) atau
+// string[] (checkbox). Pertanyaan yang sudah dihapus bisa tertinggal
+// sebagai key yatim di sini (tidak dibersihkan).
+export type FormAnswerValue = string | string[]
+
+export interface FormResponse {
+  id: string
+  form_id: string
+  answers: Record<string, FormAnswerValue>
+  attended: boolean
+  created_at: string
+}
+
 // ── SEMEJA MOVES (Data uses semejamoves-web-apps) ────────────────────────
 export type PaymentStatus = 'pending' | 'paid' | 'cancelled'
 

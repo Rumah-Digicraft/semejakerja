@@ -11,7 +11,7 @@ import {
   Dumbbell, CalendarDays, UserCheck, Layers, Settings,
   Bike, Menu, X, LogOut, ChevronRight, TrendingUp,
   BarChart2, MapPin, UsersRound, Activity, Wallet, Receipt,
-  UserCog, Megaphone
+  UserCog, Megaphone, ClipboardList
 } from 'lucide-react'
 
 interface NavItem {
@@ -51,6 +51,7 @@ const navGroups: NavGroup[] = [
       { href: '/community/members', label: 'Manajemen Member', icon: <Users size={16} /> },
       { href: '/community/transactions', label: 'Transaksi Membership', icon: <Receipt size={16} /> },
       { href: '/community/campaign', label: 'Campaign', icon: <Megaphone size={16} /> },
+      { href: '/community/forms', label: 'Form Event', icon: <ClipboardList size={16} /> },
       { href: '/community/promo-codes', label: 'Promo Code', icon: <Tag size={16} /> },
     ],
   },

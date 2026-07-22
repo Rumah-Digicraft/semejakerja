@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import HeroSection from "./components/HeroSection";
 import StorySection from "./components/StorySection";
 import GrowthStats from "./components/GrowthStats";
+import WfcEvents from "./components/WfcEvents";
 import CafeGrid from "./components/CafeGrid";
 import PartnershipSection from "./components/PartnershipSection";
 import ActivitiesGrid from "./components/ActivitiesGrid";
@@ -20,6 +21,7 @@ export default function Home() {
     <>
       <JsonLd data={faqPageSchema(homeFaqs)} />
       <HeroSection />
+      <WfcEvents />
       <StorySection />
       <GrowthStats />
       <CafeGrid />
