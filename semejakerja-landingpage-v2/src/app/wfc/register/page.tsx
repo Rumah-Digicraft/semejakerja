@@ -21,6 +21,10 @@ type FormQuestionType =
   | "short_text" | "paragraph" | "radio" | "checkbox"
   | "dropdown" | "email" | "phone" | "section";
 
+// Field user_profiles yang bisa disinkron dua arah (autofill + write-back).
+type ProfileField = "full_name" | "nickname" | "occupation" | "city" | "phone";
+type ProfileData = Record<ProfileField, string | null>;
+
 interface FormQuestion {
   id: string;
   type: FormQuestionType;
@@ -28,6 +32,7 @@ interface FormQuestion {
   help?: string;
   required?: boolean;
   options?: string[];
+  profile_field?: ProfileField;
 }
 
 interface FormRow {
@@ -56,14 +61,27 @@ interface SubmitResult {
 const isAnswerable = (t: FormQuestionType) => t !== "section";
 
 // ── The form itself ─────────────────────────────────────────────
-function FormRunner({ form, userEmail }: { form: FormRow; userEmail: string | null }) {
+function FormRunner({
+  form,
+  userId,
+  userEmail,
+  profile,
+}: {
+  form: FormRow;
+  userId: string | null;
+  userEmail: string | null;
+  profile: ProfileData | null;
+}) {
   const supabase = createClient();
-  // Prefill pertanyaan email dengan email Google yang sudah terverifikasi.
+  // Autofill: email dari Google + field yang ditandai profile_field dari
+  // user_profiles (kalau datanya sudah ada). Kalau kosong, user isi manual.
   const [answers, setAnswers] = useState<Answers>(() => {
     const init: Answers = {};
-    if (userEmail) {
-      for (const q of form.questions) {
-        if (q.type === "email") init[q.id] = userEmail;
+    for (const q of form.questions) {
+      if (q.type === "email" && userEmail) init[q.id] = userEmail;
+      if (q.profile_field && profile) {
+        const v = profile[q.profile_field];
+        if (v) init[q.id] = v;
       }
     }
     return init;
@@ -107,6 +125,24 @@ function FormRunner({ form, userEmail }: { form: FormRow; userEmail: string | nu
         p_answers: answers,
       });
       if (error) throw new Error(error.message);
+
+      // Write-back ke profil: simpan jawaban ber-profile_field ke user_profiles
+      // biar user nggak perlu isi ulang di Dashboard kalau ikut WFC lagi.
+      // Best-effort — kegagalan di sini tidak membatalkan pendaftaran.
+      if (userId) {
+        const patch: Partial<Record<ProfileField, string>> = {};
+        for (const q of form.questions) {
+          if (!q.profile_field) continue;
+          const v = answers[q.id];
+          if (typeof v === "string" && v.trim()) patch[q.profile_field] = v.trim();
+        }
+        if (Object.keys(patch).length > 0) {
+          await supabase
+            .from("user_profiles")
+            .upsert({ id: userId, ...patch }, { onConflict: "id" });
+        }
+      }
+
       setResult((data ?? {}) as SubmitResult);
     } catch (err) {
       setErrorMsg(
@@ -315,27 +351,53 @@ function RegisterContent() {
   const [form, setForm] = useState<FormRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [authState, setAuthState] = useState<"loading" | "in" | "out">("loading");
+  const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [profileReady, setProfileReady] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
+    let active = true;
 
-    // Auth: cek sesi awal + dengarkan perubahan (mis. balik dari OAuth).
-    supabase.auth.getSession().then(({ data }) => {
-      setAuthState(data.session ? "in" : "out");
-      setUserEmail(data.session?.user?.email ?? null);
-    });
+    // Resolve sesi + (kalau login) ambil profil buat autofill.
+    async function resolveAuth(
+      session: { user: { id: string; email?: string } } | null
+    ) {
+      if (!session) {
+        if (active) {
+          setAuthState("out");
+          setUserId(null);
+          setUserEmail(null);
+          setProfileReady(true);
+        }
+        return;
+      }
+      if (active) {
+        setAuthState("in");
+        setUserId(session.user.id);
+        setUserEmail(session.user.email ?? null);
+      }
+      const { data: prof } = await supabase
+        .from("user_profiles")
+        .select("full_name, nickname, occupation, city, phone")
+        .eq("id", session.user.id)
+        .maybeSingle();
+      if (active) {
+        setProfile((prof as ProfileData | null) ?? null);
+        setProfileReady(true);
+      }
+    }
+
+    supabase.auth.getSession().then(({ data }) => resolveAuth(data.session));
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthState(session ? "in" : "out");
-      setUserEmail(session?.user?.email ?? null);
-    });
+    } = supabase.auth.onAuthStateChange((_event, session) => resolveAuth(session));
 
     // Form: RLS hanya expose form status='open' ke publik (migration 030).
     async function loadForm() {
       if (!token) {
-        setLoading(false);
+        if (active) setLoading(false);
         return;
       }
       const { data } = await supabase
@@ -344,15 +406,20 @@ function RegisterContent() {
         .eq("token", token)
         .eq("status", "open")
         .maybeSingle();
-      if (data) setForm(data as FormRow);
-      setLoading(false);
+      if (active) {
+        if (data) setForm(data as FormRow);
+        setLoading(false);
+      }
     }
     loadForm();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, [token]);
 
-  if (loading || authState === "loading") {
+  if (loading || !profileReady) {
     return (
       <div className={styles.loadingWrap}>
         <Loader2 size={32} className={styles.spinner} />
@@ -378,7 +445,14 @@ function RegisterContent() {
     return <LoginGate form={form} token={token ?? ""} />;
   }
 
-  return <FormRunner form={form} userEmail={userEmail} />;
+  return (
+    <FormRunner
+      form={form}
+      userId={userId}
+      userEmail={userEmail}
+      profile={profile}
+    />
+  );
 }
 
 export default function WfcRegisterPage() {

@@ -10,6 +10,7 @@ import { formatDatetime } from '@/lib/utils/format'
 import {
   STATUS_LABELS, STATUS_OPTIONS, STATUS_COLORS, QUESTION_TYPE_OPTIONS,
   needsOptions, isAnswerable, newQuestion, responsesToCsv, downloadCsv, slugifyTitle,
+  canSyncProfile, PROFILE_FIELD_OPTIONS,
 } from '../lib'
 import {
   ArrowLeft, Loader2, Save, Copy, Check, ExternalLink, Plus, Trash2,
@@ -130,6 +131,7 @@ export default function FormDetailPage() {
       }
       if (q.help && q.help.trim()) c.help = q.help
       if (needsOptions(q.type)) c.options = (q.options ?? []).map(o => o.trim()).filter(Boolean)
+      if (q.profile_field && canSyncProfile(q.type)) c.profile_field = q.profile_field
       return c
     })
     const { error } = await supabase.from('forms').update({
@@ -317,6 +319,21 @@ export default function FormDetailPage() {
                           </div>
                         ))}
                         <button onClick={() => addOption(q.id)} className="text-xs text-purple-600 font-medium flex items-center gap-1 hover:underline"><Plus size={12} /> Tambah opsi</button>
+                      </div>
+                    )}
+
+                    {canSyncProfile(q.type) && (
+                      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+                        <span className="text-xs font-medium text-slate-500">Sinkron ke profil user</span>
+                        <select
+                          value={q.profile_field ?? ''}
+                          onChange={e => updateQuestion(q.id, { profile_field: (e.target.value || undefined) as FormQuestion['profile_field'] })}
+                          className="px-2 py-1 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none"
+                        >
+                          <option value="">— Tidak —</option>
+                          {PROFILE_FIELD_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                        {q.profile_field && <span className="text-[11px] text-slate-400">autofill dari profil &amp; update saat submit</span>}
                       </div>
                     )}
 

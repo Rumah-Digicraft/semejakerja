@@ -259,6 +259,11 @@ export type FormQuestionType =
   | 'short_text' | 'paragraph' | 'radio' | 'checkbox'
   | 'dropdown' | 'email' | 'phone' | 'section'
 
+// Field user_profiles yang bisa disinkron dua arah dari sebuah pertanyaan
+// (autofill dari profil + write-back saat submit). Cocok dengan kolom di
+// user_profiles (migration 001/009).
+export type ProfileSyncField = 'full_name' | 'nickname' | 'occupation' | 'city' | 'phone'
+
 export interface FormQuestion {
   id: string          // dibuat client (crypto.randomUUID) — jawaban di-key oleh id ini
   type: FormQuestionType
@@ -266,6 +271,8 @@ export interface FormQuestion {
   help?: string       // teks bantuan / deskripsi di bawah label
   required?: boolean
   options?: string[]  // untuk radio / checkbox / dropdown
+  // Jika di-set, jawaban di-autofill dari user_profiles & di-write-back saat submit.
+  profile_field?: ProfileSyncField
 }
 
 export interface Form {

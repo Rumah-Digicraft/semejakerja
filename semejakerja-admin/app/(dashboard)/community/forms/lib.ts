@@ -1,5 +1,5 @@
 import type {
-  Form, FormResponse, FormStatus, FormQuestion, FormQuestionType, FormAnswerValue,
+  Form, FormResponse, FormStatus, FormQuestion, FormQuestionType, FormAnswerValue, ProfileSyncField,
 } from '@/types'
 
 // ── Status form ─────────────────────────────────────────────
@@ -38,6 +38,22 @@ export const OPTION_TYPES: FormQuestionType[] = ['radio', 'checkbox', 'dropdown'
 export const needsOptions = (t: FormQuestionType) => OPTION_TYPES.includes(t)
 // Tipe yang menampung jawaban (bukan blok info statis).
 export const isAnswerable = (t: FormQuestionType) => t !== 'section'
+
+// ── Sinkron ke profil user ──────────────────────────────────
+export const PROFILE_FIELD_LABELS: Record<ProfileSyncField, string> = {
+  full_name: 'Nama lengkap',
+  nickname: 'Nickname',
+  occupation: 'Pekerjaan / kesibukan',
+  city: 'Kota / domisili',
+  phone: 'No. WhatsApp',
+}
+
+export const PROFILE_FIELD_OPTIONS: { value: ProfileSyncField; label: string }[] =
+  (Object.keys(PROFILE_FIELD_LABELS) as ProfileSyncField[]).map(v => ({ value: v, label: PROFILE_FIELD_LABELS[v] }))
+
+// Hanya tipe jawaban teks tunggal yang masuk akal disinkron ke profil.
+export const PROFILE_SYNC_TYPES: FormQuestionType[] = ['short_text', 'paragraph', 'phone']
+export const canSyncProfile = (t: FormQuestionType) => PROFILE_SYNC_TYPES.includes(t)
 
 // ── Factory pertanyaan baru ─────────────────────────────────
 export function newQuestion(type: FormQuestionType): FormQuestion {
@@ -80,10 +96,10 @@ export function wfcTemplateQuestions(): FormQuestion[] {
   ): FormQuestion => ({ id: crypto.randomUUID(), type, label, required: true, ...extra })
 
   return [
-    q('short_text', 'Nama kamu siapa? (nickname juga boleh)'),
-    q('short_text', 'Sekarang lagi sibuk apa?'),
-    q('short_text', 'Domisili kamu di mana?'),
-    q('phone', 'Tulis nomor WhatsApp aktif ya, supaya mudah kirim info dan undangan'),
+    q('short_text', 'Nama kamu siapa? (nickname juga boleh)', { profile_field: 'nickname' }),
+    q('short_text', 'Sekarang lagi sibuk apa?', { profile_field: 'occupation' }),
+    q('short_text', 'Domisili kamu di mana?', { profile_field: 'city' }),
+    q('phone', 'Tulis nomor WhatsApp aktif ya, supaya mudah kirim info dan undangan', { profile_field: 'phone' }),
     q('radio', 'Sudah follow cafe & @semejakerja di Instagram/TikTok?', {
       options: ['Sudah', 'Belum, akan segera follow'],
     }),
