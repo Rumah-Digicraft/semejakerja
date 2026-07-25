@@ -64,7 +64,9 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // 4. Find the transaction this notification is about.
+  // 4. Find the transaction this notification is about. DOKU sends every
+  //    notification (membership + moves) to the SAME dashboard-configured
+  //    URL, so we dispatch by which table the invoice lives in.
   const { data: tx, error: txErr } = await admin
     .from("payment_transactions")
     .select("id, membership_id, status")
@@ -72,27 +74,98 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (txErr) return new Response("DB error", { status: 500 });
-  if (!tx) return new Response("Transaction not found", { status: 404 });
 
-  // 5. Idempotency: DOKU may send the same notification more than once.
-  if (tx.status === "success") {
+  // ── 4a. Membership payment (unchanged behaviour) ──
+  if (tx) {
+    // Idempotency: DOKU may send the same notification more than once.
+    if (tx.status === "success") {
+      return new Response("Already processed", { status: 200 });
+    }
+
+    // Mark the transaction paid.
+    await admin.from("payment_transactions").update({
+      status: "success",
+      payment_method: method,
+      paid_at: new Date().toISOString(),
+      raw_response: payload,
+    }).eq("id", tx.id);
+
+    // Activate the membership.
+    if (tx.membership_id) {
+      await admin.from("memberships").update({
+        status: "active",
+        started_at: new Date().toISOString(),
+      }).eq("id", tx.membership_id);
+    }
+
+    return new Response("OK", { status: 200 });
+  }
+
+  // ── 4b. Semeja Moves payment (funminton/padel) ──
+  const { data: mtx, error: mErr } = await admin
+    .from("moves_payment_transactions")
+    .select(
+      "id, session_id, participant_ids, pending_participants, participant_count, base_amount, kritik_saran, polling_hari, status",
+    )
+    .eq("invoice_number", invoiceNumber)
+    .maybeSingle();
+
+  if (mErr) return new Response("DB error", { status: 500 });
+  if (!mtx) return new Response("Transaction not found", { status: 404 });
+
+  // Idempotency.
+  if (mtx.status === "success") {
     return new Response("Already processed", { status: 200 });
   }
 
-  // 6. Mark the transaction paid.
-  await admin.from("payment_transactions").update({
+  const paidAt = new Date().toISOString();
+  const today = paidAt.slice(0, 10); // YYYY-MM-DD
+  // Per-person nominal, for display on participant rows. Finance still
+  // derives income from approvedCount × price_per_person, so the kode unik
+  // (which lives only on the transaction) is never double-counted here.
+  const perPerson = mtx.participant_count > 0
+    ? Math.round(mtx.base_amount / mtx.participant_count)
+    : mtx.base_amount;
+
+  await admin.from("moves_payment_transactions").update({
     status: "success",
     payment_method: method,
-    paid_at: new Date().toISOString(),
+    paid_at: paidAt,
     raw_response: payload,
-  }).eq("id", tx.id);
+  }).eq("id", mtx.id);
 
-  // 7. Activate the membership.
-  if (tx.membership_id) {
-    await admin.from("memberships").update({
-      status: "active",
-      started_at: new Date().toISOString(),
-    }).eq("id", tx.membership_id);
+  // funminton: flip the selected existing participants to approved.
+  if (Array.isArray(mtx.participant_ids) && mtx.participant_ids.length > 0) {
+    await admin.from("participants").update({
+      payment_status: "approved",
+      attended: true,
+      payment_amount: perPerson,
+      payment_date: today,
+      submitted_at: paidAt,
+      ocr_match: true, // paid via gateway — not an OCR guess, don't flag
+      kritik_saran: mtx.kritik_saran ?? null,
+      polling_hari: mtx.polling_hari ?? null,
+    })
+      .in("id", mtx.participant_ids)
+      .eq("session_id", mtx.session_id);
+  }
+
+  // padel: create the registrations now that the payment cleared.
+  if (Array.isArray(mtx.pending_participants) && mtx.pending_participants.length > 0) {
+    const rows = (mtx.pending_participants as { name: string; phone: string | null }[]).map(
+      (p) => ({
+        session_id: mtx.session_id,
+        name: p.name,
+        phone: p.phone ?? null,
+        payment_status: "approved",
+        attended: true,
+        payment_amount: perPerson,
+        payment_date: today,
+        submitted_at: paidAt,
+        ocr_match: true,
+      }),
+    );
+    await admin.from("participants").insert(rows);
   }
 
   return new Response("OK", { status: 200 });

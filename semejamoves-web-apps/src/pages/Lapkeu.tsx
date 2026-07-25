@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { CashflowEntry, Session } from '../types';
 import { formatCurrency, formatDate } from '../utils/format';
-import { Wallet, TrendingUp, TrendingDown, Activity, Plus, Trash2 } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Activity, Plus, Trash2, Hash } from 'lucide-react';
 import CurrencyInput from '../components/CurrencyInput';
+
+// MDR QRIS DOKU (0,7%). Kode unik dipakai buat nutup fee ini; sisanya pendapatan layanan vendor.
+const DOKU_FEE_RATE = 0.007;
 
 export default function Lapkeu() {
   const [entries, setEntries] = useState<CashflowEntry[]>([]);
   const [sessions, setSessions] = useState<Record<string, Session>>({});
+  const [movesTx, setMovesTx] = useState<{ unique_code: number; amount: number; paid_at: string | null; sport_type: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'gabungan' | 'funminton' | 'padel'>('gabungan');
   
@@ -38,8 +42,19 @@ export default function Lapkeu() {
     const sessionsMap: Record<string, Session> = {};
     sessionsData?.forEach(s => sessionsMap[s.id] = s);
 
+    // Kode unik terkumpul via DOKU — ditotal terpisah dari cashflow.
+    let txQuery = supabase
+      .from('moves_payment_transactions')
+      .select('unique_code, amount, paid_at, sport_type')
+      .eq('status', 'success');
+    if (activeTab !== 'gabungan') {
+      txQuery = txQuery.eq('sport_type', activeTab);
+    }
+    const { data: txData } = await txQuery;
+
     if (entriesData) setEntries(entriesData);
     setSessions(sessionsMap);
+    setMovesTx(txData ?? []);
     setLoading(false);
   };
 
@@ -101,6 +116,18 @@ export default function Lapkeu() {
   const totalOutcome = filteredEntries.filter(e => e.category === 'outcome').reduce((sum, e) => sum + e.amount, 0);
   const netProfit = totalIncome - totalOutcome;
   const margin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
+
+  const filteredMovesTx = movesTx.filter(t => {
+    if (!t.paid_at) return false;
+    const [year, month] = t.paid_at.split('T')[0].split('-');
+    const matchMonth = filterMonth === 'all' || month === filterMonth;
+    const matchYear = filterYear === 'all' || year === filterYear;
+    return matchMonth && matchYear;
+  });
+  const kodeUnikTotal = filteredMovesTx.reduce((s, t) => s + (t.unique_code || 0), 0);
+  const kodeUnikGross = filteredMovesTx.reduce((s, t) => s + (t.amount || 0), 0);
+  const kodeUnikFee = Math.round(kodeUnikGross * DOKU_FEE_RATE);
+  const kodeUnikNet = kodeUnikTotal - kodeUnikFee;
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
@@ -173,6 +200,32 @@ export default function Lapkeu() {
             <h3 className="font-medium text-gray-500">Margin Rata-rata</h3>
           </div>
           <p className="text-2xl font-bold text-gray-900">{margin.toFixed(1)}%</p>
+        </div>
+      </div>
+
+      <div className="mb-8">
+        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3 text-emerald-700">
+            <Hash size={20} />
+            <div>
+              <h3 className="font-semibold text-emerald-800">Kode Unik (DOKU)</h3>
+              <p className="text-xs text-emerald-600">Ditotal terpisah — di luar Income &amp; Net Profit di atas.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+            <div>
+              <span className="block text-xs text-emerald-600">Total kode unik</span>
+              <span className="text-xl font-bold text-emerald-800">{formatCurrency(kodeUnikTotal)}</span>
+            </div>
+            <div>
+              <span className="block text-xs text-emerald-600">Est. fee DOKU (0,7%)</span>
+              <span className="text-base font-medium text-red-500">−{formatCurrency(kodeUnikFee)}</span>
+            </div>
+            <div>
+              <span className="block text-xs text-emerald-600">Bersih layanan vendor</span>
+              <span className="text-xl font-bold text-emerald-800">{formatCurrency(kodeUnikNet)}</span>
+            </div>
+          </div>
         </div>
       </div>
 

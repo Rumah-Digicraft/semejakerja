@@ -6,6 +6,9 @@ import { formatCurrency, formatDate } from '../utils/format';
 import { Check, X, Copy, Image as ImageIcon, Trash2, Plus } from 'lucide-react';
 import CurrencyInput from '../components/CurrencyInput';
 
+// MDR QRIS DOKU (0,7%). Kode unik dipakai buat nutup fee ini; sisanya pendapatan layanan vendor.
+const DOKU_FEE_RATE = 0.007;
+
 export default function PadelDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -13,6 +16,7 @@ export default function PadelDetail() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'peserta' | 'pembayaran' | 'ringkasan'>('peserta');
+  const [kodeUnik, setKodeUnik] = useState({ total: 0, count: 0, fee: 0, net: 0 });
 
   const [isEditCostModalOpen, setIsEditCostModalOpen] = useState(false);
   const [costForm, setCostForm] = useState({ court_cost: 0, additional_court_cost: 0, other_costs: [] as {desc: string, amount: number}[] });
@@ -52,6 +56,19 @@ export default function PadelDetail() {
       });
     }
     if (participantsData) setParticipants(participantsData);
+
+    // Kode unik terkumpul via DOKU (sumber kebenaran: moves_payment_transactions).
+    const { data: txData } = await supabase
+      .from('moves_payment_transactions')
+      .select('unique_code, amount')
+      .eq('session_id', id)
+      .eq('status', 'success');
+    const txRows = txData ?? [];
+    const kuTotal = txRows.reduce((s, t) => s + (t.unique_code || 0), 0);
+    const kuGross = txRows.reduce((s, t) => s + (t.amount || 0), 0);
+    const kuFee = Math.round(kuGross * DOKU_FEE_RATE);
+    setKodeUnik({ total: kuTotal, count: txRows.length, fee: kuFee, net: kuTotal - kuFee });
+
     setLoading(false);
   };
 
@@ -327,6 +344,21 @@ export default function PadelDetail() {
             <div className="flex justify-between items-center pt-4 mt-2 border-t border-gray-200 text-base font-bold">
               <span className="text-gray-900">Profit / Rugi</span>
               <span className={profit >= 0 ? 'text-primary-green' : 'text-red-600'}>{formatCurrency(profit)}</span>
+            </div>
+            <div className="pt-3 mt-3 border-t border-dashed border-gray-200 space-y-1.5">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500">Kode Unik (DOKU) <span className="text-xs text-gray-400">· {kodeUnik.count} transaksi</span></span>
+                <span className="font-semibold text-emerald-600">+{formatCurrency(kodeUnik.total)}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs text-gray-400 pl-3">
+                <span>Est. fee DOKU (0,7%)</span>
+                <span className="text-red-400">−{formatCurrency(kodeUnik.fee)}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs pl-3">
+                <span className="text-gray-500">Bersih layanan vendor</span>
+                <span className="font-medium text-gray-700">{formatCurrency(kodeUnik.net)}</span>
+              </div>
+              <p className="text-[11px] text-gray-400 pt-0.5">Dihitung terpisah, di luar iuran &amp; profit di atas.</p>
             </div>
           </div>
         </div>

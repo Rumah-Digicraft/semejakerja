@@ -1,43 +1,43 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { analyzePaymentProof } from '../lib/gemini';
 import type { Session, Participant } from '../types';
 import { formatCurrency, formatDate } from '../utils/format';
-import { Activity, Upload, Download, X } from 'lucide-react';
-import qrisImage from '../assets/qris.jpeg';
+import { Activity } from 'lucide-react';
+import MovesPaymentStatus from '../components/MovesPaymentStatus';
 
 export default function PublicFunminton() {
   const { token } = useParams();
+  const [searchParams] = useSearchParams();
+  const invoice = searchParams.get('invoice');
+
   const [session, setSession] = useState<Session | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState<'approved' | 'pending' | false>(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   // Form
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [file, setFile] = useState<File | null>(null);
   const [kritikSaran, setKritikSaran] = useState('');
   const [pollingAnswer, setPollingAnswer] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       if (!token) return;
-      
+
       const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
         .select('*')
         .eq('token', token)
         .eq('sport_type', 'funminton')
         .single();
-        
+
       if (sessionError || !sessionData) {
         setLoading(false);
         return;
       }
-      
+
       setSession(sessionData);
 
       const { data: pData } = await supabase
@@ -45,7 +45,7 @@ export default function PublicFunminton() {
         .select('*')
         .eq('session_id', sessionData.id)
         .neq('payment_status', 'approved');
-        
+
       if (pData) setParticipants(pData);
       setLoading(false);
     }
@@ -56,28 +56,10 @@ export default function PublicFunminton() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const compressImage = (f: File, maxPx = 1024, quality = 0.82): Promise<{ base64: string; mimeType: string }> =>
-    new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(f);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
-      };
-      img.onerror = reject;
-      img.src = url;
-    });
-
-  const handleSubmit = async (e: { preventDefault(): void }) => {
+  const handlePay = async (e: { preventDefault(): void }) => {
     e.preventDefault();
-    if (selectedIds.length === 0 || !file || !session) {
-      setErrorMsg('Pilih nama dan upload bukti pembayaran.');
+    if (selectedIds.length === 0 || !session || !token) {
+      setErrorMsg('Pilih dulu nama yang mau dibayar.');
       return;
     }
 
@@ -85,86 +67,43 @@ export default function PublicFunminton() {
     setErrorMsg('');
 
     try {
-      // 1. Compress then run OCR with Gemini
-      const { base64: base64Content, mimeType } = await compressImage(file);
-      const ocrResult = await analyzePaymentProof(base64Content, mimeType);
-      
-      // 2. Logic Auto-Approve Match
-      const expectedTotal = selectedIds.length * session.price_per_person;
-      let isMatch = false;
-      
-      if (ocrResult && typeof ocrResult.nominal === 'number') {
-        if (ocrResult.nominal === expectedTotal) {
-          isMatch = true;
-        }
+      const { data, error } = await supabase.functions.invoke('moves-create-payment', {
+        body: {
+          token,
+          participant_ids: selectedIds,
+          kritik_saran: kritikSaran || null,
+          polling_hari: pollingAnswer,
+          return_url: `${window.location.origin}/f/${token}`,
+        },
+      });
+
+      // invoke() flags any non-2xx as `error`; the real message is in the body.
+      if (error) {
+        let msg = 'Gagal memulai pembayaran. Coba lagi ya.';
+        try {
+          const body = await error.context.json();
+          if (body?.error) msg = body.error;
+        } catch { /* keep default */ }
+        throw new Error(msg);
       }
 
-      // 3. Upload file regardless of OCR result
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${session.id}/${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from('payment-proofs')
-        .upload(fileName, file);
-
-      if (uploadError) throw new Error('Gagal upload gambar.');
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('payment-proofs')
-        .getPublicUrl(fileName);
-
-      // 4. Update participants — approved if match, pending (flagged) if not
-      const updates = selectedIds.map(id => ({
-        id,
-        session_id: session.id,
-        payment_status: isMatch ? 'approved' : 'pending',
-        attended: isMatch ? true : undefined,
-        payment_amount: ocrResult?.nominal || null,
-        payment_date: ocrResult?.tanggal || new Date().toISOString().split('T')[0],
-        payment_proof_url: publicUrl,
-        ocr_raw: ocrResult,
-        ocr_match: isMatch,
-        submitted_at: new Date().toISOString(),
-        kritik_saran: kritikSaran || null,
-        polling_hari: pollingAnswer
-      }));
-
-      for (const update of updates) {
-        await supabase.from('participants').update(update).eq('id', update.id);
+      if (data?.payment_url) {
+        window.location.href = data.payment_url; // redirect to DOKU checkout
+        return;
       }
-
-      setSuccess(isMatch ? 'approved' : 'pending');
+      throw new Error('Link pembayaran tidak diterima. Coba lagi ya.');
     } catch (err: any) {
       setErrorMsg(err.message || 'Terjadi kesalahan sistem.');
-    } finally {
       setSubmitting(false);
     }
   };
 
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-green"></div></div>;
 
-  if (!session) return <div className="min-h-screen bg-gray-50 p-8 text-center"><p className="text-xl text-gray-500">Sesi tidak ditemukan atau link tidak valid.</p></div>;
+  // Returned from DOKU → show the live payment status.
+  if (invoice) return <MovesPaymentStatus invoice={invoice} accent="green" />;
 
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md w-full">
-          {success === 'approved' ? (
-            <>
-              <div className="text-5xl mb-4">🏸✅</div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Slay! Bayarnya valid bestie!</h2>
-              <p className="text-gray-500 text-sm">Transfernya udah ke-detect, status udah auto approved. See you di lapangan minggu depan 🔥</p>
-            </>
-          ) : (
-            <>
-              <div className="text-5xl mb-4">📨</div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Bukti sudah masuk!</h2>
-              <p className="text-gray-500 text-sm">Bukti TF-mu udah ke-upload ya, tapi perlu konfirmasi manual sama admin dulu. Hubungi Afif, Ghafar, atau Ilham buat konfirmasi pembayarannya 🙏</p>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
+  if (!session) return <div className="min-h-screen bg-gray-50 p-8 text-center"><p className="text-xl text-gray-500">Sesi tidak ditemukan atau link tidak valid.</p></div>;
 
   const expectedTotal = selectedIds.length * session.price_per_person;
 
@@ -179,13 +118,13 @@ export default function PublicFunminton() {
           <p className="text-gray-500 mt-2">{formatDate(session.session_date)} • {session.venue}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 space-y-6">
+        <form onSubmit={handlePay} className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 space-y-6">
           {submitting && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl flex flex-col items-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary-green mb-6"></div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Sabar bestie... 🤙</h3>
-                <p className="text-gray-500 text-sm">AI lagi ngecek bukti tf mu, bentar lagi kok. jangan kemana-mana dulu ya teman semeja ✨</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Menyiapkan pembayaran… 🤙</h3>
+                <p className="text-gray-500 text-sm">Bentar ya, kamu bakal diarahkan ke halaman pembayaran DOKU (QRIS) ✨</p>
               </div>
             </div>
           )}
@@ -194,7 +133,7 @@ export default function PublicFunminton() {
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
                 <div className="text-5xl mb-4">😭💀</div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Aduh, AI-nya ga percaya nih... Coba lagi yuk</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Waduh, gagal nih…</h3>
                 <p className="text-gray-600 text-sm mb-6">{errorMsg}</p>
                 <button
                   type="button"
@@ -223,49 +162,12 @@ export default function PublicFunminton() {
             </div>
           </div>
 
-          <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex justify-between items-center">
-            <span className="text-gray-600 font-medium">Total Tagihan</span>
-            <span className="text-xl font-bold text-primary-green">{formatCurrency(expectedTotal)}</span>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl border border-gray-100 text-center">
-            <p className="text-sm font-medium text-gray-700 mb-3">Scan QRIS di bawah ini untuk membayar:</p>
-            <img src={qrisImage} alt="QRIS Semeja Kerja" className="w-full max-w-[240px] mx-auto rounded-xl shadow-sm border border-gray-200 mb-4" />
-            <a href={qrisImage} download="QRIS_SemejaMoves.jpeg" className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
-              <Download size={16} /> Download QRIS
-            </a>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Upload Bukti Transfer (QRIS/Bank)</label>
-            {file ? (
-              <div className="flex items-center gap-3 p-4 bg-green-50 border-2 border-green-300 rounded-xl">
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Upload className="w-5 h-5 text-green-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-green-700 truncate">{file.name}</p>
-                  <p className="text-xs text-green-600">{(file.size / 1024).toFixed(0)} KB — siap diupload</p>
-                </div>
-                <button type="button" onClick={() => setFile(null)} className="text-green-500 hover:text-red-500 p-1 flex-shrink-0 transition-colors">
-                  <X size={18} />
-                </button>
-              </div>
-            ) : (
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-primary-green transition-colors bg-gray-50 cursor-pointer relative">
-                <div className="space-y-1 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600 justify-center">
-                    <span className="relative rounded-md font-medium text-primary-green">
-                      <span>Upload foto</span>
-                      <input type="file" className="sr-only" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">PNG, JPG up to 5MB</p>
-                </div>
-                <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
-              </div>
-            )}
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-1">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 font-medium">Total Tagihan</span>
+              <span className="text-xl font-bold text-primary-green">{formatCurrency(expectedTotal)}</span>
+            </div>
+            <p className="text-xs text-gray-400">+ kode unik (Rp300–700) ditambahkan otomatis di halaman pembayaran.</p>
           </div>
 
           {session.announcement_config?.enabled && (
@@ -319,10 +221,10 @@ export default function PublicFunminton() {
 
           <button
             type="submit"
-            disabled={submitting || selectedIds.length === 0 || !file}
+            disabled={submitting || selectedIds.length === 0}
             className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-primary-green hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-green disabled:opacity-50 transition-all"
           >
-            {submitting ? 'Memproses...' : 'Kirim Pembayaran'}
+            {submitting ? 'Memproses…' : 'Bayar Sekarang (QRIS)'}
           </button>
         </form>
       </div>
