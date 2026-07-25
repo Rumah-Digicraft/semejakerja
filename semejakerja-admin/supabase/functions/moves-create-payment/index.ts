@@ -46,6 +46,7 @@ Deno.serve(async (req) => {
       payer_phone,
       kritik_saran,
       polling_hari,
+      unique_code, // optional: client-proposed kode unik (validated below)
       return_url,
     } = await req.json();
 
@@ -112,8 +113,15 @@ Deno.serve(async (req) => {
     }
 
     // --- 3. Amount = count × price + kode unik (Rp 300–700). ---
+    // The client may propose the kode unik so it can show the exact total
+    // before redirect. We only accept a valid integer in [300,700]; otherwise
+    // we generate our own. The base price stays server-authoritative.
     const baseAmount = count * price;
-    const uniqueCode = 300 + Math.floor(Math.random() * 401); // 300..700 inclusive
+    const proposedCode = Number(unique_code);
+    const uniqueCode =
+      Number.isInteger(proposedCode) && proposedCode >= 300 && proposedCode <= 700
+        ? proposedCode
+        : 300 + Math.floor(Math.random() * 401);
     const amount = baseAmount + uniqueCode;
 
     const dokuEnv = (Deno.env.get("DOKU_ENV") ?? "sandbox") as "sandbox" | "production";

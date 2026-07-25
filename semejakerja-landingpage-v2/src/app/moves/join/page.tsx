@@ -55,13 +55,22 @@ function ErrorOverlay({
   );
 }
 
-const UNIQUE_CODE_NOTE =
-  "+ kode unik (Rp300–700) ditambahkan otomatis di halaman pembayaran.";
 const noteStyle: React.CSSProperties = {
   fontSize: "var(--text-xs)",
   color: "var(--color-gray-400)",
   marginTop: "var(--space-2)",
 };
+
+// Kode unik (Rp300–700) — dibuat di client agar total pastinya bisa
+// ditampilkan sebelum redirect ke DOKU (biar user nggak kaget). Server tetap
+// otoritatif: memvalidasi 300–700 & menghitung harga dasar sendiri.
+function useUniqueCode() {
+  const [code, setCode] = useState<number | null>(null);
+  useEffect(() => {
+    setCode(300 + Math.floor(Math.random() * 401));
+  }, []);
+  return code;
+}
 
 // Starts a DOKU payment and redirects to the hosted checkout page.
 async function startPayment(body: Record<string, unknown>) {
@@ -100,6 +109,7 @@ function FunmintonJoin({ session }: { session: Session }) {
   const [pollingAnswer, setPollingAnswer] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const uniqueCode = useUniqueCode();
 
   useEffect(() => {
     supabase
@@ -118,7 +128,8 @@ function FunmintonJoin({ session }: { session: Session }) {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
 
-  const expectedTotal = selectedIds.length * session.price_per_person;
+  const base = selectedIds.length * session.price_per_person;
+  const total = base > 0 ? base + (uniqueCode ?? 0) : 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,6 +146,7 @@ function FunmintonJoin({ session }: { session: Session }) {
         participant_ids: selectedIds,
         kritik_saran: kritikSaran || null,
         polling_hari: pollingAnswer,
+        unique_code: uniqueCode,
         return_url: `${window.location.origin}/moves/status`,
       });
     } catch (err) {
@@ -193,11 +205,15 @@ function FunmintonJoin({ session }: { session: Session }) {
         <div>
           <div className={styles.totalBox}>
             <span className={styles.totalLabel}>Total Tagihan</span>
-            <span className={styles.totalValue}>
-              {formatCurrency(expectedTotal)}
-            </span>
+            <span className={styles.totalValue}>{formatCurrency(total)}</span>
           </div>
-          <p style={noteStyle}>{UNIQUE_CODE_NOTE}</p>
+          {base > 0 && (
+            <p style={noteStyle}>
+              Iuran {formatCurrency(base)} + kode unik{" "}
+              {uniqueCode != null ? formatCurrency(uniqueCode) : "…"} — biar
+              gampang dicek admin.
+            </p>
+          )}
         </div>
 
         {session.announcement_config?.enabled &&
@@ -277,7 +293,7 @@ function FunmintonJoin({ session }: { session: Session }) {
 
         <button
           type="submit"
-          disabled={submitting || selectedIds.length === 0}
+          disabled={submitting || selectedIds.length === 0 || uniqueCode == null}
           className={`btn btn--primary ${styles.submitBtn}`}
         >
           {submitting ? "Memproses…" : "Bayar Sekarang (QRIS)"}
@@ -293,6 +309,7 @@ function PadelJoin({ session }: { session: Session }) {
   const [formData, setFormData] = useState({ name: "", phone: "" });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const uniqueCode = useUniqueCode();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -309,6 +326,7 @@ function PadelJoin({ session }: { session: Session }) {
         new_participants: [{ name: formData.name, phone: formData.phone || null }],
         payer_name: formData.name,
         payer_phone: formData.phone || null,
+        unique_code: uniqueCode,
         return_url: `${window.location.origin}/moves/status`,
       });
     } catch (err) {
@@ -369,12 +387,16 @@ function PadelJoin({ session }: { session: Session }) {
 
         <div>
           <div className={styles.totalBox}>
-            <span className={styles.totalLabel}>Biaya Pendaftaran</span>
+            <span className={styles.totalLabel}>Total Tagihan</span>
             <span className={styles.totalValue}>
-              {formatCurrency(session.price_per_person)}
+              {formatCurrency(session.price_per_person + (uniqueCode ?? 0))}
             </span>
           </div>
-          <p style={noteStyle}>{UNIQUE_CODE_NOTE}</p>
+          <p style={noteStyle}>
+            Biaya pendaftaran {formatCurrency(session.price_per_person)} + kode
+            unik {uniqueCode != null ? formatCurrency(uniqueCode) : "…"} — biar
+            gampang dicek admin.
+          </p>
         </div>
 
         <p style={{ ...noteStyle, marginTop: 0, textAlign: "center" }}>
@@ -383,7 +405,7 @@ function PadelJoin({ session }: { session: Session }) {
 
         <button
           type="submit"
-          disabled={submitting || !formData.name}
+          disabled={submitting || !formData.name || uniqueCode == null}
           className={`btn btn--primary ${styles.submitBtn}`}
         >
           {submitting ? "Memproses…" : "Daftar & Bayar (QRIS)"}
