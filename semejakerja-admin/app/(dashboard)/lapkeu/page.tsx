@@ -19,6 +19,9 @@ import {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 const COLORS = ['#7c3aed', '#0ea5e9', '#10b981', '#f59e0b']
 
+// MDR QRIS DOKU (0,7%). Kode unik Semeja Moves dipakai buat nutup fee ini; sisanya layanan vendor.
+const DOKU_FEE_RATE = 0.007
+
 const LINE_META = {
   maps:      { label: 'Maps Purwokerto',    icon: <MapPin size={24} className="text-blue-500" />, desc: 'Direktori kafe & WFC', bmcLabel: 'Key Partner (Kafe Partner)' },
   community: { label: 'Community Membership', icon: <Users size={24} className="text-purple-500" />, desc: 'Subscription tier anggota', bmcLabel: 'Revenue Stream (Membership Fee)' },
@@ -77,6 +80,7 @@ export default function LapkeuPage() {
   const [memberRevenue, setMemberRevenue] = useState<{ price_paid: number; created_at: string }[]>([])
   const [addonDropinRev, setAddonDropinRev] = useState<{ price_paid: number | null; created_at: string; session_date: string }[]>([])
   const [addonSubRev, setAddonSubRev] = useState<{ price_paid: number | null; created_at: string }[]>([])
+  const [movesTx, setMovesTx] = useState<{ unique_code: number; amount: number; paid_at: string | null }[]>([])
   const [loading, setLoading] = useState(true)
 
   // UI state
@@ -89,16 +93,18 @@ export default function LapkeuPage() {
   // Load all data
   const load = useCallback(async () => {
     setLoading(true)
-    const [cfRes, memRes, dropinRes, subRes] = await Promise.all([
+    const [cfRes, memRes, dropinRes, subRes, txRes] = await Promise.all([
       supabase.from('cashflow_entries').select('*').order('entry_date'),
       supabase.from('memberships').select('price_paid, created_at').eq('status', 'active'),
       supabase.from('addon_dropin').select('price_paid, created_at, session_date').eq('payment_status', 'paid'),
       supabase.from('addon_subscriptions').select('price_paid, created_at').eq('status', 'active'),
+      supabase.from('moves_payment_transactions').select('unique_code, amount, paid_at').eq('status', 'success'),
     ])
     setCashflow(cfRes.data ?? [])
     setMemberRevenue(memRes.data ?? [])
     setAddonDropinRev(dropinRes.data ?? [])
     setAddonSubRev(subRes.data ?? [])
+    setMovesTx(txRes.data ?? [])
     setLoading(false)
   }, [])
 
@@ -115,6 +121,13 @@ export default function LapkeuPage() {
 
   // ── COMPUTED DATA ─────────────────────────────────────────────────────────
   const filteredCashflow = cashflow.filter(e => inPeriod(e.entry_date))
+
+  // --- Kode unik (DOKU) Semeja Moves — ditotal terpisah dari cashflow ---
+  const filteredMovesTx = movesTx.filter(t => t.paid_at && inPeriod(t.paid_at.split('T')[0]))
+  const kodeUnikTotal = filteredMovesTx.reduce((s, t) => s + (t.unique_code || 0), 0)
+  const kodeUnikGross = filteredMovesTx.reduce((s, t) => s + (t.amount || 0), 0)
+  const kodeUnikFee = Math.round(kodeUnikGross * DOKU_FEE_RATE)
+  const kodeUnikNet = kodeUnikTotal - kodeUnikFee
 
   // --- Moves/Funminton/Padel from cashflow_entries ---
   const movesIncome = filteredCashflow.filter(e => e.category === 'income').reduce((s, e) => s + e.amount, 0)
@@ -275,6 +288,31 @@ export default function LapkeuPage() {
             <p className={`text-xl font-bold ${card.numColor}`}>{card.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* ── KODE UNIK (DOKU) — Semeja Moves, ditotal terpisah ─────────────── */}
+      <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="p-2 bg-emerald-100 rounded-xl"><Dumbbell size={20} className="text-emerald-600" /></span>
+          <div>
+            <p className="font-semibold text-emerald-800 text-sm">Kode Unik (DOKU) — Semeja Moves</p>
+            <p className="text-xs text-emerald-600">Ditotal terpisah dari cashflow. Nutup fee DOKU 0,7%, sisanya pendapatan layanan vendor.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+          <div>
+            <p className="text-[11px] text-emerald-600">Total kode unik</p>
+            <p className="text-lg font-bold text-emerald-800">{formatCurrency(kodeUnikTotal)}</p>
+          </div>
+          <div>
+            <p className="text-[11px] text-emerald-600">Est. fee DOKU (0,7%)</p>
+            <p className="text-base font-semibold text-red-500">-{formatCurrency(kodeUnikFee)}</p>
+          </div>
+          <div>
+            <p className="text-[11px] text-emerald-600">Bersih layanan vendor</p>
+            <p className="text-lg font-bold text-emerald-800">{formatCurrency(kodeUnikNet)}</p>
+          </div>
+        </div>
       </div>
 
       {/* ── CHARTS ────────────────────────────────────────────────────────── */}

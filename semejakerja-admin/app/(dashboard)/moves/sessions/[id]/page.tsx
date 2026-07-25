@@ -68,6 +68,9 @@ const SPORT_CONFIG: Record<SportType, { icon: React.ReactNode }> = {
   volleyball: { icon: <Trophy size={24} className="text-amber-600" /> },
 }
 
+// MDR QRIS DOKU (0,7%). Kode unik dipakai buat nutup fee ini; sisanya pendapatan layanan vendor.
+const DOKU_FEE_RATE = 0.007
+
 export default function SessionDetailPage() {
   const params = useParams()
   const id = params?.id as string
@@ -77,6 +80,7 @@ export default function SessionDetailPage() {
 
   const [session, setSession] = useState<Session | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
+  const [kodeUnik, setKodeUnik] = useState({ total: 0, count: 0, fee: 0, net: 0 })
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'peserta' | 'pembayaran' | 'ringkasan'>('peserta')
   
@@ -126,6 +130,19 @@ export default function SessionDetailPage() {
       if (sessionData.announcement_config) setAnnouncementForm(sessionData.announcement_config)
     }
     if (participantsData) setParticipants(participantsData)
+
+    // Kode unik terkumpul via DOKU (sumber kebenaran: moves_payment_transactions).
+    const { data: txData } = await supabase
+      .from('moves_payment_transactions')
+      .select('unique_code, amount')
+      .eq('session_id', id)
+      .eq('status', 'success')
+    const txRows = txData ?? []
+    const kuTotal = txRows.reduce((s: number, t: { unique_code: number | null }) => s + (t.unique_code || 0), 0)
+    const kuGross = txRows.reduce((s: number, t: { amount: number | null }) => s + (t.amount || 0), 0)
+    const kuFee = Math.round(kuGross * DOKU_FEE_RATE)
+    setKodeUnik({ total: kuTotal, count: txRows.length, fee: kuFee, net: kuTotal - kuFee })
+
     setLoading(false)
   }, [id, supabase])
 
@@ -629,6 +646,21 @@ export default function SessionDetailPage() {
                 <span className={`px-3 py-1 rounded-lg ${profit >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                   {formatCurrency(profit)}
                 </span>
+              </div>
+              <div className="mt-3 pt-3 border-t border-dashed border-slate-200 space-y-1">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Kode Unik (DOKU) <span className="text-xs text-slate-400">· {kodeUnik.count} transaksi</span></span>
+                  <span className="font-semibold text-emerald-600">+{formatCurrency(kodeUnik.total)}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pl-3 text-slate-400">
+                  <span>Est. fee DOKU (0,7%)</span>
+                  <span className="text-red-400">-{formatCurrency(kodeUnik.fee)}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pl-3">
+                  <span className="text-slate-500">Bersih layanan vendor</span>
+                  <span className="font-medium text-slate-700">{formatCurrency(kodeUnik.net)}</span>
+                </div>
+                <p className="text-[11px] text-slate-400 pt-0.5">Dihitung terpisah, di luar iuran &amp; profit di atas.</p>
               </div>
             </div>
 
