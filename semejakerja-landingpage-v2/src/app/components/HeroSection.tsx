@@ -40,7 +40,7 @@ export default function HeroSection() {
 
         <div className={styles.actions}>
           <a
-            href="https://linktr.ee/semejakerja"
+            href="https://chat.whatsapp.com/BMzJMgEsOVgCCVDnM4EeJP"
             target="_blank"
             rel="noopener noreferrer"
             className={`btn btn--primary btn--large ${styles.ctaMain}`}

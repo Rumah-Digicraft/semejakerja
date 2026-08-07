@@ -10,12 +10,21 @@ import { formatDatetime } from '@/lib/utils/format'
 import {
   STATUS_LABELS, STATUS_OPTIONS, STATUS_COLORS, QUESTION_TYPE_OPTIONS,
   needsOptions, isAnswerable, newQuestion, responsesToCsv, downloadCsv, slugifyTitle,
-  canSyncProfile, PROFILE_FIELD_OPTIONS,
+  canSyncProfile, PROFILE_FIELD_OPTIONS, APPROVAL_MODE_OPTIONS,
+  RESPONSE_STATUS_LABELS, RESPONSE_STATUS_COLORS,
 } from '../lib'
 import {
   ArrowLeft, Loader2, Save, Copy, Check, ExternalLink, Plus, Trash2,
   ChevronUp, ChevronDown, Users, Download, ClipboardList, GripVertical, Link2, Megaphone,
+  ThumbsUp, ThumbsDown,
 } from 'lucide-react'
+
+// Local (browser) "today" as YYYY-MM-DD — bukan toISOString() (itu UTC,
+// bisa mundur 1 hari kalau admin di WIB buka form deket tengah malam).
+const todayLocal = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 interface SettingsState {
   title: string
@@ -29,6 +38,7 @@ interface SettingsState {
   success_message: string
   status: FormStatus
   show_on_landing: boolean
+  requires_approval: boolean
 }
 
 export default function FormDetailPage() {
@@ -65,6 +75,7 @@ export default function FormDetailPage() {
       success_message: row.success_message ?? '',
       status: row.status,
       show_on_landing: !!row.show_on_landing,
+      requires_approval: !!row.requires_approval,
     })
     setQuestions(Array.isArray(row.questions) ? row.questions : [])
 
@@ -85,6 +96,8 @@ export default function FormDetailPage() {
     setSettings(s => (s ? ({ ...s, [k]: v } as SettingsState) : s))
   const toggleShowOnLanding = () =>
     setSettings(s => (s ? { ...s, show_on_landing: !s.show_on_landing } : s))
+  const setRequiresApproval = (v: boolean) =>
+    setSettings(s => (s ? { ...s, requires_approval: v } : s))
 
   // ── Builder mutations ─────────────────────────────────────
   const updateQuestion = (qid: string, patch: Partial<FormQuestion>) =>
@@ -121,6 +134,17 @@ export default function FormDetailPage() {
   // ── Save (settings + questions) ───────────────────────────
   const handleSave = async () => {
     if (!settings) return
+    // Cuma blokir kalau tanggalnya BERUBAH ke masa lalu — event yang
+    // tanggalnya udah kelewat tetap boleh disimpan ulang (mis. admin cuma
+    // mau ubah status/pertanyaan, bukan tanggalnya).
+    if (
+      settings.event_date &&
+      settings.event_date !== (form?.event_date ?? '') &&
+      settings.event_date < todayLocal()
+    ) {
+      showToast('Tanggal event nggak boleh di masa lalu')
+      return
+    }
     setSaving(true)
     const cleaned: FormQuestion[] = questions.map(q => {
       const c: FormQuestion = {
@@ -146,6 +170,7 @@ export default function FormDetailPage() {
       success_message: settings.success_message || null,
       status: settings.status,
       show_on_landing: settings.show_on_landing,
+      requires_approval: settings.requires_approval,
       questions: cleaned,
     }).eq('id', id)
     setSaving(false)
@@ -155,6 +180,15 @@ export default function FormDetailPage() {
   }
 
   // ── Responses actions ─────────────────────────────────────
+  const reviewResponse = async (r: FormResponse, status: 'registered' | 'rejected') => {
+    const { error } = await supabase.rpc('admin_review_form_response', {
+      p_response_id: r.id,
+      p_status: status,
+    })
+    if (error) { showToast('Gagal ' + (status === 'registered' ? 'approve' : 'reject') + ': ' + error.message); return }
+    showToast(status === 'registered' ? 'Respons di-approve' : 'Respons ditolak')
+    load()
+  }
   const toggleAttended = async (r: FormResponse) => {
     const next = !r.attended
     const { error } = await supabase.from('form_responses').update({ attended: next }).eq('id', r.id)
@@ -187,6 +221,8 @@ export default function FormDetailPage() {
   const input = 'w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400'
   const label = 'block text-sm font-medium text-slate-700 mb-1'
   const answerCols = (form.questions ?? []).filter(q => isAnswerable(q.type))
+  const registeredCount = responses.filter(r => r.status === 'registered').length
+  const pendingCount = responses.filter(r => r.status === 'pending').length
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
@@ -251,7 +287,7 @@ export default function FormDetailPage() {
             <textarea className={input} rows={6} value={settings.description} onChange={e => setS('description', e.target.value)} placeholder="Info event: tanggal, jam, tempat, kuota, syarat follow…" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label className={label}>Tanggal event <span className="text-slate-400 font-normal">(buat kartu di landing)</span></label><input type="date" className={input} value={settings.event_date} onChange={e => setS('event_date', e.target.value)} /></div>
+            <div><label className={label}>Tanggal event <span className="text-slate-400 font-normal">(buat kartu di landing)</span></label><input type="date" min={todayLocal()} className={input} value={settings.event_date} onChange={e => setS('event_date', e.target.value)} /></div>
             <div><label className={label}>Lokasi</label><input className={input} value={settings.location} onChange={e => setS('location', e.target.value)} placeholder="Cold 'N Brew, Purwokerto" /></div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -268,6 +304,22 @@ export default function FormDetailPage() {
             <div><label className={label}>Label tombol WhatsApp</label><input className={input} value={settings.whatsapp_group_label} onChange={e => setS('whatsapp_group_label', e.target.value)} placeholder="Klik Sini" /></div>
           </div>
           <div><label className={label}>Pesan setelah submit</label><textarea className={input} rows={2} value={settings.success_message} onChange={e => setS('success_message', e.target.value)} placeholder="Makasih udah daftar! …" /></div>
+          <div>
+            <label className={label}>Jenis event</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {APPROVAL_MODE_OPTIONS.map(o => (
+                <button
+                  key={String(o.value)}
+                  type="button"
+                  onClick={() => setRequiresApproval(o.value)}
+                  className={`text-left p-3 rounded-xl border transition ${settings.requires_approval === o.value ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-200' : 'border-slate-200 hover:bg-slate-50'}`}
+                >
+                  <span className="block text-sm font-semibold text-slate-800">{o.label}</span>
+                  <span className="block text-xs text-slate-500 mt-1">{o.hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -362,7 +414,13 @@ export default function FormDetailPage() {
       {/* Responses */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-          <span className="font-bold text-slate-800 flex items-center gap-2"><Users size={16} className="text-slate-400" /> Respons <span className="text-slate-400 font-normal">({responses.length}{form.quota ? ` / ${form.quota}` : ''})</span></span>
+          <span className="font-bold text-slate-800 flex items-center gap-2">
+            <Users size={16} className="text-slate-400" /> Respons{' '}
+            <span className="text-slate-400 font-normal">
+              ({registeredCount} terdaftar{form.quota ? ` / ${form.quota}` : ''}
+              {pendingCount > 0 ? ` · ${pendingCount} menunggu approval` : ''})
+            </span>
+          </span>
           {responses.length > 0 && (
             <button onClick={exportCsv} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-xl text-sm font-medium text-slate-700"><Download size={14} /> Export CSV</button>
           )}
@@ -375,13 +433,14 @@ export default function FormDetailPage() {
                 {answerCols.map((q, i) => (
                   <th key={q.id} className="text-left font-semibold px-4 py-3 whitespace-nowrap max-w-[220px] truncate" title={q.label}>{q.label || `Pertanyaan ${i + 1}`}</th>
                 ))}
+                <th className="text-left font-semibold px-4 py-3">Status</th>
                 <th className="text-left font-semibold px-4 py-3">Hadir</th>
                 <th className="text-right font-semibold px-4 py-3">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {responses.length === 0 ? (
-                <tr><td colSpan={answerCols.length + 3} className="px-5 py-12 text-center text-slate-400">Belum ada respons.</td></tr>
+                <tr><td colSpan={answerCols.length + 4} className="px-5 py-12 text-center text-slate-400">Belum ada respons.</td></tr>
               ) : responses.map(r => (
                 <tr key={r.id} className="hover:bg-slate-50 align-top">
                   <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{formatDatetime(r.created_at)}</td>
@@ -391,9 +450,24 @@ export default function FormDetailPage() {
                     return <td key={q.id} className="px-4 py-3 text-slate-700 max-w-[240px]"><span className="line-clamp-3 break-words">{text || <span className="text-slate-300">—</span>}</span></td>
                   })}
                   <td className="px-4 py-3">
-                    <button onClick={() => toggleAttended(r)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${r.attended ? 'bg-green-500' : 'bg-slate-300'}`} title="Tandai hadir">
-                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition ${r.attended ? 'translate-x-4' : 'translate-x-1'}`} />
-                    </button>
+                    <div className="flex flex-col items-start gap-1.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${RESPONSE_STATUS_COLORS[r.status]}`}>{RESPONSE_STATUS_LABELS[r.status]}</span>
+                      {r.status === 'pending' && (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => reviewResponse(r, 'registered')} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 text-[11px] font-medium" title="Approve"><ThumbsUp size={12} /> Approve</button>
+                          <button onClick={() => reviewResponse(r, 'rejected')} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-medium" title="Reject"><ThumbsDown size={12} /> Reject</button>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {r.status === 'registered' ? (
+                      <button onClick={() => toggleAttended(r)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${r.attended ? 'bg-green-500' : 'bg-slate-300'}`} title="Tandai hadir">
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition ${r.attended ? 'translate-x-4' : 'translate-x-1'}`} />
+                      </button>
+                    ) : (
+                      <span className="text-slate-300 text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => deleteResponse(r)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400" title="Hapus respons"><Trash2 size={15} /></button>

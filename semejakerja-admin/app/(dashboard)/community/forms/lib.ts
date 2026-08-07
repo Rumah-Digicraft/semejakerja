@@ -1,5 +1,5 @@
 import type {
-  Form, FormResponse, FormStatus, FormQuestion, FormQuestionType, FormAnswerValue, ProfileSyncField,
+  Form, FormResponse, FormStatus, FormResponseStatus, FormQuestion, FormQuestionType, FormAnswerValue, ProfileSyncField,
 } from '@/types'
 
 // ── Status form ─────────────────────────────────────────────
@@ -17,6 +17,27 @@ export const STATUS_COLORS: Record<FormStatus, string> = {
 
 export const STATUS_OPTIONS: { value: FormStatus; label: string }[] =
   (Object.keys(STATUS_LABELS) as FormStatus[]).map(v => ({ value: v, label: STATUS_LABELS[v] }))
+
+// ── Jenis event (approval) ───────────────────────────────────
+export const APPROVAL_MODE_OPTIONS: { value: boolean; label: string; hint: string }[] = [
+  { value: false, label: 'Otomatis', hint: 'Submit langsung terhitung peserta.' },
+  { value: true, label: 'Perlu approval admin', hint: 'Submit masuk antrian dulu, admin approve baru terhitung peserta.' },
+]
+
+// ── Status respons ────────────────────────────────────────────
+export const RESPONSE_STATUS_LABELS: Record<FormResponseStatus, string> = {
+  pending: 'Menunggu Approval',
+  registered: 'Terdaftar',
+  cancelled: 'Dibatalkan',
+  rejected: 'Ditolak',
+}
+
+export const RESPONSE_STATUS_COLORS: Record<FormResponseStatus, string> = {
+  pending: 'bg-amber-100 text-amber-700',
+  registered: 'bg-green-100 text-green-700',
+  cancelled: 'bg-slate-200 text-slate-500',
+  rejected: 'bg-red-100 text-red-600',
+}
 
 // ── Tipe pertanyaan ─────────────────────────────────────────
 export const QUESTION_TYPE_LABELS: Record<FormQuestionType, string> = {
@@ -86,7 +107,11 @@ const WFC_RULES = `1. Datang on time di tanggal & jam yang sudah ditentukan.
 4. Bersedia ikut dokumentasi acara (foto/video, wajah akan ditampilkan di media sosial).
 5. Membeli minimal 1 minuman.`
 
-const WFC_SUCCESS = 'Makasih udah daftar! Undangan resmi akan dikirim via WhatsApp ke peserta terpilih. Sambil nunggu, join grup WhatsApp Semeja Kerja dulu yuk 👇'
+// Nada "resmi terdaftar" (bukan "nunggu diseleksi") — cocok buat mode
+// Otomatis, di mana submit = langsung jadi peserta, tidak ada seleksi
+// lagi. Event requires_approval=true sudah punya pesan sendiri yang
+// menjelaskan status antrian (lihat RegistrationStatus di landing).
+const WFC_SUCCESS = 'Yeay, kamu resmi jadi peserta! 🎉 Gabung ke grup WhatsApp di bawah buat info lengkap acaranya ya.'
 
 export function wfcTemplateQuestions(): FormQuestion[] {
   const q = (
@@ -118,7 +143,7 @@ export function wfcTemplateForm() {
     description: WFC_DESCRIPTION,
     success_message: WFC_SUCCESS,
     whatsapp_group_url: WFC_WHATSAPP_GROUP_URL,
-    whatsapp_group_label: 'Klik Sini',
+    whatsapp_group_label: 'Gabung Grup WhatsApp',
     questions: wfcTemplateQuestions(),
   }
 }
@@ -132,10 +157,11 @@ const csvEscape = (s: string): string =>
 
 export function responsesToCsv(questions: FormQuestion[], responses: FormResponse[]): string {
   const cols = questions.filter(q => isAnswerable(q.type))
-  const header = ['Waktu', ...cols.map((q, i) => q.label || `Pertanyaan ${i + 1}`), 'Hadir']
+  const header = ['Waktu', ...cols.map((q, i) => q.label || `Pertanyaan ${i + 1}`), 'Status', 'Hadir']
   const rows = responses.map(r => [
     r.created_at,
     ...cols.map(q => cellText(r.answers?.[q.id])),
+    RESPONSE_STATUS_LABELS[r.status],
     r.attended ? 'Ya' : 'Tidak',
   ])
   return [header, ...rows]

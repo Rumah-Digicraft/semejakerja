@@ -5,8 +5,13 @@
 // <Suspense> for useSearchParams. The form definition is built in the admin
 // panel (Community → Form Event); RLS exposes only status='open' forms to
 // anon. Answers are written via the SECURITY DEFINER RPC submit_form_response
-// (migration 030) — the token is the capability; there is no direct anon
+// (migration 030/034) — the token is the capability; there is no direct anon
 // INSERT on form_responses.
+//
+// One response row per (form, user) — migration 034. A logged-in user who
+// already has an active row (pending/registered) sees their status instead
+// of the form, and can cancel via the cancel_form_response RPC. Cancelled/
+// rejected rows can be resubmitted (same row gets reused server-side).
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
@@ -47,12 +52,23 @@ interface FormRow {
   success_message: string | null;
   status: string;
   token: string;
+  requires_approval: boolean;
 }
 
 type AnswerValue = string | string[];
 type Answers = Record<string, AnswerValue>;
 
+// Mirrors form_responses.status (migration 034).
+type FormResponseStatus = "pending" | "registered" | "cancelled" | "rejected";
+
+interface MyResponse {
+  id: string;
+  status: FormResponseStatus;
+}
+
 interface SubmitResult {
+  response_id: string;
+  status: FormResponseStatus;
   whatsapp_group_url: string | null;
   whatsapp_group_label: string | null;
   success_message: string | null;
@@ -60,17 +76,43 @@ interface SubmitResult {
 
 const isAnswerable = (t: FormQuestionType) => t !== "section";
 
+// Satu kalimat ringkas, bukan 2 baris info terpisah — "ditolak" udah
+// nyiratin event-nya approval-gated, jadi nggak perlu diulang lagi.
+function noticeText(
+  previousStatus: "cancelled" | "rejected" | null,
+  requiresApproval: boolean
+): string | null {
+  if (previousStatus === "rejected") {
+    return "Pendaftaran kamu sebelumnya ditolak admin — isi ulang di bawah buat coba lagi.";
+  }
+  if (previousStatus === "cancelled") {
+    return requiresApproval
+      ? "Kamu sebelumnya cancel — isi ulang di bawah kalau mau daftar lagi. Event ini butuh approval admin dulu ya."
+      : "Kamu sebelumnya cancel — isi ulang di bawah kalau mau daftar lagi.";
+  }
+  if (requiresApproval) {
+    return "Event ini butuh approval admin dulu sebelum kamu resmi jadi peserta.";
+  }
+  return null;
+}
+
 // ── The form itself ─────────────────────────────────────────────
 function FormRunner({
   form,
   userId,
   userEmail,
   profile,
+  previousStatus,
+  onSubmitted,
 }: {
   form: FormRow;
   userId: string | null;
   userEmail: string | null;
   profile: ProfileData | null;
+  // Set kalau user pernah punya baris respons yang cancelled/rejected —
+  // dipakai buat banner "isi ulang untuk daftar lagi".
+  previousStatus: "cancelled" | "rejected" | null;
+  onSubmitted: (result: SubmitResult) => void;
 }) {
   const supabase = createClient();
   // Autofill: email dari Google + field yang ditandai profile_field dari
@@ -88,7 +130,6 @@ function FormRunner({
   });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [result, setResult] = useState<SubmitResult | null>(null);
 
   const setAnswer = (qid: string, val: AnswerValue) =>
     setAnswers((a) => ({ ...a, [qid]: val }));
@@ -143,7 +184,7 @@ function FormRunner({
         }
       }
 
-      setResult((data ?? {}) as SubmitResult);
+      onSubmitted(data as SubmitResult);
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : "Terjadi kesalahan sistem."
@@ -153,44 +194,6 @@ function FormRunner({
     }
   };
 
-  // ── Success state ──────────────────────────────────────────
-  if (result) {
-    const waUrl = result.whatsapp_group_url ?? form.whatsapp_group_url;
-    const waLabel =
-      result.whatsapp_group_label ?? form.whatsapp_group_label ?? "Klik Sini";
-    const msg =
-      result.success_message ??
-      form.success_message ??
-      "Makasih udah daftar! Undangan akan dikirim via WhatsApp ke peserta terpilih.";
-    return (
-      <div className={styles.statusCard}>
-        <div className={styles.statusEmoji}>🎉</div>
-        <h2 className={styles.statusTitle}>Pendaftaran terkirim!</h2>
-        <p className={styles.statusText}>{msg}</p>
-        {waUrl && (
-          <a
-            href={waUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`btn btn--primary ${styles.waButton}`}
-          >
-            {waLabel}
-          </a>
-        )}
-
-        <div className={styles.accountBox}>
-          <p className={styles.accountHint}>
-            Sekalian aktifin membership Semeja Kerja buat benefit diskon di cafe
-            partner &amp; akses Semeja Moves 👀
-          </p>
-          <Link href="/membership" className={`btn btn--secondary ${styles.accountButton}`}>
-            Lihat membership
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       <div className={styles.header}>
@@ -199,6 +202,12 @@ function FormRunner({
           <p className={styles.subtitle}>Kolaborasi dengan {form.cafe_name}</p>
         )}
       </div>
+
+      {noticeText(previousStatus, form.requires_approval) && (
+        <div className={styles.notice}>
+          <p>{noticeText(previousStatus, form.requires_approval)}</p>
+        </div>
+      )}
 
       {form.description && (
         <div className={styles.description}>{form.description}</div>
@@ -345,6 +354,81 @@ function LoginGate({ form, token }: { form: FormRow; token: string }) {
   );
 }
 
+// ── Status pendaftaran: user sudah punya baris pending/registered ──
+function RegistrationStatus({
+  form,
+  status,
+  onCancel,
+  cancelling,
+  cancelError,
+}: {
+  form: FormRow;
+  status: "pending" | "registered";
+  onCancel: () => void;
+  cancelling: boolean;
+  cancelError: string;
+}) {
+  const isPending = status === "pending";
+  return (
+    <>
+      <div className={styles.header}>
+        <h1 className={styles.title}>{form.title}</h1>
+        {form.cafe_name && (
+          <p className={styles.subtitle}>Kolaborasi dengan {form.cafe_name}</p>
+        )}
+      </div>
+      <div className={styles.statusCard}>
+        <div className={styles.statusEmoji}>{isPending ? "⏳" : "🎉"}</div>
+        <h2 className={styles.statusTitle}>
+          {isPending ? "Menunggu approval admin" : "Kamu terdaftar!"}
+        </h2>
+        <p className={styles.statusText}>
+          {isPending
+            ? "Pendaftaran kamu masuk antrian. Admin akan meninjau dan mengabari via WhatsApp begitu di-approve."
+            : form.success_message ??
+              "Makasih udah daftar! Undangan akan dikirim via WhatsApp ke peserta terpilih."}
+        </p>
+        {form.whatsapp_group_url && (
+          <a
+            href={form.whatsapp_group_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`btn btn--primary ${styles.waButton}`}
+          >
+            {form.whatsapp_group_label ?? "Klik Sini"}
+          </a>
+        )}
+
+        <div className={styles.accountBox}>
+          <p className={styles.accountHint}>
+            Sekalian aktifin membership Semeja Kerja buat benefit diskon di cafe
+            partner &amp; akses Semeja Moves 👀
+          </p>
+          <Link href="/membership" className={`btn btn--secondary ${styles.accountButton}`}>
+            Lihat membership
+          </Link>
+        </div>
+
+        <div className={styles.cancelSection}>
+          {cancelError && (
+            <div className={styles.errorBox} style={{ marginBottom: "var(--space-3)", width: "100%" }}>
+              {cancelError}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={cancelling}
+            className={styles.cancelButton}
+          >
+            {cancelling ? "Membatalkan..." : "Batalkan pendaftaran"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Loader: cek sesi + ambil form by token ──────────────────────
 function RegisterContent() {
   const token = useSearchParams().get("token");
@@ -355,6 +439,10 @@ function RegisterContent() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [profileReady, setProfileReady] = useState(false);
+  const [myResponse, setMyResponse] = useState<MyResponse | null>(null);
+  const [myResponseReady, setMyResponseReady] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState("");
 
   useEffect(() => {
     const supabase = createClient();
@@ -370,6 +458,7 @@ function RegisterContent() {
           setUserId(null);
           setUserEmail(null);
           setProfileReady(true);
+          setMyResponseReady(true);
         }
         return;
       }
@@ -419,7 +508,53 @@ function RegisterContent() {
     };
   }, [token]);
 
-  if (loading || !profileReady) {
+  // Baris respons milik user sendiri (migration 034) — baru bisa dicek
+  // begitu form & sesi user sudah resolve. RLS "Users read own form
+  // response" membatasi query ini ke baris user_id = auth.uid() sendiri.
+  useEffect(() => {
+    if (!form?.id || !userId) return;
+    let active = true;
+    // Defer a frame so setMyResponseReady(false) isn't a sync setState in
+    // the effect body (react-hooks/set-state-in-effect) — same pattern as
+    // admin's forms/[id]/page.tsx load().
+    const raf = requestAnimationFrame(() => {
+      setMyResponseReady(false);
+      createClient()
+        .from("form_responses")
+        .select("id, status")
+        .eq("form_id", form.id)
+        .eq("user_id", userId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (active) {
+            setMyResponse((data as MyResponse | null) ?? null);
+            setMyResponseReady(true);
+          }
+        });
+    });
+    return () => {
+      active = false;
+      cancelAnimationFrame(raf);
+    };
+  }, [form?.id, userId]);
+
+  const handleCancel = async () => {
+    if (!token) return;
+    if (!confirm("Batalkan pendaftaran kamu di event ini?")) return;
+    setCancelling(true);
+    setCancelError("");
+    const { error } = await createClient().rpc("cancel_form_response", {
+      p_token: token,
+    });
+    setCancelling(false);
+    if (error) {
+      setCancelError(error.message);
+      return;
+    }
+    setMyResponse((r) => (r ? { ...r, status: "cancelled" } : r));
+  };
+
+  if (loading || !profileReady || (authState === "in" && form && !myResponseReady)) {
     return (
       <div className={styles.loadingWrap}>
         <Loader2 size={32} className={styles.spinner} />
@@ -445,12 +580,34 @@ function RegisterContent() {
     return <LoginGate form={form} token={token ?? ""} />;
   }
 
+  // Sudah punya baris aktif (pending/registered) → tampilkan status +
+  // opsi batalkan, bukan form kosong lagi (satu user cuma 1x submit).
+  if (myResponse && (myResponse.status === "registered" || myResponse.status === "pending")) {
+    return (
+      <RegistrationStatus
+        form={form}
+        status={myResponse.status}
+        onCancel={handleCancel}
+        cancelling={cancelling}
+        cancelError={cancelError}
+      />
+    );
+  }
+
   return (
     <FormRunner
       form={form}
       userId={userId}
       userEmail={userEmail}
       profile={profile}
+      previousStatus={
+        myResponse?.status === "cancelled" || myResponse?.status === "rejected"
+          ? myResponse.status
+          : null
+      }
+      onSubmitted={(result) =>
+        setMyResponse({ id: result.response_id, status: result.status })
+      }
     />
   );
 }

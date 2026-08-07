@@ -34,7 +34,7 @@ export default function FormsPage() {
     setLoading(true)
     const [{ data: rows }, { data: resp }] = await Promise.all([
       supabase.from('forms').select('*').order('created_at', { ascending: false }),
-      supabase.from('form_responses').select('form_id'),
+      supabase.from('form_responses').select('form_id').eq('status', 'registered'),
     ])
     setForms((rows ?? []) as Form[])
     const counts: Record<string, number> = {}

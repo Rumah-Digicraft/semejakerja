@@ -293,6 +293,10 @@ export interface Form {
   show_on_landing: boolean
   event_date: string | null
   location: string | null
+  // false (default): submit langsung dihitung peserta ('registered').
+  // true: submit masuk antrian ('pending') sampai admin approve lewat
+  // admin_review_form_response (migration 034).
+  requires_approval: boolean
   created_by: string | null
   created_at: string
   updated_at: string
@@ -303,9 +307,18 @@ export interface Form {
 // sebagai key yatim di sini (tidak dibersihkan).
 export type FormAnswerValue = string | string[]
 
+// pending: menunggu approval admin (form requires_approval).
+// registered: peserta terkonfirmasi, dihitung ke kuota.
+// cancelled: dibatalkan user sendiri. rejected: ditolak admin.
+// Kedua state terakhir tidak dihitung ke kuota, dan user boleh submit
+// ulang (baris di-reuse, lihat submit_form_response migration 034).
+export type FormResponseStatus = 'pending' | 'registered' | 'cancelled' | 'rejected'
+
 export interface FormResponse {
   id: string
   form_id: string
+  user_id: string | null
+  status: FormResponseStatus
   answers: Record<string, FormAnswerValue>
   attended: boolean
   created_at: string
