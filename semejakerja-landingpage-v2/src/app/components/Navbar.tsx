@@ -137,7 +137,7 @@ export default function Navbar() {
               </Link>
             )
           )}
-          
+
           {user ? (
             <div style={{ position: "relative" }}>
               <button

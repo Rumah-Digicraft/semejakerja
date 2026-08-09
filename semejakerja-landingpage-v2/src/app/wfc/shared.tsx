@@ -3,6 +3,9 @@
 // Shared bits for surfacing WFC events publicly (homepage section + /wfc page).
 // Reads the `public_wfc_events` view (migration 031) — only forms that are
 // status='open' AND show_on_landing=true, plus a live registered_count.
+// Also cross-references the logged-in user's own form_responses (migration
+// 034/035, RLS "Users read own form response") so cards can tell "kamu
+// belum daftar" apart from "kamu udah daftar" and swap the CTA accordingly.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -10,6 +13,10 @@ import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
 import { CalendarDays, MapPin, Users, ArrowRight } from "lucide-react";
 import styles from "./wfc.module.css";
+
+// Cuma dua status yang berarti "kamu punya baris aktif di event ini" —
+// cancelled/rejected dianggap belum daftar (boleh submit lagi).
+type MyEventStatus = "pending" | "registered" | null;
 
 export interface WfcEvent {
   id: string;
@@ -21,6 +28,7 @@ export interface WfcEvent {
   event_date: string | null;
   location: string | null;
   registered_count: number;
+  myStatus: MyEventStatus;
 }
 
 export function useWfcEvents() {
@@ -30,11 +38,33 @@ export function useWfcEvents() {
   useEffect(() => {
     async function load() {
       const supabase = createClient();
-      const { data } = await supabase
-        .from("public_wfc_events")
-        .select("*")
-        .order("event_date", { ascending: true, nullsFirst: false });
-      setEvents((data ?? []) as WfcEvent[]);
+      const [{ data: rows }, { data: { session } }] = await Promise.all([
+        supabase
+          .from("public_wfc_events")
+          .select("*")
+          .order("event_date", { ascending: true, nullsFirst: false }),
+        supabase.auth.getSession(),
+      ]);
+
+      const eventRows = (rows ?? []) as Omit<WfcEvent, "myStatus">[];
+      const userId = session?.user.id;
+
+      let myStatusByForm: Record<string, MyEventStatus> = {};
+      if (userId && eventRows.length > 0) {
+        const { data: myResponses } = await supabase
+          .from("form_responses")
+          .select("form_id, status")
+          .eq("user_id", userId)
+          .in("form_id", eventRows.map((e) => e.id))
+          .in("status", ["registered", "pending"]);
+        myStatusByForm = Object.fromEntries(
+          (myResponses ?? []).map((r) => [r.form_id, r.status as MyEventStatus])
+        );
+      }
+
+      setEvents(
+        eventRows.map((e) => ({ ...e, myStatus: myStatusByForm[e.id] ?? null }))
+      );
       setLoading(false);
     }
     load();
@@ -45,7 +75,10 @@ export function useWfcEvents() {
 
 // Highlight layout untuk kasus 1 event — biar tidak "ngambang" di grid.
 export function WfcEventFeatured({ event }: { event: WfcEvent }) {
-  const full = event.quota != null && event.registered_count >= event.quota;
+  const isRegistered = event.myStatus != null;
+  // Kuota penuh tidak menghalangi user yang sudah punya baris sendiri —
+  // dia tetap bisa buka detail/status pendaftarannya.
+  const full = !isRegistered && event.quota != null && event.registered_count >= event.quota;
   const pct =
     event.quota != null && event.quota > 0
       ? Math.min((event.registered_count / event.quota) * 100, 100)
@@ -100,7 +133,7 @@ export function WfcEventFeatured({ event }: { event: WfcEvent }) {
             href={`/wfc/register?token=${event.token}`}
             className={`btn btn--primary ${styles.cardCta}`}
           >
-            Daftar sekarang <ArrowRight size={16} />
+            {isRegistered ? "Lihat detail acara" : "Daftar sekarang"} <ArrowRight size={16} />
           </Link>
         )}
       </div>
@@ -109,7 +142,8 @@ export function WfcEventFeatured({ event }: { event: WfcEvent }) {
 }
 
 export function WfcEventCard({ event }: { event: WfcEvent }) {
-  const full = event.quota != null && event.registered_count >= event.quota;
+  const isRegistered = event.myStatus != null;
+  const full = !isRegistered && event.quota != null && event.registered_count >= event.quota;
   const pct =
     event.quota != null && event.quota > 0
       ? Math.min((event.registered_count / event.quota) * 100, 100)
@@ -163,7 +197,7 @@ export function WfcEventCard({ event }: { event: WfcEvent }) {
           href={`/wfc/register?token=${event.token}`}
           className={`btn btn--primary ${styles.cardCta}`}
         >
-          Daftar sekarang <ArrowRight size={16} />
+          {isRegistered ? "Lihat detail acara" : "Daftar sekarang"} <ArrowRight size={16} />
         </Link>
       )}
     </div>
