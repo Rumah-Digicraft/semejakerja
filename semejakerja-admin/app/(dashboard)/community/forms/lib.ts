@@ -87,7 +87,7 @@ export function newQuestion(type: FormQuestionType): FormQuestion {
 // ── Template WFC Bareng Strangers ───────────────────────────
 // Nilai default sesuai Google Form yang biasa dipakai; admin tinggal
 // mengganti detail event (nama cafe, tanggal, jam, kuota, handle IG).
-export const WFC_WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/BMzJMgEsOVgCCVDnM4EeJP'
+export const WFC_WHATSAPP_GROUP_URL = 'chat.whatsapp.com/BMzJMgEsOVgCCVDnM4EeJP'
 
 const WFC_DESCRIPTION = `haloo teman semeja!
 Sebelum isi form pendaftaran, yuk cek dulu info penting berikut:
@@ -112,6 +112,25 @@ const WFC_RULES = `1. Datang on time di tanggal & jam yang sudah ditentukan.
 // lagi. Event requires_approval=true sudah punya pesan sendiri yang
 // menjelaskan status antrian (lihat RegistrationStatus di landing).
 const WFC_SUCCESS = 'Yeay, kamu resmi jadi peserta! 🎉 Gabung ke grup WhatsApp di bawah buat info lengkap acaranya ya.'
+
+// Default template buat tombol "Kirim WA" di baris respons approved —
+// admin klik, WhatsApp pribadinya kebuka dengan pesan ini udah keisi.
+// Sengaja TANPA emoji: WhatsApp Desktop (Electron) sering gagal decode
+// emoji yang dikirim lewat deep-link wa.me?text=... (beda dari emoji yang
+// diketik manual) — jadi disini "�" bukan bug encoding di kode ini,
+// tapi limitasi client WhatsApp Desktop pas nerima teks prefilled.
+export const DEFAULT_WHATSAPP_APPROVAL_MESSAGE =
+  `Hi, {{nama}}!
+
+Congratulations! You are selected to join {{event}} pada:
+Tanggal: {{tanggal}}
+Jam: {{jam}}
+Lokasi: {{lokasi}} ({{link_maps}})
+
+Terima kasih atas antusiasmenya untuk mengikuti collaboration WFC bareng Strangers kali ini! Dimohon konfirmasi kedatangan dengan membalas pesan ini dan datang tepat waktu yaa, see you soon!
+
+Jangan lupa join grup WA juga untuk info lebih update-nya yaa
+Link grup: {{link_grup}}`;
 
 export function wfcTemplateQuestions(): FormQuestion[] {
   const q = (
@@ -144,8 +163,90 @@ export function wfcTemplateForm() {
     success_message: WFC_SUCCESS,
     whatsapp_group_url: WFC_WHATSAPP_GROUP_URL,
     whatsapp_group_label: 'Gabung Grup WhatsApp',
+    whatsapp_approval_message: DEFAULT_WHATSAPP_APPROVAL_MESSAGE,
     questions: wfcTemplateQuestions(),
   }
+}
+
+// ── Kirim WA (wa.me, manual — admin pakai nomor pribadinya) ──
+
+// Cari jawaban lewat profile_field pertanyaan (mis. 'phone', 'nickname')
+// daripada nebak dari label, karena label bebas diedit admin per event.
+function answerByProfileField(form: Form, response: FormResponse, field: ProfileSyncField): string {
+  const q = form.questions.find(q => q.profile_field === field)
+  if (!q) return ''
+  const v = response.answers?.[q.id]
+  return v == null ? '' : Array.isArray(v) ? v.join(', ') : String(v)
+}
+
+function participantName(form: Form, response: FormResponse): string {
+  return answerByProfileField(form, response, 'nickname')
+    || answerByProfileField(form, response, 'full_name')
+    || 'Kak'
+}
+
+// Fallback ke tipe 'phone' kalau admin lupa set profile_field-nya.
+function participantPhone(form: Form, response: FormResponse): string {
+  const byField = answerByProfileField(form, response, 'phone')
+  if (byField) return byField
+  const q = form.questions.find(q => q.type === 'phone')
+  if (!q) return ''
+  const v = response.answers?.[q.id]
+  return v == null ? '' : Array.isArray(v) ? v.join(', ') : String(v)
+}
+
+// Nomor Indonesia ke format internasional wa.me (62xxx, tanpa +/spasi/strip).
+// null kalau kependekan buat dianggap nomor valid — pemanggil nonaktifkan
+// tombol Kirim WA daripada buka wa.me dengan nomor yang jelas salah.
+export function normalizePhoneForWa(raw: string): string | null {
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length < 8) return null
+  if (digits.startsWith('62')) return digits
+  if (digits.startsWith('0')) return '62' + digits.slice(1)
+  return '62' + digits
+}
+
+function formatEventDateID(dateStr: string | null): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr + 'T00:00:00')
+  if (Number.isNaN(d.getTime())) return dateStr
+  return d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function fillTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? '')
+}
+
+// Bangun pesan approval + nomor siap pakai buat tombol "Kirim WA".
+// Return null kalau nomornya nggak ada/nggak valid (nggak ada peserta
+// tanpa nomor WA di form WFC, tapi form custom lain bisa aja lupa
+// nambah pertanyaan nomor WA).
+export function buildApprovalWa(form: Form, response: FormResponse): { phone: string; message: string } | null {
+  const phone = normalizePhoneForWa(participantPhone(form, response))
+  if (!phone) return null
+
+  const jamMulai = form.event_time_start || ''
+  const jamSelesai = form.event_time_end || ''
+  const jam = jamMulai && jamSelesai ? `${jamMulai} - ${jamSelesai}` : (jamMulai || jamSelesai)
+
+  const template = form.whatsapp_approval_message || DEFAULT_WHATSAPP_APPROVAL_MESSAGE
+  const message = fillTemplate(template, {
+    nama: participantName(form, response),
+    event: form.title || 'acara',
+    tanggal: formatEventDateID(form.event_date),
+    tempat: form.location ? ` di ${form.location}` : (form.cafe_name ? ` di ${form.cafe_name}` : ''),
+    lokasi: form.location || form.cafe_name || '',
+    jam_mulai: jamMulai,
+    jam_selesai: jamSelesai,
+    jam,
+    link_maps: form.event_maps_url || '',
+    link_grup: form.whatsapp_group_url || '',
+  })
+  return { phone, message }
+}
+
+export function waComposeUrl(phone: string, message: string): string {
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
 }
 
 // ── Export CSV respons ──────────────────────────────────────
