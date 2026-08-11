@@ -12,11 +12,12 @@ import {
   needsOptions, isAnswerable, newQuestion, responsesToCsv, downloadCsv, slugifyTitle,
   canSyncProfile, PROFILE_FIELD_OPTIONS, APPROVAL_MODE_OPTIONS,
   RESPONSE_STATUS_LABELS, RESPONSE_STATUS_COLORS,
+  DEFAULT_WHATSAPP_APPROVAL_MESSAGE, buildApprovalWa, waComposeUrl,
 } from '../lib'
 import {
   ArrowLeft, Loader2, Save, Copy, Check, ExternalLink, Plus, Trash2,
   ChevronUp, ChevronDown, Users, Download, ClipboardList, GripVertical, Link2, Megaphone,
-  ThumbsUp, ThumbsDown,
+  ThumbsUp, ThumbsDown, MessageCircle,
 } from 'lucide-react'
 
 // Local (browser) "today" as YYYY-MM-DD — bukan toISOString() (itu UTC,
@@ -31,11 +32,15 @@ interface SettingsState {
   description: string
   cafe_name: string
   event_date: string
+  event_time_start: string
+  event_time_end: string
   location: string
+  event_maps_url: string
   quota: string
   whatsapp_group_url: string
   whatsapp_group_label: string
   success_message: string
+  whatsapp_approval_message: string
   status: FormStatus
   show_on_landing: boolean
   requires_approval: boolean
@@ -68,11 +73,15 @@ export default function FormDetailPage() {
       description: row.description ?? '',
       cafe_name: row.cafe_name ?? '',
       event_date: row.event_date ?? '',
+      event_time_start: row.event_time_start ?? '',
+      event_time_end: row.event_time_end ?? '',
       location: row.location ?? '',
+      event_maps_url: row.event_maps_url ?? '',
       quota: row.quota != null ? String(row.quota) : '',
       whatsapp_group_url: row.whatsapp_group_url ?? '',
       whatsapp_group_label: row.whatsapp_group_label ?? 'Klik Sini',
       success_message: row.success_message ?? '',
+      whatsapp_approval_message: row.whatsapp_approval_message ?? '',
       status: row.status,
       show_on_landing: !!row.show_on_landing,
       requires_approval: !!row.requires_approval,
@@ -163,11 +172,15 @@ export default function FormDetailPage() {
       description: settings.description || null,
       cafe_name: settings.cafe_name || null,
       event_date: settings.event_date || null,
+      event_time_start: settings.event_time_start || null,
+      event_time_end: settings.event_time_end || null,
       location: settings.location || null,
+      event_maps_url: settings.event_maps_url || null,
       quota: settings.quota === '' ? null : Number(settings.quota),
       whatsapp_group_url: settings.whatsapp_group_url || null,
       whatsapp_group_label: settings.whatsapp_group_label || null,
       success_message: settings.success_message || null,
+      whatsapp_approval_message: settings.whatsapp_approval_message || null,
       status: settings.status,
       show_on_landing: settings.show_on_landing,
       requires_approval: settings.requires_approval,
@@ -188,6 +201,12 @@ export default function FormDetailPage() {
     if (error) { showToast('Gagal ' + (status === 'registered' ? 'approve' : 'reject') + ': ' + error.message); return }
     showToast(status === 'registered' ? 'Respons di-approve' : 'Respons ditolak')
     load()
+  }
+  const sendWa = (r: FormResponse) => {
+    if (!form) return
+    const wa = buildApprovalWa(form, r)
+    if (!wa) { showToast('Nomor WA peserta ini nggak ketemu / nggak valid'); return }
+    window.open(waComposeUrl(wa.phone, wa.message), '_blank', 'noopener,noreferrer')
   }
   const toggleAttended = async (r: FormResponse) => {
     const next = !r.attended
@@ -291,6 +310,11 @@ export default function FormDetailPage() {
             <div><label className={label}>Lokasi</label><input className={input} value={settings.location} onChange={e => setS('location', e.target.value)} placeholder="Cold 'N Brew, Purwokerto" /></div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div><label className={label}>Jam mulai</label><input className={input} value={settings.event_time_start} onChange={e => setS('event_time_start', e.target.value)} placeholder="13:00" /></div>
+            <div><label className={label}>Jam selesai</label><input className={input} value={settings.event_time_end} onChange={e => setS('event_time_end', e.target.value)} placeholder="17:00" /></div>
+            <div><label className={label}>Link Google Maps</label><input className={input} value={settings.event_maps_url} onChange={e => setS('event_maps_url', e.target.value)} placeholder="maps.app.goo.gl/…" /></div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div><label className={label}>Cafe (kolab)</label><input className={input} value={settings.cafe_name} onChange={e => setS('cafe_name', e.target.value)} placeholder="Cold 'N Brew" /></div>
             <div><label className={label}>Kuota</label><input type="number" min={1} className={input} value={settings.quota} onChange={e => setS('quota', e.target.value)} placeholder="mis. 20 (kosong = tak terbatas)" /></div>
             <div><label className={label}>Status</label>
@@ -304,6 +328,19 @@ export default function FormDetailPage() {
             <div><label className={label}>Label tombol WhatsApp</label><input className={input} value={settings.whatsapp_group_label} onChange={e => setS('whatsapp_group_label', e.target.value)} placeholder="Klik Sini" /></div>
           </div>
           <div><label className={label}>Pesan setelah submit</label><textarea className={input} rows={2} value={settings.success_message} onChange={e => setS('success_message', e.target.value)} placeholder="Makasih udah daftar! …" /></div>
+          <div>
+            <label className={label}>Template WA approval <span className="text-slate-400 font-normal">(dipakai tombol Kirim WA di respons)</span></label>
+            <textarea
+              className={input + ' font-mono text-xs'}
+              rows={4}
+              value={settings.whatsapp_approval_message}
+              onChange={e => setS('whatsapp_approval_message', e.target.value)}
+              placeholder={DEFAULT_WHATSAPP_APPROVAL_MESSAGE}
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              Placeholder: <code>{'{{nama}}'}</code> <code>{'{{event}}'}</code> <code>{'{{tanggal}}'}</code> <code>{'{{jam}}'}</code> <code>{'{{jam_mulai}}'}</code> <code>{'{{jam_selesai}}'}</code> <code>{'{{tempat}}'}</code> <code>{'{{lokasi}}'}</code> <code>{'{{link_maps}}'}</code> <code>{'{{link_grup}}'}</code>. Kosongkan buat pakai template default.
+            </p>
+          </div>
           <div>
             <label className={label}>Jenis event</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -470,7 +507,12 @@ export default function FormDetailPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => deleteResponse(r)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400" title="Hapus respons"><Trash2 size={15} /></button>
+                    <div className="flex items-center justify-end gap-1">
+                      {r.status === 'registered' && (
+                        <button onClick={() => sendWa(r)} className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title="Kirim WA ke peserta"><MessageCircle size={15} /></button>
+                      )}
+                      <button onClick={() => deleteResponse(r)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400" title="Hapus respons"><Trash2 size={15} /></button>
+                    </div>
                   </td>
                 </tr>
               ))}

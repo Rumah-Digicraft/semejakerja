@@ -285,6 +285,9 @@ export interface Form {
   whatsapp_group_url: string | null
   whatsapp_group_label: string | null
   success_message: string | null
+  // Template pesan approval (wa.me, {{placeholders}} diisi client-side —
+  // lihat buildApprovalWaLink di community/forms/lib.ts).
+  whatsapp_approval_message: string | null
   status: FormStatus
   token: string
   // Tampilkan di landing page (homepage + /wfc). Terpisah dari `status`:
@@ -293,6 +296,11 @@ export interface Form {
   show_on_landing: boolean
   event_date: string | null
   location: string | null
+  // Jam bebas teks (bukan kolom `time`) — admin sering isi "selesai" di jam
+  // akhir, bukan jam pasti. Dipakai di template WA approval (037).
+  event_time_start: string | null
+  event_time_end: string | null
+  event_maps_url: string | null
   // false (default): submit langsung dihitung peserta ('registered').
   // true: submit masuk antrian ('pending') sampai admin approve lewat
   // admin_review_form_response (migration 034).
