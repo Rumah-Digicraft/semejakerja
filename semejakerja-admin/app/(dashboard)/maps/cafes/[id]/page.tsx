@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Cafe } from '@/types'
 import CafeForm from '../CafeForm'
+import PhotoManager from '../PhotoManager'
 import { type CafeDbPayload, cafeToFormValues } from '../lib'
 import { ArrowLeft, Gauge, MousePointerClick, Star, Trash2, Users } from 'lucide-react'
 
@@ -129,6 +130,10 @@ export default function EditCafePage() {
         >
           <Trash2 size={15} /> Hapus
         </button>
+      </div>
+
+      <div className="mb-5">
+        <PhotoManager cafeId={id} onToast={showToast} />
       </div>
 
       <CafeForm

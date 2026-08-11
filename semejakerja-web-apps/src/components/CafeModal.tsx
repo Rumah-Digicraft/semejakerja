@@ -4,13 +4,15 @@ import {
   CheckCircle2, Gauge, Tag,
   Coffee, MapPin, Share2, Check, ExternalLink,
   Pencil, MessageSquare, Camera, Users,
-  ChevronDown, ChevronUp, Lock, Crown, LogIn,
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Lock, Crown, LogIn,
   Presentation, Trees, UtensilsCrossed, Maximize,
 } from 'lucide-react';
 import type { Cafe, CafeReview } from '../types/cafe';
 import type { MapsAccess } from '../hooks/useAuth';
 import { ContributeModal, type ContributeType } from './contribute/ContributeModal';
 import { useCafeReviews } from '../hooks/useCafeReviews';
+import { useCafePhotos } from '../hooks/useCafePhotos';
+import PhotoLightbox from './PhotoLightbox';
 import { cafeSlug } from '../lib/slug';
 import SpeedTestButton from './SpeedTestButton';
 
@@ -195,6 +197,22 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
   const [contributeType, setContributeType] = useState<ContributeType | null>(null);
   const [showHours, setShowHours] = useState(false);
   const [shared, setShared] = useState(false);
+  const [activePhoto, setActivePhoto] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  const { data: photos = [] } = useCafePhotos(cafe.id);
+  const coverPhoto = photos[activePhoto] ?? photos[0] ?? null;
+
+  const showPhoto = (i: number) => setActivePhoto((i + photos.length) % photos.length);
+
+  const touchStartX = React.useRef<number | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current == null || photos.length < 2) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(delta) > 40) showPhoto(activePhoto + (delta < 0 ? 1 : -1));
+    touchStartX.current = null;
+  };
 
   // Salin link detail cafe ke clipboard (URL /cafe/:slug adalah sumber kebenaran).
   const handleShare = async () => {
@@ -266,24 +284,80 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
         {/* Header image area */}
         <div
           className="relative h-28 sm:h-36 flex items-center justify-center flex-shrink-0"
-          style={{
-            background: `linear-gradient(135deg, ${cafe.logoColor}15, ${cafe.logoColor}30)`,
-            borderBottom: `1px solid ${cafe.logoColor}22`,
-          }}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          style={
+            coverPhoto
+              ? undefined
+              : {
+                  background: `linear-gradient(135deg, ${cafe.logoColor}15, ${cafe.logoColor}30)`,
+                  borderBottom: `1px solid ${cafe.logoColor}22`,
+                }
+          }
         >
-          <div className="absolute w-40 h-40 sm:w-48 sm:h-48 rounded-full opacity-20" style={{ background: cafe.logoColor, top: '-30px', right: '-30px' }} />
-          <div className="absolute w-24 h-24 sm:w-32 sm:h-32 rounded-full opacity-10" style={{ background: cafe.logoColor, bottom: '-20px', left: '20px' }} />
+          {coverPhoto ? (
+            <>
+              <img
+                src={coverPhoto.url}
+                alt={coverPhoto.caption || cafe.name}
+                onClick={() => setLightboxOpen(true)}
+                className="absolute inset-0 w-full h-full object-cover cursor-pointer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/0 to-black/10 pointer-events-none" />
+            </>
+          ) : (
+            <>
+              <div className="absolute w-40 h-40 sm:w-48 sm:h-48 rounded-full opacity-20" style={{ background: cafe.logoColor, top: '-30px', right: '-30px' }} />
+              <div className="absolute w-24 h-24 sm:w-32 sm:h-32 rounded-full opacity-10" style={{ background: cafe.logoColor, bottom: '-20px', left: '20px' }} />
+            </>
+          )}
 
-          <div
-            className="relative z-10 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-xl"
-            style={{
-              background: cafe.logoColor,
-              border: '3px solid white',
-              boxShadow: `0 8px 24px ${cafe.logoColor}44`,
-            }}
-          >
-            {cafe.name.slice(0, 2).toUpperCase()}
-          </div>
+          {!coverPhoto && (
+            <div
+              className="relative z-10 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-xl"
+              style={{
+                background: cafe.logoColor,
+                border: '3px solid white',
+                boxShadow: `0 8px 24px ${cafe.logoColor}44`,
+              }}
+            >
+              {cafe.name.slice(0, 2).toUpperCase()}
+            </div>
+          )}
+
+          {photos.length > 1 && (
+            <>
+              <button
+                onClick={e => { e.stopPropagation(); showPhoto(activePhoto - 1); }}
+                aria-label="Foto sebelumnya"
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full flex items-center justify-center bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm transition-colors"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); showPhoto(activePhoto + 1); }}
+                aria-label="Foto berikutnya"
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full flex items-center justify-center bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm transition-colors"
+              >
+                <ChevronRight size={16} />
+              </button>
+
+              <span className="absolute bottom-2.5 right-3 z-10 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/40 text-white backdrop-blur-sm">
+                {activePhoto + 1}/{photos.length}
+              </span>
+
+              <div className="absolute bottom-2.5 left-3 z-10 flex gap-1">
+                {photos.map((p, i) => (
+                  <button
+                    key={p.id}
+                    onClick={e => { e.stopPropagation(); showPhoto(i); }}
+                    aria-label={`Foto ${i + 1}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-all ${i === activePhoto ? 'bg-white w-4' : 'bg-white/50'}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
 
           {cafe.category !== 'regular' && (
             <div
@@ -642,6 +716,16 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
           )}
         </div>
       </div>
+
+      {/* Full-size photo viewer */}
+      {lightboxOpen && photos.length > 0 && (
+        <PhotoLightbox
+          photos={photos}
+          index={activePhoto}
+          onIndexChange={setActivePhoto}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
 
       {/* Contribute modal */}
       {contributeType && (

@@ -120,6 +120,7 @@ export interface CafePhoto {
   submitter_name: string
   storage_path: string
   caption: string | null
+  sort_order: number
   reviewed_by: string | null
   reviewed_at: string | null
   review_note: string | null

@@ -9,6 +9,7 @@ import AuthCallback from './components/AuthCallback';
 import { CafesLoadingOverlay, CafesErrorOverlay } from './components/CafesLoadingOverlay';
 import Seo from './components/Seo';
 import NotFound from './pages/NotFound';
+import TebakKafe from './pages/TebakKafe';
 import { useCafes } from './hooks/useCafes';
 import { useAuth, mapsAccess } from './hooks/useAuth';
 import { supabase } from './lib/supabaseClient';
@@ -191,6 +192,7 @@ function App() {
         <Route index element={null} />
         <Route path="cafe/:slug" element={null} />
       </Route>
+      <Route path="/tebak-kafe" element={<TebakKafe />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
