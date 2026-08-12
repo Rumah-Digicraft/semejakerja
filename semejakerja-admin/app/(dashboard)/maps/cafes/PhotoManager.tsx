@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { CafePhoto } from '@/types'
 import { Camera, Check, GripVertical, Loader2, Trash2, X } from 'lucide-react'
 import { SectionCard } from './CafeForm'
+import PhotoCropModal from './PhotoCropModal'
 
 const BUCKET = 'cafe-photos'
 const MAX_FILE_BYTES = 10 * 1024 * 1024 // matches the bucket's file_size_limit
@@ -34,8 +35,11 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
   const [reordering, setReordering] = useState(false)
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [queueTotal, setQueueTotal] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragPointerId = useRef<number | null>(null)
+  const nextOrderRef = useRef(0)
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -53,10 +57,11 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
 
   const publicUrl = (path: string) => supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
 
-  const handleFiles = async (files: FileList | null) => {
+  // File selection just validates and queues — actual upload happens after
+  // each file goes through the 4:3 crop step (see PhotoCropModal below).
+  const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return
-    setUploading(true)
-    let nextOrder = photos.length // new uploads are appended after existing photos
+    const valid: File[] = []
     for (const file of Array.from(files)) {
       if (!file.type.startsWith('image/')) {
         onToast(`${file.name} dilewati — bukan file gambar`)
@@ -66,31 +71,55 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
         onToast(`${file.name} dilewati — ukuran lebih dari 10MB`)
         continue
       }
-      const ext = file.name.split('.').pop() || 'jpg'
-      const path = `${cafeId}/${Date.now()}-${Math.round(Math.random() * 1e6)}.${ext}`
-
-      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false })
-      if (uploadError) {
-        onToast(`Gagal upload ${file.name}: ${uploadError.message}`)
-        continue
-      }
-
-      const { error: dbError } = await supabase.from('cafe_photos').insert({
-        cafe_id: cafeId,
-        submitter_name: 'Admin',
-        storage_path: path,
-        status: 'approved',
-        sort_order: nextOrder++,
-        reviewed_at: new Date().toISOString(),
-      })
-      if (dbError) {
-        onToast(`Foto ke-upload tapi gagal disimpan: ${dbError.message}`)
-        await supabase.storage.from(BUCKET).remove([path])
-      }
+      valid.push(file)
     }
-    setUploading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
-    load()
+    if (valid.length === 0) return
+    nextOrderRef.current = photos.length // new uploads are appended after existing photos
+    setQueueTotal(valid.length)
+    setPendingFiles(valid)
+    setUploading(true)
+  }
+
+  // Advances the crop queue; once it's empty the batch is done, so re-enable
+  // the uploader and refresh the grid from the DB.
+  const advanceQueue = () => {
+    setPendingFiles(prev => {
+      const next = prev.slice(1)
+      if (next.length === 0) {
+        setUploading(false)
+        load()
+      }
+      return next
+    })
+  }
+
+  const handleCropConfirm = async (blob: Blob) => {
+    const path = `${cafeId}/${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, blob, { upsert: false, contentType: 'image/jpeg' })
+
+    if (uploadError) {
+      onToast(`Gagal upload: ${uploadError.message}`)
+      advanceQueue()
+      return
+    }
+
+    const { error: dbError } = await supabase.from('cafe_photos').insert({
+      cafe_id: cafeId,
+      submitter_name: 'Admin',
+      storage_path: path,
+      status: 'approved',
+      sort_order: nextOrderRef.current++,
+      reviewed_at: new Date().toISOString(),
+    })
+    if (dbError) {
+      onToast(`Foto ke-upload tapi gagal disimpan: ${dbError.message}`)
+      await supabase.storage.from(BUCKET).remove([path])
+    }
+    advanceQueue()
   }
 
   // Rewrites sort_order for the whole list as a dense 0..N-1 sequence — with
@@ -168,7 +197,7 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="aspect-[4/3] rounded-xl bg-slate-100 animate-pulse" />
+            <div key={i} className="aspect-[3/4] rounded-xl bg-slate-100 animate-pulse" />
           ))
         ) : (
           photos.map((photo, index) => (
@@ -176,7 +205,7 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
               key={photo.id}
               data-photo-index={index}
               className={[
-                'relative group aspect-[4/3] rounded-xl overflow-hidden border bg-slate-50 transition-[opacity,box-shadow]',
+                'relative group aspect-[3/4] rounded-xl overflow-hidden border bg-slate-50 transition-[opacity,box-shadow]',
                 draggingIndex === index ? 'opacity-40' : 'opacity-100',
                 dragOverIndex === index && draggingIndex !== index ? 'border-purple-400 ring-2 ring-purple-300' : 'border-slate-100',
               ].join(' ')}
@@ -248,7 +277,7 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="aspect-[4/3] rounded-xl border-2 border-dashed border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 transition-colors flex flex-col items-center justify-center gap-1.5 text-slate-400 hover:text-purple-500 disabled:opacity-50"
+          className="aspect-[3/4] rounded-xl border-2 border-dashed border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 transition-colors flex flex-col items-center justify-center gap-1.5 text-slate-400 hover:text-purple-500 disabled:opacity-50"
         >
           {uploading ? <Loader2 size={20} className="animate-spin" /> : <Camera size={20} />}
           <span className="text-xs font-medium">{uploading ? 'Mengunggah...' : 'Tambah Foto'}</span>
@@ -269,6 +298,17 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
       )}
       {!loading && photos.length > 1 && (
         <p className="text-xs text-slate-400 mt-3">Seret (drag) foto buat urutkan ulang — foto pertama jadi sampul di peta publik.</p>
+      )}
+
+      {pendingFiles.length > 0 && (
+        <PhotoCropModal
+          key={pendingFiles.length}
+          file={pendingFiles[0]}
+          position={queueTotal - pendingFiles.length + 1}
+          total={queueTotal}
+          onConfirm={handleCropConfirm}
+          onSkip={advanceQueue}
+        />
       )}
     </SectionCard>
   )

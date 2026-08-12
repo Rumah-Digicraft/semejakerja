@@ -1,10 +1,23 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Wifi, Wind, Zap, BookOpen, Bike, Car, Presentation, Trees, UtensilsCrossed, Star, Crown, VolumeX, Volume2 } from 'lucide-react';
 import type { Cafe, CafeFacility } from '../../types/cafe';
+import { useCafePhotos } from '../../hooks/useCafePhotos';
 import CafeArtPlaceholder from './CafeArtPlaceholder';
 
 interface ClueCardProps {
   cafe: Cafe;
+  /** Varies per game (set once in TebakKafe's startGame, an event handler —
+   * not render), so which photo shows isn't always the map's cover photo.
+   * Deterministic hash, not Math.random(): React's purity rules disallow
+   * calling impure functions during render/useMemo. */
+  photoSeed?: number;
+}
+
+// Small deterministic string hash (djb2) — pure, safe to call during render.
+function hashString(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h >>> 0;
 }
 
 const FACILITY_CLUES: { id: keyof CafeFacility; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
@@ -27,8 +40,17 @@ const VIBE_LABEL: Record<number, string> = {
   5: 'Ramai banget',
 };
 
-const ClueCard: React.FC<ClueCardProps> = ({ cafe }) => {
+const ClueCard: React.FC<ClueCardProps> = ({ cafe, photoSeed }) => {
   const activeFacilities = FACILITY_CLUES.filter(f => cafe.facilities[f.id]);
+  // Real photos are 3:4 crops (see PhotoCropModal); only swap in once loaded
+  // and non-empty, otherwise keep the placeholder — avoids a layout flash
+  // from a stray loading state on the fast per-round fetch.
+  const { data: photos } = useCafePhotos(cafe.id);
+  const coverPhoto = useMemo(() => {
+    if (!photos || photos.length === 0) return undefined;
+    const idx = hashString(`${cafe.id}:${photoSeed ?? 0}`) % photos.length;
+    return photos[idx];
+  }, [photos, cafe.id, photoSeed]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -41,7 +63,19 @@ const ClueCard: React.FC<ClueCardProps> = ({ cafe }) => {
         )}
       </div>
 
-      <CafeArtPlaceholder cafe={cafe} />
+      {coverPhoto ? (
+        <img
+          src={coverPhoto.url}
+          alt={coverPhoto.caption || cafe.name}
+          // Fixed height, not aspect-driven — a full 3:4 crop at mobile
+          // width would run ~560px tall and bury the map underneath this
+          // bottom sheet. This slot is a quick visual clue, not a photo
+          // viewer, so a shorter crop is the right tradeoff here.
+          className="w-full h-40 object-cover rounded-xl border border-amber-100"
+        />
+      ) : (
+        <CafeArtPlaceholder cafe={cafe} />
+      )}
 
       <div className="flex items-center gap-3 flex-wrap text-sm">
         <span className="flex items-center gap-1 font-bold text-gray-900">

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Coffee, MapPin, SlidersHorizontal, X, LogIn, LogOut, Crown } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Coffee, MapPin, SlidersHorizontal, X, LogIn, LogOut, Crown, Gamepad2 } from 'lucide-react';
 import { useAuth, type MembershipTier } from '../hooks/useAuth';
 import { LoginModal } from './LoginModal';
 
@@ -70,6 +71,16 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
 
       {/* Right actions */}
       <div className="flex items-center gap-3 sm:gap-5">
+        {/* Tebak Kafe mini-game entry point */}
+        <Link
+          to="/tebak-kafe"
+          title="Main Tebak Kafe"
+          className="flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-white/60 hover:bg-white border border-white/80 transition-all shadow-sm text-purple-700 font-bold text-sm sm:text-base flex-shrink-0"
+        >
+          <Gamepad2 size={18} />
+          <span className="hidden sm:inline">Tebak Kafe</span>
+        </Link>
+
         {/* Account: Google login (users) — admin has its own app */}
         {user ? (
           <div className="relative">

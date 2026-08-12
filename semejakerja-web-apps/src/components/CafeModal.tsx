@@ -283,7 +283,11 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
 
         {/* Header image area */}
         <div
-          className="relative h-28 sm:h-36 flex items-center justify-center flex-shrink-0"
+          // Taller than before (was h-28/h-36) — cover photos are now
+          // cropped 3:4 portrait, not 4:3 landscape, so this needs more
+          // height for object-cover to show a meaningful slice instead of
+          // just a thin horizontal band from the middle of the photo.
+          className="relative h-40 sm:h-52 flex items-center justify-center flex-shrink-0"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           style={

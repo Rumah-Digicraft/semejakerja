@@ -72,4 +72,11 @@ export interface RoundResult {
   distanceMeters: number;
   points: number;
   verdict: VerdictTier;
+  // Raw guess coordinates — kept so the finished game can submit them to
+  // submit_tebak_kafe_score(), which recomputes distance/score server-side
+  // against the real cafe location. The client-computed distance/points
+  // above are for instant round feedback only; the server score is what
+  // actually lands on the leaderboard.
+  guessLat: number;
+  guessLng: number;
 }
