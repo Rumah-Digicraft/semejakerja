@@ -81,6 +81,19 @@ body {
   background: rgba(147, 51, 234, 0.6);
 }
 
+/* Hides the scroll indicator entirely (mobile browsers mostly ignore the
+   custom ::-webkit-scrollbar styling above and show their own native
+   overlay instead) while keeping the element scrollable as a fallback —
+   used where scrolling is a safety net, not the primary interaction
+   (e.g. Tebak Kafe's collapsible clue panel). */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* WOW Glassmorphism effect */
 .glass-panel {
   background: rgba(255, 255, 255, 0.65);
