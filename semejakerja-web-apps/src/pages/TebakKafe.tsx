@@ -32,6 +32,10 @@ export default function TebakKafe() {
   const [resultsTab, setResultsTab] = useState<'rounds' | 'leaderboard'>('rounds');
   const [showLogin, setShowLogin] = useState(false);
   const [showIntroLeaderboard, setShowIntroLeaderboard] = useState(false);
+  // Mobile-only: lets the player collapse the clue panel down to a thin bar
+  // to see more of the map while placing their pin. Desktop's side panel
+  // never covers the map, so this only matters below the md breakpoint.
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
 
   const started = roundCafes !== null;
   const finished = started && round >= ROUND_COUNT;
@@ -57,6 +61,7 @@ export default function TebakKafe() {
     setGuess(null);
     setLocked(false);
     setResultsTab('rounds');
+    setPanelCollapsed(false);
     submittedForRef.current = null;
   }, [cafes]);
 
@@ -81,6 +86,7 @@ export default function TebakKafe() {
     setRound(r => r + 1);
     setGuess(null);
     setLocked(false);
+    setPanelCollapsed(false);
   }, []);
 
   const lastResult = results[results.length - 1] ?? null;
@@ -193,11 +199,28 @@ export default function TebakKafe() {
       {started && !finished && currentCafe && (
         <div
           className={[
-            'glass-panel z-40 flex flex-col gap-4 shadow-xl px-5 py-5',
-            'fixed bottom-0 left-0 right-0 rounded-t-3xl',
-            'md:absolute md:top-[104px] md:bottom-6 md:right-6 md:left-auto md:w-[380px] md:rounded-3xl md:h-auto md:overflow-y-auto',
+            'glass-panel z-40 flex flex-col shadow-xl rounded-t-3xl overflow-hidden',
+            // Collapsible on mobile — tap the handle to shrink this down to
+            // a thin bar and see the whole map while placing a pin. Capped
+            // (not just scrollable) so a long clue can't bury the map even
+            // when expanded, on shorter phone screens.
+            'fixed bottom-0 left-0 right-0 transition-[max-height] duration-300 ease-in-out',
+            panelCollapsed ? 'max-h-14' : 'max-h-[50vh]',
+            'md:absolute md:top-[104px] md:bottom-6 md:right-6 md:left-auto md:w-[380px] md:rounded-3xl md:h-auto md:max-h-none',
           ].join(' ')}
         >
+          {/* Same visual handle as CafeModal's mobile drag handle — tap to
+              collapse/expand (CafeModal's is decorative only; this one is
+              wired up since the map needs to be reachable underneath). */}
+          <button
+            onClick={() => setPanelCollapsed(c => !c)}
+            aria-label={panelCollapsed ? 'Lihat petunjuk kafe' : 'Sembunyikan panel, lihat peta'}
+            className="md:hidden flex-shrink-0 flex items-center justify-center py-3"
+          >
+            <span className="w-10 h-1 bg-gray-300 rounded-full" />
+          </button>
+
+          <div className="flex flex-col gap-4 px-5 pb-5 md:pt-5 overflow-y-auto no-scrollbar">
           <ClueCard cafe={currentCafe} photoSeed={photoSeed} />
 
           {!locked ? (
@@ -247,6 +270,7 @@ export default function TebakKafe() {
               </button>
             </div>
           )}
+          </div>
         </div>
       )}
 
