@@ -309,14 +309,6 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
           className="relative h-40 sm:h-52 flex items-center justify-center flex-shrink-0"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          style={
-            coverPhoto
-              ? undefined
-              : {
-                  background: `linear-gradient(135deg, ${cafe.logoColor}15, ${cafe.logoColor}30)`,
-                  borderBottom: `1px solid ${cafe.logoColor}22`,
-                }
-          }
         >
           {coverPhoto ? (
             <>
@@ -329,23 +321,7 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
               <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/0 to-black/10 pointer-events-none" />
             </>
           ) : (
-            <>
-              <div className="absolute w-40 h-40 sm:w-48 sm:h-48 rounded-full opacity-20" style={{ background: cafe.logoColor, top: '-30px', right: '-30px' }} />
-              <div className="absolute w-24 h-24 sm:w-32 sm:h-32 rounded-full opacity-10" style={{ background: cafe.logoColor, bottom: '-20px', left: '20px' }} />
-            </>
-          )}
-
-          {!coverPhoto && (
-            <div
-              className="relative z-10 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-xl"
-              style={{
-                background: cafe.logoColor,
-                border: '3px solid white',
-                boxShadow: `0 8px 24px ${cafe.logoColor}44`,
-              }}
-            >
-              {cafe.name.slice(0, 2).toUpperCase()}
-            </div>
+            <img src="/placeholder-image.svg" alt="" className="absolute inset-0 w-full h-full object-cover" />
           )}
 
           {photos.length > 1 && (
