@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet';
+import { ZoomIn, ZoomOut } from 'lucide-react';
 import L from 'leaflet';
 
 export interface LatLng {
@@ -17,6 +18,31 @@ interface GuessMapProps {
 // Purwokerto center, matching MapView's default view.
 const CENTER: [number, number] = [-7.4245, 109.2302];
 const BOUNDS = L.latLngBounds([-7.51, 109.14], [-7.34, 109.32]);
+
+// Zoom in/out buttons — GuessMap runs with zoomControl={false} like MapView,
+// but (unlike MapView) had no replacement buttons, leaving pinch/scroll as
+// the only way to zoom.
+const ZoomButtons: React.FC = () => {
+  const map = useMap();
+  return (
+    <div className="absolute left-4 sm:left-6 top-24 sm:top-28 flex flex-col gap-2 z-[400]">
+      <button
+        onClick={() => map.zoomIn()}
+        title="Zoom In"
+        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/95 sm:bg-white/90 sm:backdrop-blur-md text-purple-600 hover:text-purple-800"
+      >
+        <ZoomIn size={16} />
+      </button>
+      <button
+        onClick={() => map.zoomOut()}
+        title="Zoom Out"
+        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 bg-white/95 sm:bg-white/90 sm:backdrop-blur-md text-purple-600 hover:text-purple-800"
+      >
+        <ZoomOut size={16} />
+      </button>
+    </div>
+  );
+};
 
 function guessPinSvg(): string {
   return (
@@ -80,9 +106,9 @@ const GuessMap: React.FC<GuessMapProps> = ({ guess, actual, locked, onGuess }) =
       <MapContainer
         center={CENTER}
         zoom={13}
-        minZoom={12}
-        maxBounds={BOUNDS.pad(0.15)}
-        maxBoundsViscosity={0.8}
+        minZoom={11}
+        maxBounds={BOUNDS.pad(0.5)}
+        maxBoundsViscosity={0.4}
         zoomControl={false}
         attributionControl={false}
         className="w-full h-full"
@@ -92,6 +118,7 @@ const GuessMap: React.FC<GuessMapProps> = ({ guess, actual, locked, onGuess }) =
 
         <ClickCatcher locked={locked} onGuess={onGuess} />
         <RevealFrame guess={guess} actual={actual} locked={locked} />
+        <ZoomButtons />
 
         {guess && <Marker position={[guess.lat, guess.lng]} icon={guessIcon} />}
         {locked && actual && <Marker position={[actual.lat, actual.lng]} icon={actualIcon} />}

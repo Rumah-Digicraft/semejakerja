@@ -254,11 +254,13 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
   };
 
   const isGuest = access === 'guest';
-  const hasFullMaps = access === 'full';
   // Tier Free (Nyantai): fasilitas diblur + CTA upgrade. Jam buka, harga,
   // speed test & ulasan terbuka. Guest melihat semua detail diblur di balik
   // overlay login.
   const facilitiesLocked = access === 'basic';
+  // Kontribusi (koreksi info, ulasan, foto) terbuka untuk semua tier
+  // member yang login — beda dari facilitiesLocked (fitur premium map).
+  const canContribute = !isGuest;
 
   const activeFacilities = Object.entries(cafe.facilities)
     .filter(([, val]) => val)
@@ -587,10 +589,10 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
             <SpeedTestButton cafe={cafe} />
           </div>
 
-          {/* Community Reviews — semua member; tulis ulasan tetap Nongkrong+ */}
+          {/* Community Reviews — baca & tulis terbuka untuk semua member yang login */}
           <CommunityReviews
             cafeId={cafe.id}
-            canWrite={hasFullMaps}
+            canWrite={canContribute}
             myReviewStatus={myReviewStatus}
             onWriteReview={() => setContributeType('review')}
           />
@@ -665,8 +667,8 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
               <ExternalLink size={14} /> Lihat di Maps
             </button>
           </div>
-          {/* Contribute actions — Crowdsource Maps = Nongkrong+ */}
-          {hasFullMaps ? (
+          {/* Contribute actions — terbuka untuk semua tier member yang login */}
+          {canContribute ? (
             <div className="flex gap-1.5 px-4 pb-4">
               <button
                 onClick={() => setContributeType('edit')}
@@ -689,7 +691,7 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
                 <Camera size={12} /> Upload Foto
               </button>
             </div>
-          ) : isGuest ? (
+          ) : (
             <div className="px-4 pb-4">
               <button
                 onClick={onRequestLogin}
@@ -697,17 +699,6 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
               >
                 <LogIn size={12} /> Masuk untuk koreksi info, tulis ulasan & upload foto
               </button>
-            </div>
-          ) : (
-            <div className="px-4 pb-4">
-              <a
-                href={`${landingUrl}/membership`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-100 hover:bg-amber-100 transition-all"
-              >
-                <Lock size={12} /> Kontribusi (koreksi, ulasan, foto) khusus Nongkrong+
-              </a>
             </div>
           )}
         </div>
