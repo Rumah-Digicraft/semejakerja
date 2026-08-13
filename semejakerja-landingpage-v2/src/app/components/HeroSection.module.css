@@ -1,6 +1,11 @@
 .hero {
   position: relative;
+  /* vh dulu sebagai fallback browser lama; dvh menyesuaikan tinggi layar HP
+     yang sebenarnya (memperhitungkan address bar mobile yang muncul/hilang),
+     jadi hero selalu pas 1 layar penuh di HP apa pun, tidak cuma persentase
+     tetap yang bisa nyisain/nutupin section berikutnya beda-beda tiap device. */
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -56,7 +61,7 @@
   z-index: 3;
   max-width: 900px;
   margin: 0 auto;
-  padding: calc(var(--navbar-height) + var(--space-12)) var(--space-6) var(--space-16);
+  padding: calc(var(--navbar-height) + var(--space-6)) var(--space-6) var(--space-8);
   text-align: center;
 }
 
@@ -111,13 +116,13 @@
 
 .titleLine1 {
   display: block;
-  font-size: var(--text-4xl);
+  font-size: var(--text-3xl);
   color: white;
 }
 
 .titleLine2 {
   display: block;
-  font-size: var(--text-5xl);
+  font-size: var(--text-3xl);
   background: linear-gradient(135deg, var(--color-accent), #FFD700, #FFA500);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -136,9 +141,9 @@
 }
 
 .subtitle {
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
   color: rgba(255, 255, 255, 0.8);
-  line-height: 1.7;
+  line-height: 1.6;
   max-width: 600px;
   margin: 0 auto var(--space-10);
 }
@@ -151,31 +156,23 @@
 
 .actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-12);
-}
-
-@media (min-width: 640px) {
-  .actions {
-    flex-direction: row;
-    justify-content: center;
-  }
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-8);
 }
 
 .ctaMain {
-  width: 100%;
-  max-width: 360px;
-}
-
-@media (min-width: 640px) {
-  .ctaMain {
-    width: auto;
-  }
+  width: auto;
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--text-sm);
+  white-space: nowrap;
 }
 
 .ctaSecondary {
+  padding: var(--space-3) var(--space-5);
   font-size: var(--text-sm);
 }
 
