@@ -43,15 +43,13 @@ export interface EditData {
   cafeId: string;
   suggestedData: CafeEditSuggestedData;
   notes?: string;
-  submitterName?: string;
-  submitterWa?: string;
 }
 
+// Identitas (submitter_name/wa) TIDAK dikirim dari client — trigger
+// cafe_edits_set_identity (migration 041) yang mengisinya dari akun login.
 async function submitEdit(data: EditData) {
   const { error } = await supabase.from('cafe_edits').insert({
     cafe_id: data.cafeId,
-    submitter_name: data.submitterName || null,
-    submitter_wa: data.submitterWa || null,
     suggested_data: data.suggestedData,
     notes: data.notes || null,
   });
@@ -70,21 +68,23 @@ export interface ReviewData {
   comment?: string;
   wifiSpeed?: number;
   vibes?: number;
-  submitterName?: string;
-  submitterWa?: string;
 }
 
+// Identitas (nama, WA, user_id) TIDAK dikirim dari client — server (trigger
+// cafe_reviews_set_identity, migration 040) yang mengisinya dari akun yang
+// login, jadi tidak bisa disamarkan lewat request langsung ke Supabase.
 async function submitReview(data: ReviewData) {
   const { error } = await supabase.from('cafe_reviews').insert({
     cafe_id: data.cafeId,
-    reviewer_name: data.submitterName || null,
-    reviewer_wa: data.submitterWa || null,
     rating: data.rating,
     comment: data.comment || null,
     wifi_speed: data.wifiSpeed ?? null,
     vibes: data.vibes ?? null,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (error.code === '23505') throw new Error('Kamu sudah pernah menulis ulasan untuk kafe ini.');
+    throw new Error(error.message);
+  }
 }
 
 export function useSubmitReview() {
@@ -92,32 +92,35 @@ export function useSubmitReview() {
 }
 
 // ── Upload foto ──────────────────────────────────────────────────────────────
+// `file` di sini SUDAH melalui crop (lihat PhotoCropModal) — selalu blob JPEG,
+// bukan file mentah dari input. Path & contentType meniru persis flow admin
+// (PhotoManager.tsx) supaya konsisten. Identitas (submitter_name) TIDAK
+// dikirim dari client — trigger cafe_photos_set_identity (migration 041)
+// yang mengisinya dari akun yang login.
 
 export interface PhotoData {
   cafeId: string;
-  file: File;
+  file: Blob;
   caption?: string;
-  submitterName?: string;
-  submitterWa?: string;
 }
 
 async function submitPhoto(data: PhotoData) {
-  const ext = data.file.name.split('.').pop();
-  const path = `${data.cafeId}/${Date.now()}.${ext}`;
+  const path = `${data.cafeId}/${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`;
 
   const { error: uploadError } = await supabase.storage
     .from('cafe-photos')
-    .upload(path, data.file, { upsert: false });
-
+    .upload(path, data.file, { upsert: false, contentType: 'image/jpeg' });
   if (uploadError) throw new Error(uploadError.message);
 
   const { error: dbError } = await supabase.from('cafe_photos').insert({
     cafe_id: data.cafeId,
-    submitter_name: data.submitterName || null,
     storage_path: path,
     caption: data.caption || null,
   });
-  if (dbError) throw new Error(dbError.message);
+  if (dbError) {
+    await supabase.storage.from('cafe-photos').remove([path]);
+    throw new Error(dbError.message);
+  }
 }
 
 export function useSubmitPhoto() {

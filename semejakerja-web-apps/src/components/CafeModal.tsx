@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import {
   X, Star, Wifi, Zap, Wind, BookOpen, Bike, Car,
-  CheckCircle2, Gauge, Tag,
-  Coffee, MapPin, Share2, Check, ExternalLink,
-  Pencil, MessageSquare, Camera, Users,
+  CheckCircle2, Gauge,
+  MapPin, Share2, Check, ExternalLink,
+  Pencil, MessageSquare, Camera, Users, FileText,
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Lock, Crown, LogIn,
   Presentation, Trees, UtensilsCrossed, Maximize,
 } from 'lucide-react';
 import type { Cafe, CafeReview } from '../types/cafe';
 import type { MapsAccess } from '../hooks/useAuth';
 import { ContributeModal, type ContributeType } from './contribute/ContributeModal';
-import { useCafeReviews } from '../hooks/useCafeReviews';
+import { useCafeReviews, useMyCafeReview } from '../hooks/useCafeReviews';
 import { useCafePhotos } from '../hooks/useCafePhotos';
 import PhotoLightbox from './PhotoLightbox';
 import { cafeSlug } from '../lib/slug';
@@ -20,6 +20,7 @@ interface CafeModalProps {
   cafe: Cafe;
   onClose: () => void;
   access: MapsAccess;
+  userId?: string;
   onRequestLogin: () => void;
   landingUrl: string;
 }
@@ -96,8 +97,19 @@ function StarRow({ rating, size = 13 }: { rating: number; size?: number }) {
   );
 }
 
-function CommunityReviews({ cafeId, canWrite, onWriteReview }: { cafeId: string; canWrite: boolean; onWriteReview: () => void }) {
+const REVIEW_STATUS_LABEL: Record<string, string> = {
+  pending: 'Ulasanmu sedang ditinjau tim.',
+  rejected: 'Ulasanmu tidak lolos moderasi.',
+  approved: 'Kamu sudah menulis ulasan untuk kafe ini.',
+};
+
+function CommunityReviews({
+  cafeId, canWrite, myReviewStatus, onWriteReview,
+}: {
+  cafeId: string; canWrite: boolean; myReviewStatus: string | null; onWriteReview: () => void;
+}) {
   const { data: reviews = [], isLoading } = useCafeReviews(cafeId);
+  const canWriteNew = canWrite && !myReviewStatus;
 
   const avgRating = reviews.length > 0
     ? reviews.reduce((sum, r) => sum + (r.rating ?? 0), 0) / reviews.length
@@ -132,14 +144,16 @@ function CommunityReviews({ cafeId, canWrite, onWriteReview }: { cafeId: string;
       ) : reviews.length === 0 ? (
         <div className="flex flex-col items-center py-5 text-center gap-2">
           <p className="text-xs text-gray-400">Belum ada ulasan dari member.</p>
-          {canWrite && (
+          {canWriteNew ? (
             <button
               onClick={onWriteReview}
               className="text-xs font-semibold text-purple-600 hover:text-purple-700 underline underline-offset-2"
             >
               Jadilah yang pertama menulis ulasan
             </button>
-          )}
+          ) : canWrite && myReviewStatus ? (
+            <p className="text-xs text-gray-400">{REVIEW_STATUS_LABEL[myReviewStatus] ?? REVIEW_STATUS_LABEL.approved}</p>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-3">
@@ -177,13 +191,16 @@ function CommunityReviews({ cafeId, canWrite, onWriteReview }: { cafeId: string;
               )}
             </div>
           ))}
-          {canWrite && reviews.length >= 3 && (
+          {canWriteNew && reviews.length >= 3 && (
             <button
               onClick={onWriteReview}
               className="w-full py-2 text-xs font-semibold text-purple-600 hover:text-purple-700 border border-purple-100 hover:border-purple-200 rounded-xl hover:bg-purple-50 transition-all"
             >
               + Tulis Ulasan Kamu
             </button>
+          )}
+          {canWrite && myReviewStatus && (
+            <p className="text-center text-xs text-gray-400">{REVIEW_STATUS_LABEL[myReviewStatus] ?? REVIEW_STATUS_LABEL.approved}</p>
           )}
         </div>
       )}
@@ -193,8 +210,10 @@ function CommunityReviews({ cafeId, canWrite, onWriteReview }: { cafeId: string;
 
 // ── Main Modal ─────────────────────────────────────────────────────────────
 
-const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestLogin, landingUrl }) => {
+const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, onRequestLogin, landingUrl }) => {
   const [contributeType, setContributeType] = useState<ContributeType | null>(null);
+  const { data: myReview } = useMyCafeReview(cafe.id, userId);
+  const myReviewStatus = myReview?.status ?? null;
   const [showHours, setShowHours] = useState(false);
   const [shared, setShared] = useState(false);
   const [activePhoto, setActivePhoto] = useState(0);
@@ -596,28 +615,9 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
           <CommunityReviews
             cafeId={cafe.id}
             canWrite={hasFullMaps}
+            myReviewStatus={myReviewStatus}
             onWriteReview={() => setContributeType('review')}
           />
-
-          {/* Menu Utama */}
-          <div className="pt-5 border-t border-gray-100 space-y-3.5">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Menu Utama</h3>
-            <div className="space-y-1">
-              {cafe.menuItems.map((item, i) => (
-                <div key={i} className="flex items-center justify-between py-1.5 px-2 hover:bg-purple-50/50 rounded-lg transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Coffee size={12} className="text-purple-400" />
-                    <span className="text-xs font-medium text-gray-800">{item.name}</span>
-                  </div>
-                  <span className="text-xs font-bold text-purple-700">{item.price}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center gap-1.5 px-2">
-              <Tag size={12} className="text-gray-400" />
-              <span className="text-[11px] font-medium text-gray-500">Rentang Harga: {cafe.priceRange}</span>
-            </div>
-          </div>
 
           </div>
 
@@ -654,6 +654,20 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
 
         {/* Footer sticky buttons */}
         <div className="border-t border-gray-100 bg-gray-50/50 backdrop-blur-lg">
+          {/* Menu PDF — selalu tampil di sini (bukan di konten scroll) biar tidak
+              tenggelam; cuma render kalau kafe punya menu ter-upload. */}
+          {cafe.menuPdfUrl && (
+            <div className="px-4 pt-3">
+              <a
+                href={cafe.menuPdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-purple-700 bg-purple-50 border border-purple-100 hover:bg-purple-100 transition-all"
+              >
+                <FileText size={13} /> Lihat Menu (PDF)
+              </a>
+            </div>
+          )}
           {/* Primary actions */}
           <div className="flex gap-2 p-4 pb-2">
             <button
@@ -686,9 +700,11 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, onRequestL
               </button>
               <button
                 onClick={() => setContributeType('review')}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-gray-500 hover:text-purple-700 hover:bg-purple-50 border border-gray-100 hover:border-purple-200 transition-all"
+                disabled={!!myReviewStatus}
+                title={myReviewStatus ? REVIEW_STATUS_LABEL[myReviewStatus] ?? REVIEW_STATUS_LABEL.approved : undefined}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-gray-500 hover:text-purple-700 hover:bg-purple-50 border border-gray-100 hover:border-purple-200 transition-all disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500"
               >
-                <MessageSquare size={12} /> Tulis Ulasan
+                <MessageSquare size={12} /> {myReviewStatus ? 'Sudah Diulas' : 'Tulis Ulasan'}
               </button>
               <button
                 onClick={() => setContributeType('photo')}

@@ -8,6 +8,7 @@ export type MembershipTier = 'nyantai' | 'nongkrong' | 'mode_serius';
 export interface MemberProfile {
   fullName: string | null;
   avatarUrl: string | null;
+  phone: string | null;
   tier: MembershipTier | null;
 }
 
@@ -67,7 +68,7 @@ export function useAuth() {
       const [{ data: profileRow }, { data: membershipRows }] = await Promise.all([
         supabase
           .from('user_profiles')
-          .select('full_name, avatar_url')
+          .select('full_name, avatar_url, phone')
           .eq('id', user!.id)
           .maybeSingle(),
         supabase
@@ -100,6 +101,7 @@ export function useAuth() {
           profileRow?.avatar_url ??
           (user!.user_metadata?.avatar_url as string | undefined) ??
           null,
+        phone: profileRow?.phone ?? null,
         tier,
       };
     },
