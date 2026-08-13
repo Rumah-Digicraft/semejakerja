@@ -56,7 +56,9 @@ const MapSearch: React.FC<MapSearchProps> = ({ cafes, onCafeClick }) => {
         </div>
         <input
           type="text"
-          className="w-full bg-white/95 sm:bg-white/90 sm:backdrop-blur-md border border-white shadow-lg rounded-2xl py-3 pl-11 pr-10 text-sm font-medium text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+          // text-base (16px), bukan text-sm — di bawah 16px, Safari iOS
+          // auto-zoom saat input di-fokus (memaksa user zoom out manual).
+          className="w-full bg-white/95 sm:bg-white/90 sm:backdrop-blur-md border border-white shadow-lg rounded-2xl py-3 pl-11 pr-10 text-base font-medium text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
           placeholder="Cari nama cafe atau lokasi..."
           value={query}
           onChange={(e) => {
