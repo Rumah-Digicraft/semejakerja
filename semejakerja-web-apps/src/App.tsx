@@ -21,8 +21,8 @@ import './index.css';
 
 const defaultFilters: FilterState = {
   facilities: [],
-  vibesMin: 5,
-  vibesMax: 5,
+  vibesMin: 3,
+  vibesMax: 3,
   areaMin: 0,
   motorParkingMin: 0,
   carParkingMin: 0,

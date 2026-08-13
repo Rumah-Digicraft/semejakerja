@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Wifi, Zap, Wind, BookOpen, Bike, Car,
-  Volume2, VolumeX, Clock, CheckCircle2, Moon,
+  Volume2, VolumeX, Volume1, Clock, CheckCircle2, Moon,
   SlidersHorizontal, X, PlusCircle, LogIn, Crown, Lock,
   Presentation, Trees, UtensilsCrossed, Maximize,
 } from 'lucide-react';
@@ -39,6 +39,15 @@ const premiumFacilityOptions: FacilityOption[] = [
   { id: 'wifi', label: 'WiFi Cepat', icon: Wifi },
   { id: 'ac', label: 'AC', icon: Wind },
   { id: 'meetingRoom', label: 'Ruang Meeting', icon: Presentation },
+];
+
+// Suasana: 3 level bernama, filter "maks. seramai apa" (pilih Ramai = tanpa
+// filter, karena itu level teratas) — beda dari ScaleFilter di bawah yang
+// semantiknya "minimal".
+const VIBE_LEVELS = [
+  { value: 1, label: 'Tenang', icon: VolumeX },
+  { value: 2, label: 'Sedang', icon: Volume1 },
+  { value: 3, label: 'Ramai', icon: Volume2 },
 ];
 
 // Slider skala "minimal" 0-3 (0 = Semua). Reuse pola slider Suasana.
@@ -246,28 +255,26 @@ const Sidebar: React.FC<SidebarProps> = ({
               ].join(' ')}
             >
 
-          {/* Suasana Slider */}
+          {/* Suasana — 3 level (Tenang · Sedang · Ramai) */}
           <div>
             <label className="block font-extrabold text-xs uppercase tracking-widest text-gray-400 mt-6 mb-3">
               Suasana
             </label>
-            <div className="space-y-4 sm:space-y-5">
-              <input
-                type="range"
-                min={1}
-                max={5}
-                value={filters.vibesMin}
-                onChange={e => onFiltersChange({ ...filters, vibesMin: Number(e.target.value) })}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs font-bold text-gray-500">
-                <span className="flex items-center gap-1.5"><VolumeX size={13} /> Tenang</span>
-                <span className="flex items-center gap-1.5">Ramai <Volume2 size={13} /></span>
-              </div>
-              <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl bg-purple-50/50 border border-purple-100 shadow-sm">
-                <span className="text-sm font-bold text-purple-700">Level suasana max</span>
-                <span className="text-sm font-extrabold text-purple-700 bg-white px-3 py-1 rounded-lg shadow-sm border border-purple-100">{filters.vibesMin}/5</span>
-              </div>
+            <div className="flex rounded-2xl overflow-hidden border border-purple-100 shadow-sm">
+              {VIBE_LEVELS.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onFiltersChange({ ...filters, vibesMin: value, vibesMax: value })}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs sm:text-sm font-bold transition ${
+                    filters.vibesMin === value
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white text-gray-500 hover:bg-purple-50'
+                  }`}
+                >
+                  <Icon size={13} /> {label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -390,8 +397,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={() => onFiltersChange({
               facilities: [],
-              vibesMin: 5,
-              vibesMax: 5,
+              vibesMin: 3,
+              vibesMax: 3,
               areaMin: 0,
               motorParkingMin: 0,
               carParkingMin: 0,

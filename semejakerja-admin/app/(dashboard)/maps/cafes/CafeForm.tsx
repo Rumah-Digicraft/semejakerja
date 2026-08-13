@@ -51,6 +51,12 @@ const PRICE_OPTIONS = [
   { value: 4, label: 'Rp 150.000 - 300.000' },
 ]
 
+const VIBE_LEVELS = [
+  { value: 1, label: 'Tenang' },
+  { value: 2, label: 'Sedang' },
+  { value: 3, label: 'Ramai' },
+]
+
 const DEFAULT_WEEK = (): WeekHours => DAY_LABELS.map(() => ({ open: true, from: '09:00', to: '22:00' }))
 
 const inputCls =
@@ -261,21 +267,17 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
             </div>
             <div>
               <label className={labelCls}>Tingkat Suasana (vibes)</label>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">Tenang</span>
-                <div className="flex rounded-xl border border-slate-200 overflow-hidden">
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <button
-                      key={n} type="button" onClick={() => set({ vibes: n })}
-                      className={`w-9 h-9 text-sm font-medium transition ${
-                        values.vibes === n ? 'bg-purple-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-                <span className="text-xs text-slate-400">Ramai</span>
+              <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+                {VIBE_LEVELS.map(({ value, label }) => (
+                  <button
+                    key={value} type="button" onClick={() => set({ vibes: value })}
+                    className={`flex-1 py-2 text-sm font-medium transition border-l first:border-l-0 border-slate-200 ${
+                      values.vibes === value ? 'bg-purple-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
             {/* Skala 0-3: luas area, parkir motor/mobil, colokan */}

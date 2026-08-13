@@ -253,7 +253,7 @@ export function emptyFormValues(): CafeFormValues {
     tier: 'basic',
     discount_value: null, price_level: 0,
     week: null, open_hours: '',
-    facilities: { ...DEFAULT_FACILITIES }, scales: { ...DEFAULT_SCALES }, vibes: 3,
+    facilities: { ...DEFAULT_FACILITIES }, scales: { ...DEFAULT_SCALES }, vibes: 2,
     wifi_speed_mbps: null, wifi_upload_mbps: null, wifi_latency_ms: null, wifi_tested_at: null,
     rating: 0, total_reviews: 0,
   }
@@ -274,7 +274,7 @@ export function cafeToFormValues(cafe: Cafe): CafeFormValues {
     open_hours: cafe.open_hours ?? '',
     facilities: normalizeFacilities(cafe.facilities),
     scales: normalizeScales(cafe.scales),
-    vibes: Math.min(5, Math.max(1, Math.round(Number(cafe.vibes)) || 3)),
+    vibes: Math.min(3, Math.max(1, Math.round(Number(cafe.vibes)) || 2)),
     wifi_speed_mbps: cafe.wifi_speed_mbps != null ? Number(cafe.wifi_speed_mbps) : null,
     wifi_upload_mbps: cafe.wifi_upload_mbps != null ? Number(cafe.wifi_upload_mbps) : null,
     wifi_latency_ms: cafe.wifi_latency_ms != null ? Number(cafe.wifi_latency_ms) : null,
