@@ -78,7 +78,7 @@ export interface Cafe {
   wifiUpload: number;
   wifiLatency: number | null;
   wifiTestedAt: string | null; // waktu pengukuran terakhir (cooldown global 10 mnt)
-  vibes: number;           // 1 (tenang) to 5 (ramai) — default 3 until enriched
+  vibes: number;           // 1 Tenang, 2 Sedang, 3 Ramai — default 2 until enriched
   facilities: CafeFacility;
   scales: CafeScale;       // area/parkir/colokan 0-3 — default 0 until enriched
   openHours: string;

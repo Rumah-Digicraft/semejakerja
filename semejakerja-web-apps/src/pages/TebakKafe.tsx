@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Coffee, LogIn, Loader2, MapPin, Trophy, X } from 'lucide-react';
 import Seo from '../components/Seo';
@@ -36,6 +36,17 @@ export default function TebakKafe() {
   // to see more of the map while placing their pin. Desktop's side panel
   // never covers the map, so this only matters below the md breakpoint.
   const [panelCollapsed, setPanelCollapsed] = useState(false);
+  // Swipe (not tap) on the handle bar — same threshold-delta technique as
+  // CafeModal/PhotoLightbox's photo-swipe, just on the Y axis.
+  const panelTouchStartY = useRef<number | null>(null);
+  const handlePanelTouchStart = (e: TouchEvent) => { panelTouchStartY.current = e.touches[0].clientY; };
+  const handlePanelTouchEnd = (e: TouchEvent) => {
+    if (panelTouchStartY.current == null) return;
+    const delta = e.changedTouches[0].clientY - panelTouchStartY.current;
+    if (delta > 30) setPanelCollapsed(true);
+    else if (delta < -30) setPanelCollapsed(false);
+    panelTouchStartY.current = null;
+  };
 
   const started = roundCafes !== null;
   const finished = started && round >= ROUND_COUNT;
@@ -200,27 +211,27 @@ export default function TebakKafe() {
         <div
           className={[
             'glass-panel z-40 flex flex-col shadow-xl rounded-t-3xl overflow-hidden',
-            // Collapsible on mobile — tap the handle to shrink this down to
-            // a thin bar and see the whole map while placing a pin. Capped
-            // (not just scrollable) so a long clue can't bury the map even
-            // when expanded, on shorter phone screens.
+            // Collapsible on mobile — swipe the handle to shrink this down to
+            // a thin bar and see the whole map while placing a pin. No inner
+            // scroll when expanded — the panel just grows to fit its content
+            // (max-h here is a viewport safety net, not a scroll trigger).
             'fixed bottom-0 left-0 right-0 transition-[max-height] duration-300 ease-in-out',
-            panelCollapsed ? 'max-h-14' : 'max-h-[50vh]',
+            panelCollapsed ? 'max-h-14' : 'max-h-[85vh]',
             'md:absolute md:top-[104px] md:bottom-6 md:right-6 md:left-auto md:w-[380px] md:rounded-3xl md:h-auto md:max-h-none',
           ].join(' ')}
         >
-          {/* Same visual handle as CafeModal's mobile drag handle — tap to
-              collapse/expand (CafeModal's is decorative only; this one is
+          {/* Same visual handle as CafeModal's mobile drag handle — swipe up/down
+              to collapse/expand (CafeModal's is decorative only; this one is
               wired up since the map needs to be reachable underneath). */}
-          <button
-            onClick={() => setPanelCollapsed(c => !c)}
-            aria-label={panelCollapsed ? 'Lihat petunjuk kafe' : 'Sembunyikan panel, lihat peta'}
-            className="md:hidden flex-shrink-0 flex items-center justify-center py-3"
+          <div
+            onTouchStart={handlePanelTouchStart}
+            onTouchEnd={handlePanelTouchEnd}
+            className="md:hidden flex-shrink-0 flex items-center justify-center py-3 touch-none"
           >
             <span className="w-10 h-1 bg-gray-300 rounded-full" />
-          </button>
+          </div>
 
-          <div className="flex flex-col gap-4 px-5 pb-5 md:pt-5 overflow-y-auto no-scrollbar">
+          <div className="flex flex-col gap-4 px-5 pb-5 md:pt-5">
           <ClueCard cafe={currentCafe} photoSeed={photoSeed} />
 
           {!locked ? (

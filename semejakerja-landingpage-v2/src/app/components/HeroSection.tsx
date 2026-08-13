@@ -45,7 +45,7 @@ export default function HeroSection() {
             rel="noopener noreferrer"
             className={`btn btn--primary btn--large ${styles.ctaMain}`}
           >
-            Gabung Komunitas — 100% Gratis
+            Gabung Komunitas
           </a>
           <a href="#cerita" className={`btn btn--ghost ${styles.ctaSecondary}`}>
             Kenalan Dulu ↓

@@ -172,7 +172,7 @@ function mapRowToCafe(row: CafeRow): Cafe {
     wifiUpload: parseFloat(String(row.wifi_upload_mbps ?? '')) || 0,
     wifiLatency: row.wifi_latency_ms != null ? Number(row.wifi_latency_ms) : null,
     wifiTestedAt: (row.wifi_tested_at as string | null) ?? null,
-    vibes: Math.min(5, Math.max(1, Math.round(Number(row.vibes)) || 3)),
+    vibes: Math.min(3, Math.max(1, Math.round(Number(row.vibes)) || 2)),
     facilities: normalizeFacilities(row.facilities),
     scales: normalizeScales(row.scales),
     openHours: todayStatus,

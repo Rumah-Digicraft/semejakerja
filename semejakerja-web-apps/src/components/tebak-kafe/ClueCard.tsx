@@ -33,11 +33,9 @@ const FACILITY_CLUES: { id: keyof CafeFacility; label: string; icon: React.Compo
 ];
 
 const VIBE_LABEL: Record<number, string> = {
-  1: 'Tenang banget',
-  2: 'Tenang',
-  3: 'Santai',
-  4: 'Ramai',
-  5: 'Ramai banget',
+  1: 'Tenang',
+  2: 'Sedang',
+  3: 'Ramai',
 };
 
 const ClueCard: React.FC<ClueCardProps> = ({ cafe, photoSeed }) => {
@@ -52,6 +50,41 @@ const ClueCard: React.FC<ClueCardProps> = ({ cafe, photoSeed }) => {
     return photos[idx];
   }, [photos, cafe.id, photoSeed]);
 
+  // Semua petunjuk (rating/harga/vibes + fasilitas) duduk di atas gambar
+  // lewat gradient scrim di bawahnya — bukan baris/list terpisah di bawah
+  // gambar. Fasilitas dirender sebagai chip yang wrap (bukan grid 2 kolom)
+  // biar tetap ringkas walau aktif sampai 9 item sekaligus.
+  const clueOverlay = (
+    <div className="absolute inset-x-0 bottom-0 px-3 pt-10 pb-3 bg-gradient-to-t from-black/85 via-black/45 to-transparent">
+      <div className="flex items-center gap-2 flex-wrap text-sm mb-2">
+        <span className="flex items-center gap-1 font-bold text-white">
+          <Star size={14} className="text-yellow-400 fill-yellow-400" />
+          {cafe.rating > 0 ? cafe.rating.toFixed(1) : '—'}
+          {cafe.reviewCount > 0 && <span className="font-medium text-white/70">({cafe.reviewCount})</span>}
+        </span>
+        <span className="text-white/40">·</span>
+        <span className="font-medium text-white/90">{cafe.priceRange}</span>
+        <span className="text-white/40">·</span>
+        <span className="flex items-center gap-1 font-medium text-white/90">
+          {cafe.vibes >= 3 ? <Volume2 size={13} /> : <VolumeX size={13} />}
+          {VIBE_LABEL[cafe.vibes] ?? 'Sedang'}
+        </span>
+      </div>
+      {activeFacilities.length > 0 ? (
+        <div className="flex flex-wrap gap-x-2.5 gap-y-1">
+          {activeFacilities.map(f => (
+            <span key={f.id} className="flex items-center gap-1 text-xs font-medium text-white/90">
+              <f.icon size={12} />
+              {f.label}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-white/60 italic">Belum ada data fasilitas buat kafe ini.</p>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
@@ -64,45 +97,20 @@ const ClueCard: React.FC<ClueCardProps> = ({ cafe, photoSeed }) => {
       </div>
 
       {coverPhoto ? (
-        <img
-          src={coverPhoto.url}
-          alt={coverPhoto.caption || cafe.name}
-          // Fixed height, not aspect-driven — a full 3:4 crop at mobile
-          // width would run ~560px tall and bury the map underneath this
-          // bottom sheet. This slot is a quick visual clue, not a photo
-          // viewer, so a shorter crop is the right tradeoff here.
-          className="w-full h-40 object-cover rounded-xl border border-amber-100"
-        />
+        <div className="relative rounded-xl overflow-hidden border border-amber-100">
+          <img
+            src={coverPhoto.url}
+            alt={coverPhoto.caption || cafe.name}
+            // Fixed height, not aspect-driven — a full 3:4 crop at mobile
+            // width would run ~560px tall and bury the map underneath this
+            // bottom sheet. This slot is a quick visual clue, not a photo
+            // viewer, so a shorter crop is the right tradeoff here.
+            className="w-full h-48 object-cover block"
+          />
+          {clueOverlay}
+        </div>
       ) : (
-        <CafeArtPlaceholder cafe={cafe} />
-      )}
-
-      <div className="flex items-center gap-3 flex-wrap text-sm">
-        <span className="flex items-center gap-1 font-bold text-gray-900">
-          <Star size={14} className="text-yellow-500 fill-yellow-500" />
-          {cafe.rating > 0 ? cafe.rating.toFixed(1) : '—'}
-          {cafe.reviewCount > 0 && <span className="font-medium text-gray-400">({cafe.reviewCount})</span>}
-        </span>
-        <span className="text-gray-300">·</span>
-        <span className="font-medium text-gray-600">{cafe.priceRange}</span>
-        <span className="text-gray-300">·</span>
-        <span className="flex items-center gap-1 font-medium text-gray-600">
-          {cafe.vibes >= 4 ? <Volume2 size={13} /> : <VolumeX size={13} />}
-          {VIBE_LABEL[cafe.vibes] ?? 'Santai'}
-        </span>
-      </div>
-
-      {activeFacilities.length > 0 ? (
-        <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-          {activeFacilities.map(f => (
-            <li key={f.id} className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
-              <f.icon size={13} />
-              {f.label}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-xs text-gray-400 italic">Belum ada data fasilitas buat kafe ini.</p>
+        <CafeArtPlaceholder>{clueOverlay}</CafeArtPlaceholder>
       )}
     </div>
   );

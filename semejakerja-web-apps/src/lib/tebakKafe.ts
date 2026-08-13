@@ -58,11 +58,18 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 // Picks cafes with usable coordinates, preferring ones with at least a
-// little facility/rating data so the clue card isn't blank.
+// little facility/rating data so the clue card isn't blank. Only non-basic
+// tier cafes (verified/partner/sponsor) are eligible — basic-tier rows are
+// rarely enriched enough to make a fair clue. Falls back to the full valid
+// pool if there aren't enough non-basic cafes to fill a round.
+// (Cafe has no raw `tier` field — category/isMitraSemejaKerja are its
+// derived form; 'basic' tier is exactly category 'regular' + not a mitra.)
 export function pickRoundCafes(cafes: Cafe[], count = ROUND_COUNT): Cafe[] {
   const valid = cafes.filter(c => Number.isFinite(c.lat) && Number.isFinite(c.lng) && c.lat !== 0 && c.lng !== 0);
-  const withSignal = valid.filter(c => c.rating > 0 || Object.values(c.facilities).some(Boolean));
-  const pool = withSignal.length >= count ? withSignal : valid;
+  const eligible = valid.filter(c => c.category !== 'regular' || c.isMitraSemejaKerja);
+  const tierPool = eligible.length >= count ? eligible : valid;
+  const withSignal = tierPool.filter(c => c.rating > 0 || Object.values(c.facilities).some(Boolean));
+  const pool = withSignal.length >= count ? withSignal : tierPool;
   return shuffle(pool).slice(0, count);
 }
 
