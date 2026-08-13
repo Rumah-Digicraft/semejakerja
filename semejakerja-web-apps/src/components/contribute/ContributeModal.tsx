@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { X, CheckCircle2, Star, Upload, ChevronRight } from 'lucide-react';
+import { X, CheckCircle2, Star, Upload, ChevronRight, Loader2 } from 'lucide-react';
 import {
   useSubmitNewCafe,
   useSubmitEdit,
@@ -7,6 +7,9 @@ import {
   useSubmitPhoto,
 } from '../../hooks/useContribute';
 import type { CafeEditSuggestedData } from '../../types/cafe';
+import PhotoCropModal from './PhotoCropModal';
+
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // samain dengan limit bucket cafe-photos (lihat admin PhotoManager)
 
 export type ContributeType = 'new-cafe' | 'edit' | 'review' | 'photo';
 
@@ -241,7 +244,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
-function ReviewForm({ onSubmit, isLoading }: { onSubmit: (d: Record<string, unknown>) => void; isLoading: boolean }) {
+function ReviewForm({ onSubmit, isLoading, errorMessage }: { onSubmit: (d: Record<string, unknown>) => void; isLoading: boolean; errorMessage?: string }) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [wifiSpeed, setWifiSpeed] = useState('');
@@ -297,6 +300,7 @@ function ReviewForm({ onSubmit, isLoading }: { onSubmit: (d: Record<string, unkn
           </div>
         </div>
       </div>
+      {errorMessage && <p className="text-xs text-red-500 -mt-1">{errorMessage}</p>}
       <button type="submit" disabled={isLoading || rating === 0} className="w-full py-3 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-all shadow-sm disabled:opacity-60">
         {isLoading ? 'Mengirim...' : 'Kirim Ulasan'}
       </button>
@@ -304,39 +308,77 @@ function ReviewForm({ onSubmit, isLoading }: { onSubmit: (d: Record<string, unkn
   );
 }
 
-function PhotoForm({ onSubmit, isLoading }: { onSubmit: (file: File, caption: string) => void; isLoading: boolean }) {
-  const [file, setFile] = useState<File | null>(null);
+// Sama seperti admin PhotoManager.tsx: pilih beberapa file sekaligus, tiap
+// file lewat crop 3:4 satu-satu, langsung upload begitu di-crop (tidak ada
+// tombol "kirim" terpisah). Identitas TIDAK dikirim dari sini — trigger DB
+// yang mengisinya dari akun login (lihat useContribute.ts).
+function PhotoForm({ cafeId, onDone }: { cafeId: string; onDone: () => void }) {
+  const { mutateAsync: uploadPhoto } = useSubmitPhoto();
   const [caption, setCaption] = useState('');
-  const [preview, setPreview] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [queueTotal, setQueueTotal] = useState(0);
+  const [uploading, setUploading] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const successCountRef = useRef(0);
 
-  const handleFile = (f: File) => {
-    setFile(f);
-    const url = URL.createObjectURL(f);
-    setPreview(url);
+  const handleFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const valid: File[] = [];
+    const rejected: string[] = [];
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) { rejected.push(`${file.name} dilewati — bukan file gambar`); continue; }
+      if (file.size > MAX_PHOTO_BYTES) { rejected.push(`${file.name} dilewati — ukuran lebih dari 10MB`); continue; }
+      valid.push(file);
+    }
+    if (inputRef.current) inputRef.current.value = '';
+    setErrors(rejected);
+    if (valid.length === 0) return;
+    successCountRef.current = 0;
+    setQueueTotal(valid.length);
+    setPendingFiles(valid);
+    setUploading(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file) return;
-    onSubmit(file, caption);
+  const advanceQueue = () => {
+    setPendingFiles(prev => {
+      const next = prev.slice(1);
+      if (next.length === 0) {
+        setUploading(false);
+        if (successCountRef.current > 0) onDone();
+      }
+      return next;
+    });
+  };
+
+  const handleCropConfirm = async (blob: Blob) => {
+    try {
+      await uploadPhoto({ cafeId, file: blob, caption });
+      successCountRef.current += 1;
+    } catch (err) {
+      setErrors(prev => [...prev, err instanceof Error ? err.message : 'Gagal upload foto']);
+    }
+    advanceQueue();
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="space-y-4">
       <div>
-        <Label text="Foto" />
+        <Label text="Foto" hint="bisa pilih lebih dari 1 sekaligus" />
         <div
-          onClick={() => inputRef.current?.click()}
+          onClick={() => !uploading && inputRef.current?.click()}
           className="border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-purple-300 hover:bg-purple-50/30 transition-all"
         >
-          {preview ? (
-            <img src={preview} alt="preview" className="max-h-40 rounded-xl object-contain" />
+          {uploading ? (
+            <>
+              <Loader2 className="w-8 h-8 text-purple-400 animate-spin mb-2" />
+              <p className="text-sm text-gray-400">Mengunggah {queueTotal - pendingFiles.length + 1} dari {queueTotal}...</p>
+            </>
           ) : (
             <>
               <Upload className="w-8 h-8 text-gray-300 mb-2" />
               <p className="text-sm text-gray-400">Klik untuk pilih foto</p>
-              <p className="text-xs text-gray-300 mt-1">JPG, PNG, WebP — maks. 5MB</p>
+              <p className="text-xs text-gray-300 mt-1">JPG, PNG, WebP — maks. 10MB per foto</p>
             </>
           )}
         </div>
@@ -344,18 +386,38 @@ function PhotoForm({ onSubmit, isLoading }: { onSubmit: (file: File, caption: st
           ref={inputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+          onChange={(e) => handleFiles(e.target.files)}
         />
       </div>
       <div>
-        <Label text="Keterangan Foto" optional />
-        <input className={inputCls} placeholder="mis. Area colokan yang banyak" value={caption} onChange={(e) => setCaption(e.target.value)} />
+        <Label text="Keterangan Foto" optional hint="dipakai untuk semua foto yang dipilih" />
+        <input
+          className={inputCls}
+          placeholder="mis. Area colokan yang banyak"
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          disabled={uploading}
+        />
       </div>
-      <button type="submit" disabled={isLoading || !file} className="w-full py-3 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-all shadow-sm disabled:opacity-60">
-        {isLoading ? 'Mengunggah...' : 'Upload Foto'}
-      </button>
-    </form>
+      {errors.length > 0 && (
+        <div className="space-y-0.5">
+          {errors.map((e, i) => <p key={i} className="text-xs text-red-500">{e}</p>)}
+        </div>
+      )}
+
+      {pendingFiles.length > 0 && (
+        <PhotoCropModal
+          key={pendingFiles.length}
+          file={pendingFiles[0]}
+          position={queueTotal - pendingFiles.length + 1}
+          total={queueTotal}
+          onConfirm={handleCropConfirm}
+          onSkip={advanceQueue}
+        />
+      )}
+    </div>
   );
 }
 
@@ -400,16 +462,26 @@ const TITLES: Record<ContributeType, string> = {
 
 type Step = 'identity' | 'form' | 'success';
 
+// Koreksi info, ulasan & upload foto tidak punya step identitas — nama & WA
+// diambil dari akun yang login (server-side, migration 040/041), jadi
+// langsung ke step form. "Usulkan café baru" tetap pakai identitas bebas.
+const STEPS_FOR: Record<ContributeType, Step[]> = {
+  'new-cafe': ['identity', 'form'],
+  'edit': ['form'],
+  'review': ['form'],
+  'photo': ['form'],
+};
+
 export function ContributeModal({ type, cafeId, cafeName, currentValues, onClose }: ContributeModalProps) {
-  const [step, setStep] = useState<Step>('identity');
+  const steps = STEPS_FOR[type];
+  const [step, setStep] = useState<Step>(steps[0]);
   const [identity, setIdentity] = useState<IdentityData>({ name: '', wa: '' });
 
   const { mutate: submitNew, isPending: pendingNew } = useSubmitNewCafe();
   const { mutate: submitEdit, isPending: pendingEdit } = useSubmitEdit();
-  const { mutate: submitReview, isPending: pendingReview } = useSubmitReview();
-  const { mutate: submitPhoto, isPending: pendingPhoto } = useSubmitPhoto();
+  const { mutate: submitReview, isPending: pendingReview, error: reviewError } = useSubmitReview();
 
-  const isLoading = pendingNew || pendingEdit || pendingReview || pendingPhoto;
+  const isLoading = pendingNew || pendingEdit || pendingReview;
 
   const handleNewCafe = (d: Record<string, string>) => {
     submitNew(
@@ -431,7 +503,7 @@ export function ContributeModal({ type, cafeId, cafeName, currentValues, onClose
     if (!cafeId) return;
     const { _notes, ...suggestedData } = d;
     submitEdit(
-      { cafeId, suggestedData, notes: _notes, submitterName: identity.name, submitterWa: identity.wa },
+      { cafeId, suggestedData, notes: _notes },
       { onSuccess: () => setStep('success') },
     );
   };
@@ -445,17 +517,7 @@ export function ContributeModal({ type, cafeId, cafeName, currentValues, onClose
         comment: d.comment as string,
         wifiSpeed: d.wifiSpeed as number,
         vibes: d.vibes as number,
-        submitterName: identity.name,
-        submitterWa: identity.wa,
       },
-      { onSuccess: () => setStep('success') },
-    );
-  };
-
-  const handlePhoto = (file: File, caption: string) => {
-    if (!cafeId) return;
-    submitPhoto(
-      { cafeId, file, caption, submitterName: identity.name, submitterWa: identity.wa },
       { onSuccess: () => setStep('success') },
     );
   };
@@ -475,15 +537,15 @@ export function ContributeModal({ type, cafeId, cafeName, currentValues, onClose
           </button>
         </div>
 
-        {/* Step indicator */}
-        {step !== 'success' && (
+        {/* Step indicator — cuma tampil kalau ada >1 step (review langsung ke form) */}
+        {step !== 'success' && steps.length > 1 && (
           <div className="flex items-center gap-2 px-6 pt-4 shrink-0">
-            {(['identity', 'form'] as Step[]).map((s, i) => (
+            {steps.map((s, i) => (
               <div key={s} className="flex items-center gap-2">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step === s ? 'bg-purple-600 text-white' : i < (['identity', 'form'] as Step[]).indexOf(step) ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                  {i < (['identity', 'form'] as Step[]).indexOf(step) ? '✓' : i + 1}
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step === s ? 'bg-purple-600 text-white' : i < steps.indexOf(step) ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                  {i < steps.indexOf(step) ? '✓' : i + 1}
                 </div>
-                {i < 1 && <div className={`flex-1 h-0.5 w-8 ${step === 'form' ? 'bg-purple-200' : 'bg-gray-100'}`} />}
+                {i < steps.length - 1 && <div className={`flex-1 h-0.5 w-8 ${step === 'form' ? 'bg-purple-200' : 'bg-gray-100'}`} />}
               </div>
             ))}
           </div>
@@ -501,10 +563,10 @@ export function ContributeModal({ type, cafeId, cafeName, currentValues, onClose
             <EditForm currentValues={currentValues} onSubmit={handleEdit} isLoading={isLoading} />
           )}
           {step === 'form' && type === 'review' && (
-            <ReviewForm onSubmit={handleReview} isLoading={isLoading} />
+            <ReviewForm onSubmit={handleReview} isLoading={isLoading} errorMessage={reviewError?.message} />
           )}
-          {step === 'form' && type === 'photo' && (
-            <PhotoForm onSubmit={handlePhoto} isLoading={isLoading} />
+          {step === 'form' && type === 'photo' && cafeId && (
+            <PhotoForm cafeId={cafeId} onDone={() => setStep('success')} />
           )}
           {step === 'success' && (
             <SuccessScreen type={type} onClose={onClose} />

@@ -10,21 +10,52 @@ import { CheckCircle, XCircle, Clock, Loader2, MessageSquare, Image, MapPin, Edi
 
 type TabType = 'submissions' | 'edits' | 'reviews' | 'photos'
 
+const BUCKET = 'cafe-photos'
+
+const EDIT_FIELD_LABELS: Record<string, string> = {
+  name: 'Nama Kafe',
+  address: 'Alamat',
+  phone: 'Telepon',
+  website: 'Website',
+  open_hours: 'Jam Buka',
+}
+
 function Badge({ count }: { count: number }) {
   if (count === 0) return null
   return <span className="ml-1.5 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{count}</span>
 }
 
-function ReviewModal({ item, type, onClose, onDone }: { item: any, type: string, onClose: () => void, onDone: () => void }) {
+function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, type: string, cafeName?: string, onClose: () => void, onDone: () => void }) {
   const supabase = createClient()
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
+  const [currentCafe, setCurrentCafe] = useState<Record<string, any> | null>(null)
 
   const table = { submissions: 'cafe_submissions', edits: 'cafe_edits', reviews: 'cafe_reviews', photos: 'cafe_photos' }[type] as string
 
+  // Buat perbandingan "nilai sekarang → disarankan" di tab edit.
+  useEffect(() => {
+    if (type !== 'edits' || !item.cafe_id) return
+    supabase.from('cafes').select('name, address, phone, website, open_hours').eq('id', item.cafe_id).single()
+      .then(({ data }) => setCurrentCafe(data))
+  }, [type, item.cafe_id])
+
+  const photoUrl = type === 'photos' && item.storage_path
+    ? supabase.storage.from(BUCKET).getPublicUrl(item.storage_path).data.publicUrl
+    : null
+
   const submit = async (status: 'approved' | 'rejected') => {
     setLoading(true)
-    await supabase.from(table).update({ status, review_note: note, reviewed_at: new Date().toISOString() }).eq('id', item.id)
+    const payload: Record<string, any> = { status, review_note: note, reviewed_at: new Date().toISOString() }
+    // Foto publik tidak pernah kirim sort_order (default DB = 0) — kalau
+    // dibiarkan, foto ini bisa "menyalip" jadi sampul karena tie-break-nya
+    // created_at terbaru duluan. Taruh di urutan paling akhir, sama seperti
+    // upload admin.
+    if (type === 'photos' && status === 'approved') {
+      const { count } = await supabase.from('cafe_photos').select('id', { count: 'exact', head: true }).eq('cafe_id', item.cafe_id).eq('status', 'approved')
+      payload.sort_order = count ?? 0
+    }
+    await supabase.from(table).update(payload).eq('id', item.id)
     setLoading(false)
     onDone()
     onClose()
@@ -32,14 +63,52 @@ function ReviewModal({ item, type, onClose, onDone }: { item: any, type: string,
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
         <h3 className="font-bold text-lg text-slate-900 mb-2">Review Kontribusi</h3>
         <div className="bg-slate-50 rounded-xl p-4 mb-4 text-sm space-y-1">
           <p><span className="text-slate-500">Dari:</span> <strong>{item.submitter_name || item.reviewer_name || 'Anonim'}</strong></p>
-          {item.name && <p><span className="text-slate-500">Kafe:</span> {item.name}</p>}
+          {(item.name || cafeName) && <p><span className="text-slate-500">Kafe:</span> {item.name || cafeName}</p>}
           {item.comment && <p><span className="text-slate-500">Komentar:</span> {item.comment}</p>}
           {item.rating && <p><span className="text-slate-500">Rating:</span> ⭐ {item.rating}/5</p>}
         </div>
+
+        {type === 'edits' && item.suggested_data && (
+          <div className="bg-slate-50 rounded-xl p-4 mb-4 text-sm space-y-3">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Perubahan yang Disarankan</p>
+            {Object.entries(item.suggested_data as Record<string, string>)
+              .filter(([key, value]) => key !== '_notes' && value)
+              .map(([key, value]) => (
+                <div key={key}>
+                  <p className="text-xs text-slate-400">{EDIT_FIELD_LABELS[key] ?? key}</p>
+                  {currentCafe?.[key] ? (
+                    <p>
+                      <span className="text-slate-400 line-through">{currentCafe[key]}</span>
+                      {' → '}
+                      <span className="font-medium text-slate-900">{value}</span>
+                    </p>
+                  ) : (
+                    <p className="font-medium text-slate-900">{value}</p>
+                  )}
+                </div>
+              ))}
+            {item.notes && (
+              <div className="pt-2 border-t border-slate-200">
+                <p className="text-xs text-slate-400">Alasan dari kontributor</p>
+                <p className="text-slate-700">{item.notes}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {type === 'photos' && photoUrl && (
+          <div className="mb-4">
+            {/* eslint-disable-next-line @next/next/no-img-element -- Supabase Storage public URL */}
+            <img src={photoUrl} alt={item.caption ?? 'Foto kafe'} className="w-full max-w-[220px] mx-auto aspect-[3/4] object-cover rounded-xl border border-slate-100" />
+            {item.caption && <p className="text-xs text-slate-500 mt-1.5 text-center">&quot;{item.caption}&quot;</p>}
+            <p className="text-xs text-slate-400 mt-2 text-center">Kalau disetujui, foto ini langsung tayang di galeri foto publik kafe ini.</p>
+          </div>
+        )}
+
         <div className="mb-4">
           <label className="block text-sm font-medium text-slate-700 mb-1">Catatan Review (opsional)</label>
           <textarea
@@ -68,6 +137,7 @@ export default function ModerasiPage() {
   const supabase = createClient()
   const [tab, setTab] = useState<TabType>('submissions')
   const [data, setData] = useState<any[]>([])
+  const [cafeNames, setCafeNames] = useState<Record<string, string>>({})
   const [counts, setCounts] = useState({ submissions: 0, edits: 0, reviews: 0, photos: 0 })
   const [loading, setLoading] = useState(true)
   const [reviewItem, setReviewItem] = useState<any>(null)
@@ -87,6 +157,19 @@ export default function ModerasiPage() {
     const tableMap = { submissions: 'cafe_submissions', edits: 'cafe_edits', reviews: 'cafe_reviews', photos: 'cafe_photos' }
     const { data } = await supabase.from(tableMap[tab]).select('*').order('created_at', { ascending: false }).limit(50)
     setData(data ?? [])
+
+    // submissions = usulan kafe baru, tidak punya cafe_id (belum ada kafenya).
+    // Tab lain cuma nyimpen cafe_id — nama kafenya perlu dicari terpisah biar
+    // admin tahu kontribusi ini soal kafe yang mana.
+    if (tab !== 'submissions') {
+      const ids = [...new Set((data ?? []).map(d => d.cafe_id).filter(Boolean))]
+      if (ids.length > 0) {
+        const { data: cafes } = await supabase.from('cafes').select('id, name').in('id', ids)
+        setCafeNames(Object.fromEntries((cafes ?? []).map(c => [c.id, c.name])))
+      } else {
+        setCafeNames({})
+      }
+    }
     setLoading(false)
   }, [tab])
 
@@ -110,7 +193,13 @@ export default function ModerasiPage() {
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       {reviewItem && (
-        <ReviewModal item={reviewItem} type={tab} onClose={() => setReviewItem(null)} onDone={() => { loadTab(); loadCounts() }} />
+        <ReviewModal
+          item={reviewItem}
+          type={tab}
+          cafeName={cafeNames[reviewItem.cafe_id]}
+          onClose={() => setReviewItem(null)}
+          onDone={() => { loadTab(); loadCounts() }}
+        />
       )}
 
       <div className="mb-6">
@@ -166,7 +255,22 @@ export default function ModerasiPage() {
                     <p className="text-xs text-slate-400">{item.submitter_wa || item.reviewer_wa || ''}</p>
                   </td>
                   <td className="px-5 py-4 text-slate-600">
-                    <p>{item.name || item.comment || (item.suggested_data ? 'Edit data kafe' : item.caption || 'Foto kafe')}</p>
+                    {tab !== 'submissions' && cafeNames[item.cafe_id] && (
+                      <p className="font-medium text-slate-800">{cafeNames[item.cafe_id]}</p>
+                    )}
+                    {tab === 'photos' && item.storage_path ? (
+                      <div className="flex items-center gap-2.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- Supabase Storage public URL */}
+                        <img
+                          src={supabase.storage.from(BUCKET).getPublicUrl(item.storage_path).data.publicUrl}
+                          alt={item.caption ?? 'Foto kafe'}
+                          className="w-9 h-12 rounded-lg object-cover border border-slate-100 shrink-0"
+                        />
+                        <span>{item.caption || 'Foto kafe'}</span>
+                      </div>
+                    ) : (
+                      <p>{item.name || item.comment || (item.suggested_data ? 'Edit data kafe' : '')}</p>
+                    )}
                     {item.rating && <p className="text-xs text-amber-500">⭐ {item.rating}/5</p>}
                     {item.notes && <p className="text-xs text-slate-400">{item.notes}</p>}
                   </td>

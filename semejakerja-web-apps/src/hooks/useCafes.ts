@@ -184,6 +184,9 @@ function mapRowToCafe(row: CafeRow): Cafe {
     description: '',
     quickSummary: PRICE_RANGE[row.price_level] ?? PRICE_RANGE[0],
     menuItems: [],
+    menuPdfUrl: row.menu_pdf_path
+      ? supabase.storage.from('cafe-menus').getPublicUrl(row.menu_pdf_path).data.publicUrl
+      : null,
     images: [],
     logoColor: color,
     markerColor: color,
@@ -203,7 +206,7 @@ function mapRowToCafe(row: CafeRow): Cafe {
 const CAFE_COLUMNS =
   'id,name,lat,lng,rating,total_reviews,tier,is_partner,open_hours,weekday_text,' +
   'address,price_level,phone,website,discount_value,clicks,facilities,vibes,' +
-  'wifi_speed_mbps,wifi_upload_mbps,wifi_latency_ms,wifi_tested_at,scales';
+  'wifi_speed_mbps,wifi_upload_mbps,wifi_latency_ms,wifi_tested_at,scales,menu_pdf_path';
 
 async function fetchCafes(): Promise<Cafe[]> {
   const { data, error } = await supabase

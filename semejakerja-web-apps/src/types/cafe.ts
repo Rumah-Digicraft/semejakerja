@@ -25,6 +25,7 @@ export interface CafeRow {
   top_review: string | null;
   clicks: number;
   created_at: string;
+  menu_pdf_path?: string | null;
   // Kolom enrichment (migration 015) — facilities bisa objek 6-boolean,
   // string JSON, atau array string legacy; selalu lewat normalizeFacilities.
   facilities?: unknown;
@@ -89,6 +90,8 @@ export interface Cafe {
   description: string;
   quickSummary: string;
   menuItems: MenuItem[];
+  // Optional, sama seperti phone/website/topReview di bawah — biar mock data tak perlu diisi.
+  menuPdfUrl?: string | null;
   images: string[];
   logoColor: string;
   markerColor: string;
@@ -169,6 +172,7 @@ export interface CafeReview {
   cafe_id: string;
   cafe_name?: string; // joined for display
   status: ContributionStatus;
+  user_id: string | null;
   reviewer_name: string | null;
   reviewer_wa: string | null;
   rating: number | null;

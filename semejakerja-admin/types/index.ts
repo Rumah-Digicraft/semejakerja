@@ -57,6 +57,7 @@ export interface Cafe {
   scales: CafeScales | null
   clicks: number
   top_review: string | null
+  menu_pdf_path: string | null
   created_at: string
 }
 
@@ -100,6 +101,7 @@ export interface CafeReview {
   id: string
   cafe_id: string
   status: ContributionStatus
+  user_id: string | null
   reviewer_name: string
   reviewer_wa: string
   rating: number

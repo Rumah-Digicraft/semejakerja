@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { AdminRole } from '@/types'
 import { ALL_ROLES, allowedRolesFor } from '@/lib/access'
+import NotificationBell from '@/components/NotificationBell'
 import {
   LayoutDashboard, Map, Store, Shield, Users, Tag,
   Dumbbell, CalendarDays, UserCheck, Layers, Settings,
@@ -227,15 +228,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile header */}
-        <header className="lg:hidden flex items-center justify-between px-4 h-14 bg-white border-b border-slate-200 flex-shrink-0">
-          <button onClick={() => setIsMobileOpen(true)} className="p-2 rounded-lg hover:bg-slate-100">
+        {/* Topbar — hamburger+logo cuma mobile (desktop sudah ada di sidebar), tapi
+            bell notifikasi selalu tampil di kedua breakpoint. */}
+        <header className="flex items-center justify-between px-4 h-14 bg-white border-b border-slate-200 flex-shrink-0">
+          <button onClick={() => setIsMobileOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-slate-100">
             <Menu size={20} className="text-slate-600" />
           </button>
-          <h1 className="font-bold text-slate-800">
+          <h1 className="lg:hidden font-bold text-slate-800">
             Semeja<span className="text-purple-600">kerja</span>
           </h1>
-          <div className="w-9" />
+          <div className="hidden lg:block" />
+          <NotificationBell />
         </header>
 
         {/* Page content */}

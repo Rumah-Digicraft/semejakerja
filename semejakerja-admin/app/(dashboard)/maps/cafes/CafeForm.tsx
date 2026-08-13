@@ -7,7 +7,7 @@ import type { CafeFacilities, CafeScales } from '@/types'
 import {
   type CafeDbPayload, type CafeFormValues, type WeekHours,
   DAY_LABELS, PURWOKERTO_CENTER,
-  suggestOpenHours, toDbPayload, validateForm,
+  formatOpenHoursRange, parseOpenHoursRange, suggestOpenHours, toDbPayload, validateForm,
 } from './lib'
 import {
   Bike, BookOpen, Car, Clock, Gauge, Info, Loader2, MapPin, Maximize,
@@ -82,6 +82,11 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
   const [errors, setErrors] = useState<Record<string, string>>({})
   // open_hours mengikuti saran dari jadwal per-hari sampai diedit manual.
   const [openHoursTouched, setOpenHoursTouched] = useState(initial.open_hours.trim() !== '')
+  // Section "Atur jam per hari" selalu mulai tertutup, walau kafe sudah
+  // punya data weekday_text — data lama tetap tersimpan di values.week
+  // (round-trip apa adanya kalau tidak disentuh), hanya tampilannya yang
+  // default ke mode ringkasan.
+  const [weekSectionOpen, setWeekSectionOpen] = useState(false)
   const lastWeekRef = useRef<WeekHours>(initial.week ?? DEFAULT_WEEK())
 
   const set = (patch: Partial<CafeFormValues>) => setValues(v => ({ ...v, ...patch }))
@@ -196,6 +201,7 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
                 </select>
               </div>
             </div>
+            <p className="text-xs text-slate-400 -mt-2">Tier &quot;Partner&quot; tampil sebagai &quot;Mitra SK&quot; di peta publik.</p>
             <div>
               <label className={labelCls}>Diskon Member (%)</label>
               <input
@@ -205,17 +211,27 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
               />
               {err('discount_value')}
             </div>
-            <label className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3 cursor-pointer">
-              <input
-                type="checkbox" checked={values.is_partner}
-                onChange={e => set({ is_partner: e.target.checked })}
-                className="w-4 h-4 accent-purple-600"
-              />
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-sm font-medium text-slate-800">Partner Semeja Kerja</p>
-                <p className="text-xs text-slate-500">Tampil sebagai &quot;Mitra SK&quot; di peta publik</p>
+                <label className={labelCls}>Rating (Google Maps)</label>
+                <input
+                  type="number" min={0} max={5} step="0.1" value={values.rating || ''}
+                  onChange={e => set({ rating: e.target.value === '' ? 0 : Number(e.target.value) })}
+                  className={inputCls} placeholder="mis. 4.8"
+                />
+                {err('rating')}
               </div>
-            </label>
+              <div>
+                <label className={labelCls}>Jumlah Review</label>
+                <input
+                  type="number" min={0} step={1} value={values.total_reviews || ''}
+                  onChange={e => set({ total_reviews: e.target.value === '' ? 0 : Number(e.target.value) })}
+                  className={inputCls} placeholder="mis. 834"
+                />
+                {err('total_reviews')}
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 -mt-2">Diisi manual dari Google Maps.</p>
           </div>
         </SectionCard>
 
@@ -299,8 +315,13 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
           <div className="space-y-4">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
-                type="checkbox" checked={values.week !== null}
-                onChange={e => setWeek(e.target.checked ? lastWeekRef.current : null)}
+                type="checkbox" checked={weekSectionOpen}
+                onChange={e => {
+                  const open = e.target.checked
+                  setWeekSectionOpen(open)
+                  if (!open) setWeek(null)
+                  else if (!values.week) setWeek(lastWeekRef.current)
+                }}
                 className="w-4 h-4 accent-purple-600"
               />
               <div>
@@ -309,7 +330,7 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
               </div>
             </label>
 
-            {values.week && (
+            {weekSectionOpen && values.week && (
               <>
                 <div className="flex gap-2">
                   <button
@@ -361,13 +382,13 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
 
             <div>
               <label className={labelCls}>Ringkasan Jam</label>
-              <div className="flex gap-2">
-                <input
-                  value={values.open_hours}
-                  onChange={e => { setOpenHoursTouched(true); set({ open_hours: e.target.value }) }}
-                  className={inputCls} placeholder='mis. "09:00 - 22:00" atau "24 Jam"'
-                />
-                {values.week && (
+              {weekSectionOpen ? (
+                <div className="flex gap-2">
+                  <input
+                    value={values.open_hours}
+                    onChange={e => { setOpenHoursTouched(true); set({ open_hours: e.target.value }) }}
+                    className={inputCls} placeholder='mis. "09:00 - 22:00" atau "24 Jam"'
+                  />
                   <button
                     type="button"
                     onClick={() => { setOpenHoursTouched(false); set({ open_hours: suggestOpenHours(values.week) }) }}
@@ -375,11 +396,39 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
                   >
                     Pakai saran
                   </button>
-                )}
-              </div>
-              <p className="text-xs text-slate-400 mt-1">
-                Dipakai peta publik untuk filter &quot;Buka Malam&quot; dan sebagai fallback status buka.
-              </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-xs text-slate-400 mb-1 block">Jam Buka</span>
+                      <input
+                        type="time"
+                        value={parseOpenHoursRange(values.open_hours).from}
+                        onChange={e => set({ open_hours: formatOpenHoursRange(e.target.value, parseOpenHoursRange(values.open_hours).to) })}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-400 mb-1 block">Jam Tutup</span>
+                      <input
+                        type="time"
+                        value={parseOpenHoursRange(values.open_hours).to}
+                        onChange={e => set({ open_hours: formatOpenHoursRange(parseOpenHoursRange(values.open_hours).from, e.target.value) })}
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => set({ open_hours: '24 Jam' })}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 transition"
+                  >
+                    24 Jam
+                  </button>
+                </div>
+              )}
+              <p className="text-xs text-slate-400 mt-1">Jam ini yang tampil di peta publik.</p>
             </div>
           </div>
         </SectionCard>
@@ -416,8 +465,8 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
               />
             </div>
             <p className="text-xs text-slate-400">
-              Download dipakai label di detail publik (≥50 &quot;Super Cepat&quot;, ≥25 &quot;Stabil&quot;, di bawahnya &quot;Standar&quot;).
-              Nilai ini di-replace otomatis kalau ada yang jalanin speedtest langsung di kafe.
+              Kecepatan download menentukan label di halaman publik: ≥50 &quot;Super Cepat&quot;, ≥25 &quot;Stabil&quot;, di bawahnya &quot;Standar&quot;.
+              Bisa berubah sendiri kalau ada pengunjung yang tes kecepatan wifi di kafe ini.
             </p>
             {values.wifi_tested_at && (
               <p className="text-xs text-slate-400">

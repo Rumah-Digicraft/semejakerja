@@ -168,6 +168,7 @@ function MapApp() {
           cafe={selectedCafe}
           onClose={() => navigate('/')}
           access={access}
+          userId={user?.id}
           onRequestLogin={() => setShowLogin(true)}
           landingUrl={landingUrl}
         />

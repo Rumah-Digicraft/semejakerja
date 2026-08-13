@@ -23,7 +23,7 @@ export default function NewCafePage() {
     // (NOT NULL-nya dilepas di migrasi 015).
     const { data, error } = await supabase
       .from('cafes')
-      .insert({ ...payload, rating: 0, total_reviews: 0, clicks: 0, top_review: null })
+      .insert({ ...payload, clicks: 0, top_review: null })
       .select('id')
       .single()
     setSaving(false)
