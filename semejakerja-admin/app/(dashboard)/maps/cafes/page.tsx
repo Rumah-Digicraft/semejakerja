@@ -23,7 +23,6 @@ export default function DataKafePage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterTier, setFilterTier] = useState('all')
-  const [filterPartner, setFilterPartner] = useState('all')
   const [toast, setToast] = useState('')
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -41,16 +40,14 @@ export default function DataKafePage() {
     const q = search.toLowerCase()
     return cafes.filter(c => {
       if (filterTier !== 'all' && c.tier !== filterTier) return false
-      if (filterPartner === 'partner' && !c.is_partner) return false
-      if (filterPartner === 'non_partner' && c.is_partner) return false
       if (q && !c.name.toLowerCase().includes(q) && !(c.address ?? '').toLowerCase().includes(q)) return false
       return true
     })
-  }, [cafes, search, filterTier, filterPartner])
+  }, [cafes, search, filterTier])
 
   const { page, setPage, pageCount, pageItems, pageSize, total } = usePagination(
     filtered,
-    `${search}|${filterTier}|${filterPartner}`,
+    `${search}|${filterTier}`,
   )
 
   const handleDelete = async (cafe: Cafe) => {
@@ -99,11 +96,6 @@ export default function DataKafePage() {
           <option value="verified">Verified</option>
           <option value="partner">Partner</option>
           <option value="sponsor">Sponsor</option>
-        </select>
-        <select value={filterPartner} onChange={e => setFilterPartner(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none">
-          <option value="all">Semua Status</option>
-          <option value="partner">Partner</option>
-          <option value="non_partner">Non-Partner</option>
         </select>
         <div className="flex items-center text-xs text-slate-400 md:ml-auto">
           {loading ? '...' : `${filtered.length} dari ${cafes.length} kafe`}

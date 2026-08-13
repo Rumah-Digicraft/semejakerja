@@ -46,6 +46,7 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
       .from('cafe_photos')
       .select('*')
       .eq('cafe_id', cafeId)
+      .neq('status', 'rejected') // foto ditolak tak perlu nongkrong di grid ini
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
     if (error) onToast(`Gagal memuat foto: ${error.message}`)

@@ -110,6 +110,19 @@ export function suggestOpenHours(week: WeekHours | null): string {
   return best === '00:00 - 23:59' ? '24 Jam' : best
 }
 
+// Mode ringkasan-saja (per-hari mati): 2 input time buka/tutup ↔ open_hours.
+export function parseOpenHoursRange(text: string): { from: string; to: string } {
+  const lower = text.toLowerCase()
+  if (lower.includes('24 jam') || lower.includes('24jam') || lower.includes('24 hours')) {
+    return { from: '00:00', to: '23:59' }
+  }
+  return parseTimeRange(text) ?? { from: DEFAULT_DAY.from, to: DEFAULT_DAY.to }
+}
+
+export function formatOpenHoursRange(from: string, to: string): string {
+  return from === '00:00' && to === '23:59' ? '24 Jam' : `${from} - ${to}`
+}
+
 // ── Facilities ──────────────────────────────────────────────────────────
 export const DEFAULT_FACILITIES: CafeFacilities = {
   wifi: false, ac: false, powerOutlets: false, mushola: false, motorParking: false, carParking: false,
@@ -186,7 +199,6 @@ export interface CafeFormValues {
   lat: number | null
   lng: number | null
   tier: Cafe['tier']
-  is_partner: boolean
   discount_value: number | null
   price_level: number
   week: WeekHours | null // null = jadwal per-hari tidak diatur (weekday_text null)
@@ -198,6 +210,8 @@ export interface CafeFormValues {
   wifi_upload_mbps: number | null
   wifi_latency_ms: number | null
   wifi_tested_at: string | null // read-only, ditampilkan tapi tak ditulis balik
+  rating: number // manual, sumber: Google Maps — admin isi langsung, tidak dihitung dari cafe_reviews
+  total_reviews: number
 }
 
 // Kolom yang ditulis form ke tabel cafes. `location` (PostGIS legacy)
@@ -212,6 +226,9 @@ export interface CafeDbPayload {
   phone: string | null
   website: string | null
   tier: Cafe['tier']
+  // Bukan input form terpisah — diturunkan dari tier di toDbPayload().
+  // Peta publik sendiri sudah pakai tier === 'partner' langsung (lihat
+  // useCafes.ts isMitraSemejaKerja); is_partner cuma fallback lama.
   is_partner: boolean
   discount_value: number | null
   price_level: number
@@ -223,6 +240,8 @@ export interface CafeDbPayload {
   wifi_speed_mbps: number | null // = download
   wifi_upload_mbps: number | null
   wifi_latency_ms: number | null
+  rating: number
+  total_reviews: number
 }
 
 export const PURWOKERTO_CENTER: [number, number] = [-7.424, 109.23]
@@ -231,11 +250,12 @@ export function emptyFormValues(): CafeFormValues {
   return {
     name: '', phone: '', website: '', address: '',
     lat: null, lng: null,
-    tier: 'basic', is_partner: false,
+    tier: 'basic',
     discount_value: null, price_level: 0,
     week: null, open_hours: '',
     facilities: { ...DEFAULT_FACILITIES }, scales: { ...DEFAULT_SCALES }, vibes: 3,
     wifi_speed_mbps: null, wifi_upload_mbps: null, wifi_latency_ms: null, wifi_tested_at: null,
+    rating: 0, total_reviews: 0,
   }
 }
 
@@ -248,7 +268,6 @@ export function cafeToFormValues(cafe: Cafe): CafeFormValues {
     lat: cafe.lat ?? null,
     lng: cafe.lng ?? null,
     tier: cafe.tier ?? 'basic',
-    is_partner: Boolean(cafe.is_partner),
     discount_value: cafe.discount_value ?? null,
     price_level: cafe.price_level ?? 0,
     week: parseWeekdayText(cafe.weekday_text),
@@ -260,6 +279,8 @@ export function cafeToFormValues(cafe: Cafe): CafeFormValues {
     wifi_upload_mbps: cafe.wifi_upload_mbps != null ? Number(cafe.wifi_upload_mbps) : null,
     wifi_latency_ms: cafe.wifi_latency_ms != null ? Number(cafe.wifi_latency_ms) : null,
     wifi_tested_at: cafe.wifi_tested_at ?? null,
+    rating: cafe.rating != null ? Number(cafe.rating) : 0,
+    total_reviews: cafe.total_reviews != null ? Number(cafe.total_reviews) : 0,
   }
 }
 
@@ -272,7 +293,7 @@ export function toDbPayload(v: CafeFormValues): CafeDbPayload {
     phone: v.phone.trim() || null,
     website: v.website.trim() || null,
     tier: v.tier,
-    is_partner: v.is_partner,
+    is_partner: v.tier === 'partner',
     discount_value: v.discount_value,
     price_level: v.price_level,
     weekday_text: v.week ? serializeWeekdayText(v.week) : null,
@@ -290,6 +311,8 @@ export function toDbPayload(v: CafeFormValues): CafeDbPayload {
     wifi_speed_mbps: v.wifi_speed_mbps,
     wifi_upload_mbps: v.wifi_upload_mbps,
     wifi_latency_ms: v.wifi_latency_ms,
+    rating: v.rating,
+    total_reviews: v.total_reviews,
   }
 }
 
@@ -311,6 +334,12 @@ export function validateForm(v: CafeFormValues): Record<string, string> {
   }
   if (v.wifi_upload_mbps != null && v.wifi_upload_mbps <= 0) {
     errors.wifi_upload_mbps = 'Upload harus lebih dari 0'
+  }
+  if (v.rating < 0 || v.rating > 5) {
+    errors.rating = 'Rating harus 0-5'
+  }
+  if (v.total_reviews < 0) {
+    errors.total_reviews = 'Jumlah review tidak boleh negatif'
   }
   // Defensif — kontrol skala hanya bisa emit 0-3, tapi jaga sejajar CHECK DB.
   if (Object.values(v.scales).some(n => n < 0 || n > 3)) {
