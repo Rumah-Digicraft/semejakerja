@@ -15,21 +15,25 @@
 -- ============================================================
 
 DROP POLICY IF EXISTS "Full-access members submit cafe reviews" ON cafe_reviews;
+DROP POLICY IF EXISTS "Logged-in members submit cafe reviews" ON cafe_reviews;
 CREATE POLICY "Logged-in members submit cafe reviews" ON cafe_reviews
   FOR INSERT TO authenticated
   WITH CHECK (status = 'pending');
 
 DROP POLICY IF EXISTS "Full-access members submit cafe edits" ON cafe_edits;
+DROP POLICY IF EXISTS "Logged-in members submit cafe edits" ON cafe_edits;
 CREATE POLICY "Logged-in members submit cafe edits" ON cafe_edits
   FOR INSERT TO authenticated
   WITH CHECK (status = 'pending');
 
 DROP POLICY IF EXISTS "Full-access members submit cafe photos" ON cafe_photos;
+DROP POLICY IF EXISTS "Logged-in members submit cafe photos" ON cafe_photos;
 CREATE POLICY "Logged-in members submit cafe photos" ON cafe_photos
   FOR INSERT TO authenticated
   WITH CHECK (status = 'pending');
 
 DROP POLICY IF EXISTS "Full-access members upload cafe photos" ON storage.objects;
+DROP POLICY IF EXISTS "Logged-in members upload cafe photos" ON storage.objects;
 CREATE POLICY "Logged-in members upload cafe photos" ON storage.objects
   FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'cafe-photos');
