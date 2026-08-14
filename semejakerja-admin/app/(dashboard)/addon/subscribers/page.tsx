@@ -90,7 +90,7 @@ export default function SubscribersPage() {
       </div>
 
       {/* Tab */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-5 w-fit">
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-5 w-fit max-w-full overflow-x-auto">
         {[{ id: 'subscriptions', label: '📅 Pass Bulanan' }, { id: 'dropin', label: '🎯 Drop-in' }].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as TabType)} className={`px-5 py-2 rounded-lg text-sm font-medium transition ${tab === t.id ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
             {t.label}
@@ -115,7 +115,9 @@ export default function SubscribersPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop: full table. Mobile: stacked cards below (6-7 columns
+            don't fit a phone — same fix as the members page). */}
+        <div className="hidden md:block overflow-x-auto">
           {tab === 'subscriptions' ? (
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
@@ -179,6 +181,52 @@ export default function SubscribersPage() {
             </table>
           )}
         </div>
+
+        {/* Mobile: stacked cards */}
+        <div className="md:hidden divide-y divide-slate-50">
+          {tab === 'subscriptions' ? (
+            loading ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-4 space-y-2"><div className="h-4 w-1/2 bg-slate-100 rounded animate-pulse" /><div className="h-3 w-1/3 bg-slate-100 rounded animate-pulse" /></div>
+            )) : subs.length === 0 ? (
+              <p className="px-5 py-12 text-center text-slate-400 text-sm">Belum ada subscriber.</p>
+            ) : subPg.pageItems.map(s => (
+              <div key={s.id} className="p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium text-slate-900">{s.user_id.slice(0, 8)}...</p>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${SUB_STATUS[s.status]}`}>{s.status}</span>
+                </div>
+                <p className="text-xs text-slate-600">{s.addon?.name ?? '—'}</p>
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>{formatDate(s.started_at)} → {s.expires_at ? formatDate(s.expires_at) : 'tanpa batas'}</span>
+                  <span className="text-purple-700 font-medium">{s.price_paid ? formatCurrency(s.price_paid) : '—'}</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            loading ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-4 space-y-2"><div className="h-4 w-1/2 bg-slate-100 rounded animate-pulse" /><div className="h-3 w-1/3 bg-slate-100 rounded animate-pulse" /></div>
+            )) : dropins.length === 0 ? (
+              <p className="px-5 py-12 text-center text-slate-400 text-sm">Belum ada drop-in.</p>
+            ) : dropinPg.pageItems.map(d => (
+              <div key={d.id} className="p-4 flex flex-col gap-3">
+                <div>
+                  <p className="font-medium text-slate-900">{d.participant_name ?? '—'}</p>
+                  <p className="text-xs text-slate-400">{d.participant_wa ?? '—'}</p>
+                </div>
+                <p className="text-xs text-slate-600">{d.addon?.name ?? '—'} · {formatDate(d.session_date)}</p>
+                <div className="flex items-center gap-1.5">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${PAYMENT_STATUS[d.payment_status]?.color}`}>{PAYMENT_STATUS[d.payment_status]?.label}</span>
+                  <span className="text-xs font-medium text-purple-700">{d.price_paid ? formatCurrency(d.price_paid) : '—'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {d.payment_status === 'pending' && <button onClick={() => confirmDropin(d.id)} className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition"><CheckCircle size={15} /></button>}
+                  {d.payment_status !== 'cancelled' && <button onClick={() => cancelDropin(d.id)} className="p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition"><XCircle size={15} /></button>}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
         {!loading && (tab === 'subscriptions'
           ? <Pagination page={subPg.page} pageCount={subPg.pageCount} total={subPg.total} pageSize={subPg.pageSize} onPageChange={subPg.setPage} itemLabel="subscriber" />
           : <Pagination page={dropinPg.page} pageCount={dropinPg.pageCount} total={dropinPg.total} pageSize={dropinPg.pageSize} onPageChange={dropinPg.setPage} itemLabel="drop-in" />)}

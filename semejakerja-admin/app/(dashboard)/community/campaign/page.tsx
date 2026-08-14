@@ -94,7 +94,8 @@ export default function CampaignPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop: full table. Mobile: stacked cards below. */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
               <tr>
@@ -154,6 +155,57 @@ export default function CampaignPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile: stacked cards */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {loading ? Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="p-4 space-y-2">
+              <div className="h-4 w-1/2 bg-slate-100 rounded animate-pulse" />
+              <div className="h-3 w-1/3 bg-slate-100 rounded animate-pulse" />
+            </div>
+          )) : pageItems.length === 0 ? (
+            <p className="px-5 py-16 text-center text-slate-400 text-sm">Belum ada campaign.</p>
+          ) : pageItems.map(c => (
+            <div
+              key={c.id}
+              onClick={() => router.push(`/community/campaign/${c.id}`)}
+              className="p-4 flex flex-col gap-2 active:bg-slate-50 cursor-pointer"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2 min-w-0">
+                  {c.is_launch ? <Rocket size={15} className="text-fuchsia-500 shrink-0 mt-0.5" /> : <Megaphone size={15} className="text-slate-400 shrink-0 mt-0.5" />}
+                  <div className="min-w-0">
+                    <div className="font-semibold text-slate-800 flex items-center gap-2">
+                      <span className="truncate">{c.name}</span>
+                      {c.is_launch && c.is_published && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-600 shrink-0">
+                          <Circle size={7} className="fill-green-500 text-green-500" /> LIVE
+                        </span>
+                      )}
+                    </div>
+                    {c.headline && <div className="text-xs text-slate-400 truncate">{c.headline}</div>}
+                  </div>
+                </div>
+                <button onClick={e => handleDelete(e, c.id, c.name)} title="Hapus" className="shrink-0 p-1.5 rounded-lg hover:bg-red-50 text-red-400"><Trash2 size={15} /></button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${OBJECTIVE_COLORS[c.objective]}`}>{OBJECTIVE_LABELS[c.objective]}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_COLORS[c.status]}`}>{STATUS_LABELS[c.status]}</span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span className="inline-flex items-center gap-1"><Users size={13} className="text-slate-400" />{leadCounts[c.id] ?? 0}{c.quota ? ` / ${c.quota}` : ''}</span>
+                <span>
+                  {c.starts_at || c.ends_at
+                    ? `${c.starts_at ? formatDate(c.starts_at) : '…'} – ${c.ends_at ? formatDate(c.ends_at) : '…'}`
+                    : '—'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="campaign" />
       </div>
 

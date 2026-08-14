@@ -208,7 +208,7 @@ export default function ModerasiPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 w-fit overflow-x-auto">
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 w-fit max-w-full overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -224,7 +224,10 @@ export default function ModerasiPage() {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop: full table. Mobile: stacked cards below — "Detail" can
+            hold a photo thumbnail + caption or a comment/rating, too dense
+            for a narrow column. */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
               <tr>
@@ -296,6 +299,65 @@ export default function ModerasiPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile: stacked cards */}
+        <div className="md:hidden divide-y divide-slate-50">
+          {loading ? Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="p-4 space-y-2">
+              <div className="h-4 w-1/2 bg-slate-100 rounded animate-pulse" />
+              <div className="h-3 w-2/3 bg-slate-100 rounded animate-pulse" />
+            </div>
+          )) : data.length === 0 ? (
+            <p className="px-5 py-12 text-center text-slate-400 text-sm">Tidak ada data.</p>
+          ) : pageItems.map(item => (
+            <div key={item.id} className="p-4 flex flex-col gap-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium text-slate-900">{item.submitter_name || item.reviewer_name || 'Anonim'}</p>
+                  <p className="text-xs text-slate-400">{item.submitter_wa || item.reviewer_wa || ''}</p>
+                </div>
+                <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${STATUS_STYLE[item.status]}`}>
+                  {item.status}
+                </span>
+              </div>
+
+              <div className="text-slate-600 text-sm">
+                {tab !== 'submissions' && cafeNames[item.cafe_id] && (
+                  <p className="font-medium text-slate-800">{cafeNames[item.cafe_id]}</p>
+                )}
+                {tab === 'photos' && item.storage_path ? (
+                  <div className="flex items-center gap-2.5 mt-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Supabase Storage public URL */}
+                    <img
+                      src={supabase.storage.from(BUCKET).getPublicUrl(item.storage_path).data.publicUrl}
+                      alt={item.caption ?? 'Foto kafe'}
+                      className="w-9 h-12 rounded-lg object-cover border border-slate-100 shrink-0"
+                    />
+                    <span>{item.caption || 'Foto kafe'}</span>
+                  </div>
+                ) : (
+                  <p>{item.name || item.comment || (item.suggested_data ? 'Edit data kafe' : '')}</p>
+                )}
+                {item.rating && <p className="text-xs text-amber-500 mt-0.5">⭐ {item.rating}/5</p>}
+                {item.notes && <p className="text-xs text-slate-400 mt-0.5">{item.notes}</p>}
+                {item.review_note && <p className="text-xs text-slate-400 mt-0.5">&quot;{item.review_note}&quot;</p>}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">{formatDate(item.created_at)}</span>
+                {item.status === 'pending' && (
+                  <button
+                    onClick={() => setReviewItem(item)}
+                    className="px-3 py-1.5 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg text-xs font-medium transition"
+                  >
+                    Review
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
         {!loading && <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="kontribusi" />}
       </div>
     </div>
