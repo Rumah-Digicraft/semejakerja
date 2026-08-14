@@ -156,7 +156,9 @@ export default function TransactionsPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop: full table. Mobile: stacked cards (7 columns is too cramped
+            on a phone — same fix as the members page). */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
               <tr>
@@ -231,6 +233,72 @@ export default function TransactionsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile: stacked cards */}
+        <div className="md:hidden divide-y divide-slate-50">
+          {loading ? Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="p-4 space-y-2">
+              <div className="h-4 w-2/3 bg-slate-100 rounded animate-pulse" />
+              <div className="h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
+            </div>
+          )) : filtered.length === 0 ? (
+            <p className="px-5 py-12 text-center text-slate-400 text-sm">Tidak ada transaksi ditemukan.</p>
+          ) : pageItems.map(row => (
+            <div key={row.id} className="p-4 flex flex-col gap-3">
+              <div>
+                <p className="font-semibold text-slate-900">{row.profile?.full_name ?? 'Nama belum diisi'}</p>
+                <p className="text-xs text-slate-400">{row.profile?.phone ?? '—'}</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${TIER_LABELS[row.tier]?.color}`}>
+                  {TIER_LABELS[row.tier]?.label ?? row.tier}
+                </span>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_LABELS[row.status]?.color}`}>
+                  {STATUS_LABELS[row.status]?.label ?? row.status}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-700 font-medium">{row.price_paid ? formatCurrency(row.price_paid) : 'Gratis'}</span>
+                {row.promo_code_used ? (
+                  <span className="inline-flex items-center gap-1 text-slate-500">
+                    <Tag size={12} /> {row.promo_code_used}
+                  </span>
+                ) : <span className="text-slate-300">Tanpa promo</span>}
+              </div>
+
+              <p className="text-xs text-slate-400">{formatDatetime(row.created_at)}</p>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {row.status === 'pending_payment' && (
+                  <>
+                    <button
+                      onClick={() => handlePayment(row.id, 'approve')}
+                      className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-medium flex items-center gap-1 transition"
+                    >
+                      <CheckCircle size={12} /> Konfirmasi
+                    </button>
+                    <button
+                      onClick={() => handlePayment(row.id, 'reject')}
+                      className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-medium flex items-center gap-1 transition"
+                    >
+                      <XCircle size={12} /> Tolak
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => handleDelete(row)}
+                  title="Hapus transaksi permanen"
+                  className="px-3 py-1.5 bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-lg text-xs font-medium flex items-center gap-1 transition"
+                >
+                  <Trash2 size={12} /> Hapus
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
         {!loading && <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="transaksi" />}
       </div>
     </div>

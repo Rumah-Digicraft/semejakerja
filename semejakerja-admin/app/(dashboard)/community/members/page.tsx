@@ -204,7 +204,10 @@ export default function MembersPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop: full table. Mobile columns get too narrow to read (email
+            wraps character-by-character, tier badge + select collide) — a
+            stacked card per member below reads much better on a phone. */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
               <tr>
@@ -289,7 +292,7 @@ export default function MembersPage() {
                           <CheckCircle size={12} /> Verif KTM
                         </button>
                       )}
-                      
+
                       {membership?.status === 'pending_payment' && (
                         <div className="flex items-center gap-2">
                           <button
@@ -313,6 +316,106 @@ export default function MembersPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile: stacked cards */}
+        <div className="md:hidden divide-y divide-slate-50">
+          {loading ? Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="p-4 space-y-2">
+              <div className="h-4 w-2/3 bg-slate-100 rounded animate-pulse" />
+              <div className="h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
+              <div className="h-3 w-1/3 bg-slate-100 rounded animate-pulse" />
+            </div>
+          )) : filtered.length === 0 ? (
+            <p className="px-5 py-12 text-center text-slate-400 text-sm">Tidak ada member ditemukan.</p>
+          ) : pageItems.map(({ profile, membership }) => (
+            <div key={profile.id} className="p-4 flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-3">
+                <button onClick={() => setSelectedId(profile.id)} className="text-left min-w-0">
+                  <p className="font-semibold text-slate-900 truncate">{profile.full_name ?? 'Nama belum diisi'}</p>
+                  <p className="text-xs text-slate-400">{profile.phone ?? '—'}</p>
+                </button>
+                <button
+                  onClick={() => setSelectedId(profile.id)}
+                  className="flex-shrink-0 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-purple-600 transition"
+                  aria-label="Lihat detail"
+                >
+                  <Eye size={16} />
+                </button>
+              </div>
+
+              {profile.email && (
+                <a href={`mailto:${profile.email}`} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-purple-600 break-all">
+                  <Mail size={12} className="flex-shrink-0" /> {profile.email}
+                </a>
+              )}
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {membership ? (
+                  <>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${TIER_LABELS[membership.tier]?.color}`}>
+                      {TIER_LABELS[membership.tier]?.label}
+                    </span>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[membership.status]}`}>
+                      {STATUS_LABELS[membership.status] ?? membership.status}
+                    </span>
+                  </>
+                ) : <span className="text-slate-400 text-xs">Belum ada membership</span>}
+                {profile.is_student && (
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${profile.student_verified_at ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <GraduationCap size={11} /> {profile.student_verified_at ? 'Terverifikasi' : 'Belum verify'}
+                  </span>
+                )}
+              </div>
+
+              {membership && (
+                <label className="flex items-center gap-2 text-xs text-slate-400">
+                  Ubah tier:
+                  <select
+                    value={membership.tier}
+                    onChange={e => handleChangeTier(profile.id, membership.id, e.target.value)}
+                    className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none text-slate-700"
+                  >
+                    <option value="nyantai">Nyantai</option>
+                    <option value="nongkrong">Nongkrong</option>
+                    <option value="mode_serius">Mode Serius</option>
+                  </select>
+                </label>
+              )}
+
+              <p className="text-xs text-slate-400">Bergabung {formatDate(profile.created_at)}</p>
+
+              {(profile.is_student && !profile.student_verified_at) || membership?.status === 'pending_payment' ? (
+                <div className="flex flex-wrap gap-2">
+                  {profile.is_student && !profile.student_verified_at && (
+                    <button
+                      onClick={() => handleVerifyKTM(profile.id)}
+                      className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-medium flex items-center gap-1 transition"
+                    >
+                      <CheckCircle size={12} /> Verif KTM
+                    </button>
+                  )}
+                  {membership?.status === 'pending_payment' && (
+                    <>
+                      <button
+                        onClick={() => handlePayment(membership.id, 'approve')}
+                        className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-medium flex items-center gap-1 transition"
+                      >
+                        <CreditCard size={12} /> Konfirmasi Bayar
+                      </button>
+                      <button
+                        onClick={() => handlePayment(membership.id, 'reject')}
+                        className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-medium flex items-center gap-1 transition"
+                      >
+                        <XCircle size={12} /> Tolak
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+
         {!loading && <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="member" />}
       </div>
 

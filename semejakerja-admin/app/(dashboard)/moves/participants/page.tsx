@@ -244,7 +244,9 @@ export default function ParticipantsPage() {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop: full table. Mobile: stacked cards (7 dense columns don't
+            fit a phone — same fix as the members page). */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
               <tr>
@@ -373,6 +375,85 @@ export default function ParticipantsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile: stacked cards */}
+        <div className="md:hidden divide-y divide-slate-50">
+          {loading ? Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="p-4 space-y-2">
+              <div className="h-4 w-2/3 bg-slate-100 rounded animate-pulse" />
+              <div className="h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
+            </div>
+          )) : filtered.length === 0 ? (
+            <p className="px-5 py-12 text-center text-slate-400 text-sm">Tidak ada peserta ditemukan.</p>
+          ) : pageItems.map(p => (
+            <div key={p.id} className="p-4 flex flex-col gap-3">
+              <div>
+                <p className="font-semibold text-slate-900">{p.name}</p>
+                {p.phone && (
+                  <a
+                    href={`https://wa.me/${p.phone.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-slate-400 hover:text-purple-600 hover:underline"
+                  >
+                    {p.phone}
+                  </a>
+                )}
+              </div>
+
+              {p.session && (
+                <p className="text-xs text-slate-600">
+                  {SPORT_EMOJI[p.session.sport_type]} {formatDate(p.session.session_date)} · {p.session.venue}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${PAYMENT_STATUS[p.payment_status]?.color}`}>
+                  {PAYMENT_STATUS[p.payment_status]?.label}
+                </span>
+                {p.payment_amount != null && (
+                  <span className="text-xs font-medium text-purple-700">{formatCurrency(p.payment_amount)}</span>
+                )}
+                {p.payment_proof_url && (
+                  <a href={p.payment_proof_url} target="_blank" rel="noreferrer" className="text-xs text-purple-500 underline">
+                    Bukti
+                  </a>
+                )}
+                {p.ocr_match === true && <span className="text-xs text-emerald-600 font-medium">✓ OCR Match</span>}
+                {p.ocr_match === false && <span className="text-xs text-red-400 font-medium">✗ OCR Mismatch</span>}
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={() => handleToggleAttend(p.id, p.attended)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${p.attended ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                >
+                  <UserCheck size={12} />
+                  {p.attended ? 'Hadir' : 'Absen'}
+                </button>
+                {p.payment_status === 'pending' && (
+                  <button
+                    onClick={() => handleApprove(p.id)}
+                    className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition"
+                    title="Approve pembayaran"
+                  >
+                    <CheckCircle size={15} />
+                  </button>
+                )}
+                {p.payment_status !== 'rejected' && (
+                  <button
+                    onClick={() => handleReject(p.id)}
+                    className="p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition"
+                    title="Tolak pembayaran"
+                  >
+                    <XCircle size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
         {!loading && <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="peserta" />}
       </div>
     </div>

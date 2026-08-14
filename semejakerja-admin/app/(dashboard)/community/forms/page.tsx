@@ -102,7 +102,8 @@ export default function FormsPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop: full table. Mobile: stacked cards below. */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
               <tr>
@@ -154,6 +155,47 @@ export default function FormsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile: stacked cards */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {loading ? Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="p-4 space-y-2">
+              <div className="h-4 w-1/2 bg-slate-100 rounded animate-pulse" />
+              <div className="h-3 w-1/3 bg-slate-100 rounded animate-pulse" />
+            </div>
+          )) : pageItems.length === 0 ? (
+            <p className="px-5 py-16 text-center text-slate-400 text-sm">Belum ada form. Klik “Buat Form” untuk mulai.</p>
+          ) : pageItems.map(f => (
+            <div
+              key={f.id}
+              onClick={() => router.push(`/community/forms/${f.id}`)}
+              className="p-4 flex flex-col gap-2 active:bg-slate-50 cursor-pointer"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2 min-w-0">
+                  <ClipboardList size={15} className="text-purple-500 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <div className="font-semibold text-slate-800 truncate">{f.title || <span className="text-slate-400">Tanpa judul</span>}</div>
+                    <div className="text-xs text-slate-400">{f.questions?.length ?? 0} pertanyaan</div>
+                  </div>
+                </div>
+                <button onClick={e => handleDelete(e, f.id, f.title)} title="Hapus" className="shrink-0 p-1.5 rounded-lg hover:bg-red-50 text-red-400"><Trash2 size={15} /></button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_COLORS[f.status]}`}>{STATUS_LABELS[f.status]}</span>
+                {f.show_on_landing && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-purple-100 text-purple-700">di LP</span>}
+                {f.cafe_name && <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Store size={12} className="text-slate-400" />{f.cafe_name}</span>}
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span className="inline-flex items-center gap-1"><Users size={13} className="text-slate-400" />{respCounts[f.id] ?? 0}{f.quota ? ` / ${f.quota}` : ''}</span>
+                <span className="text-slate-400">{formatDate(f.created_at)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="form" />
       </div>
 

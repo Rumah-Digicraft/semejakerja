@@ -270,7 +270,9 @@ export default function PromoCodesPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop: full table. Mobile: 7 columns + 5 action buttons is way too
+            cramped on a phone — stacked cards below read much better. */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
               <tr>
@@ -343,6 +345,67 @@ export default function PromoCodesPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile: stacked cards */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {loading ? Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="p-4 space-y-2">
+              <div className="h-4 w-1/3 bg-slate-100 rounded animate-pulse" />
+              <div className="h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
+            </div>
+          )) : pageItems.length === 0 ? (
+            <p className="px-5 py-16 text-center text-slate-400 text-sm">Belum ada promo code.</p>
+          ) : pageItems.map(code => (
+            <div key={code.id} className={`p-4 flex flex-col gap-3 ${code.is_active ? '' : 'opacity-60'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2 min-w-0">
+                  <Tag size={14} className="text-purple-400 shrink-0 mt-1" />
+                  <div className="min-w-0">
+                    <code className="font-mono font-bold text-slate-800 tracking-wide">{code.code}</code>
+                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${TYPE_COLORS[code.type] ?? 'bg-slate-100 text-slate-600'}`}>{code.type}</span>
+                      {(emailsByCode.get(code.id)?.length ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-700">
+                          <Lock size={9} /> {emailsByCode.get(code.id)!.length} EMAIL
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <span className={`shrink-0 px-2 py-0.5 rounded-full text-[11px] font-semibold ${code.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{code.is_active ? 'Aktif' : 'Nonaktif'}</span>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="font-semibold text-purple-700 text-sm">{code.discount_percent}% diskon</span>
+                {code.expires_at ? (
+                  <span className="text-slate-500">{formatDate(code.expires_at)}</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 font-medium"><InfinityIcon size={11} /> Lifetime</span>
+                )}
+              </div>
+
+              <div>
+                <div className="text-slate-700 text-xs mb-1">Usage: {code.used_count} {code.max_usage ? `/ ${code.max_usage}` : '/ ∞'}</div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-purple-500 rounded-full" style={{ width: code.max_usage ? `${Math.min((code.used_count / code.max_usage) * 100, 100)}%` : (code.used_count > 0 ? '100%' : '0%') }} />
+                </div>
+              </div>
+
+              {code.campaign_id && (
+                <Link href={`/community/campaign/${code.campaign_id}`} className="text-xs text-purple-600 hover:underline w-fit">{campaignName.get(code.campaign_id) ?? 'Campaign'}</Link>
+              )}
+
+              <div className="flex items-center gap-1.5 pt-1">
+                <button onClick={() => copyCode(code.code)} title="Salin kode" className="p-2 rounded-lg hover:bg-slate-100 text-slate-400"><Copy size={15} /></button>
+                <button onClick={() => openEdit(code)} title="Edit detail promo" className="p-2 rounded-lg hover:bg-purple-50 text-purple-400"><Pencil size={15} /></button>
+                <button onClick={() => { setEmailModal({ id: code.id, code: code.code }); setEmailInput('') }} title="Kelola email yang boleh pakai" className="p-2 rounded-lg hover:bg-rose-50 text-rose-400"><Mail size={15} /></button>
+                <button onClick={() => handleToggle(code.id, code.is_active)} className={`ml-auto px-3 py-1.5 rounded-lg text-xs font-medium transition ${code.is_active ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>{code.is_active ? 'Off' : 'On'}</button>
+                <button onClick={() => handleDelete(code.id, code.code)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-500 hover:bg-red-100 transition">Hapus</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="kode" />
       </div>
 

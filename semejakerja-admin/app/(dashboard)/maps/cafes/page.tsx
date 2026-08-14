@@ -103,7 +103,9 @@ export default function DataKafePage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop: full table. Mobile: stacked cards below (7 columns don't
+            fit a phone — same fix as the members page). */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
@@ -188,6 +190,60 @@ export default function DataKafePage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile: stacked cards */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {loading ? Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="p-4 space-y-2">
+              <div className="h-4 w-1/2 bg-slate-100 rounded animate-pulse" />
+              <div className="h-3 w-2/3 bg-slate-100 rounded animate-pulse" />
+            </div>
+          )) : filtered.length === 0 ? (
+            <p className="px-5 py-16 text-center text-slate-400 text-sm">Tidak ada kafe ditemukan.</p>
+          ) : pageItems.map(cafe => {
+            const rating = Number(cafe.rating) || 0
+            const wifi = cafe.wifi_speed_mbps != null ? Number(cafe.wifi_speed_mbps) : null
+            const wifiUp = cafe.wifi_upload_mbps != null ? Number(cafe.wifi_upload_mbps) : null
+            return (
+              <div
+                key={cafe.id}
+                onClick={() => router.push(`/maps/cafes/${cafe.id}`)}
+                className="p-4 flex flex-col gap-2 active:bg-slate-50 cursor-pointer"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-800 truncate">{cafe.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{cafe.address}</p>
+                  </div>
+                  <span className={`shrink-0 px-2 py-1 rounded-full text-[11px] font-bold capitalize ${TIER_COLORS[cafe.tier] ?? TIER_COLORS.basic}`}>
+                    {cafe.tier ?? 'basic'}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                  {cafe.is_partner && <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle size={13} /> Partner</span>}
+                  {rating > 0 && <span className="inline-flex items-center gap-1"><Star size={13} className="text-amber-400 fill-amber-400" /> {rating.toFixed(1)}</span>}
+                  {wifi != null && <span className="inline-flex items-center gap-1"><Wifi size={13} className="text-purple-500" /> {wifi}{wifiUp != null ? ` / ${wifiUp}` : ''} Mbps</span>}
+                  {cafe.website && (
+                    <a href={cafe.website} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-purple-500 hover:text-purple-400">
+                      <ExternalLink size={12} /> Website
+                    </a>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5 pt-1" onClick={e => e.stopPropagation()}>
+                  <Link href={`/maps/cafes/${cafe.id}`} title="Edit" className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
+                    <Edit2 size={15} />
+                  </Link>
+                  <button onClick={() => handleDelete(cafe)} title="Hapus" className="p-2 rounded-lg hover:bg-red-50 text-red-400">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
         {!loading && <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPageChange={setPage} itemLabel="kafe" />}
       </div>
     </div>
