@@ -218,6 +218,19 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
   const [shared, setShared] = useState(false);
   const [activePhoto, setActivePhoto] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  // Mobile bottom sheet has two snap points: peek (default) and expanded —
+  // there's too much info (facilities, hours, wifi, reviews) to fit the
+  // peek height's scroll area, so dragging/tapping the handle reveals more
+  // without permanently covering the map.
+  const [expanded, setExpanded] = useState(false);
+  // Reset to peek when the modal is reused for a different cafe (App.tsx
+  // doesn't key it by cafe.id) — adjusting state during render per React's
+  // guidance, rather than in an effect, avoids an extra cascading render.
+  const [expandedForCafeId, setExpandedForCafeId] = useState(cafe.id);
+  if (cafe.id !== expandedForCafeId) {
+    setExpandedForCafeId(cafe.id);
+    setExpanded(false);
+  }
 
   const { data: photos = [] } = useCafePhotos(cafe.id);
   const coverPhoto = photos[activePhoto] ?? photos[0] ?? null;
@@ -233,14 +246,23 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
     touchStartX.current = null;
   };
 
-  // Swipe-down-to-close on the mobile drag handle — same threshold-delta
-  // technique as Sidebar's filter panel / Tebak Kafe's clue panel.
+  // Drag handle gesture — same threshold-delta technique as Sidebar's filter
+  // panel / Tebak Kafe's clue panel, extended to two snap points: swipe up
+  // expands the sheet, swipe down collapses it back to peek (only closing
+  // once already at peek height), and a plain tap toggles between the two.
   const dragStartY = React.useRef<number | null>(null);
   const handleDragTouchStart = (e: React.TouchEvent) => { dragStartY.current = e.touches[0].clientY; };
   const handleDragTouchEnd = (e: React.TouchEvent) => {
     if (dragStartY.current == null) return;
     const delta = e.changedTouches[0].clientY - dragStartY.current;
-    if (delta > 40) onClose();
+    if (delta > 40) {
+      if (expanded) setExpanded(false);
+      else onClose();
+    } else if (delta < -40) {
+      setExpanded(true);
+    } else if (Math.abs(delta) < 10) {
+      setExpanded(v => !v);
+    }
     dragStartY.current = null;
   };
 
@@ -303,20 +325,26 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
       <div
         className={[
           'glass-panel flex flex-col animate-slide-in-right overflow-hidden',
-          // Mobile: half-height bottom sheet — leaves the map visible/pannable above it
-          'fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl h-[50vh]',
+          // Mobile: bottom sheet with two snap points — peek by default,
+          // expands toward full-height when there's more info than the
+          // peek scroll area can comfortably hold.
+          'fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl transition-[height] duration-300 ease-out',
+          expanded ? 'h-[88vh]' : 'h-[50vh]',
           // Desktop: right floating panel (height driven by top/bottom)
           'md:absolute md:top-[120px] md:bottom-6 md:right-6 md:left-auto md:w-[380px] md:rounded-3xl md:h-auto',
         ].join(' ')}
         onClick={e => e.stopPropagation()}
       >
-        {/* Mobile drag handle — swipe down to close */}
+        {/* Mobile drag handle — swipe up/down or tap to expand/collapse, swipe down from peek closes */}
         <div
           onTouchStart={handleDragTouchStart}
           onTouchEnd={handleDragTouchEnd}
-          className="md:hidden flex items-center justify-center pt-3 pb-1 touch-none"
+          className="md:hidden flex flex-col items-center justify-center gap-1 pt-3 pb-1.5 touch-none"
         >
           <span className="w-10 h-1 bg-gray-300 rounded-full" />
+          {!expanded && (
+            <span className="text-[9px] font-medium text-gray-400">Tarik ke atas untuk info lengkap</span>
+          )}
         </div>
 
         {/* Header image area */}
@@ -379,7 +407,7 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
 
           {cafe.category !== 'regular' && (
             <div
-              className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shadow-md"
+              className="absolute top-3.5 left-3.5 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md"
               style={{
                 background: cafe.category === 'sponsored' ? 'rgba(251, 191, 36, 0.95)' : 'rgba(124, 58, 237, 0.95)',
                 color: cafe.category === 'sponsored' ? '#78350f' : '#fff',
@@ -393,7 +421,7 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
 
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:bg-white/80 hover:scale-105 shadow-sm bg-white/50 backdrop-blur-md"
+            className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:bg-white/80 hover:scale-105 shadow-sm bg-white/50 backdrop-blur-md"
             style={{ border: '1px solid rgba(255,255,255,0.8)' }}
           >
             <X size={16} className="text-gray-700" />

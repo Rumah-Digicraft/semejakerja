@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import { ZoomIn, ZoomOut, Compass, MapPin, Navigation } from 'lucide-react';
 import L from 'leaflet';
 import type { Cafe, FilterState } from '../types/cafe';
@@ -154,35 +154,12 @@ const CafeMarker = React.memo(function CafeMarker({
       icon={createMarkerIcon(cafe, tier)}
       zIndexOffset={getZIndexOffset(tier)}
       eventHandlers={{
+        // Tapping a pin opens the full CafeModal sheet directly — no
+        // intermediate popup. A separate mini-card here used to show
+        // alongside the sheet with a duplicate "Lihat Detail" action.
         click: () => onCafeClick(cafe),
       }}
-    >
-      <Popup className="custom-popup" closeButton={false}>
-        <div className="p-1 min-w-[200px]">
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <h3 className="font-bold text-gray-900 text-sm m-0 leading-tight">{cafe.name}</h3>
-            {cafe.isMitraSemejaKerja && (
-              <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
-                Mitra SK
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1 mb-3 text-xs text-gray-500 font-medium">
-            <span className="text-yellow-500 font-bold">★ {cafe.rating}</span>
-            <span>({cafe.reviewCount})</span>
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onCafeClick(cafe);
-            }}
-            className="w-full py-2 rounded-lg bg-purple-600 text-white text-xs font-bold hover:bg-purple-700 transition-colors shadow-sm"
-          >
-            Lihat Detail
-          </button>
-        </div>
-      </Popup>
-    </Marker>
+    />
   );
 });
 

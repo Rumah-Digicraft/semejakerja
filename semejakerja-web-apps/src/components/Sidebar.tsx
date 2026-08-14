@@ -83,14 +83,36 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [showNewCafeModal, setShowNewCafeModal] = useState(false);
 
-  // Swipe-down-to-close on the mobile drag handle — same threshold-delta
-  // technique as TebakKafe's clue panel / CafeModal's photo swipe.
+  // Mobile sheet has two snap points: peek (default) and expanded — there
+  // are too many filter sections to fit the peek scroll area, so
+  // dragging/tapping the handle reveals more, same pattern as CafeModal.
+  const [expanded, setExpanded] = useState(false);
+  // Reset to peek each time the sheet is (re)opened — adjusting state
+  // during render per React's guidance, rather than in an effect, avoids
+  // an extra cascading render.
+  const [expandedForOpenState, setExpandedForOpenState] = useState(isOpen);
+  if (isOpen !== expandedForOpenState) {
+    setExpandedForOpenState(isOpen);
+    if (isOpen) setExpanded(false);
+  }
+
+  // Drag handle gesture — same threshold-delta technique as TebakKafe's clue
+  // panel / CafeModal's photo swipe, extended to two snap points: swipe up
+  // expands the sheet, swipe down collapses it back to peek (only closing
+  // once already at peek height), and a plain tap toggles between the two.
   const handleTouchStartY = useRef<number | null>(null);
   const handleHandleTouchStart = (e: TouchEvent) => { handleTouchStartY.current = e.touches[0].clientY; };
   const handleHandleTouchEnd = (e: TouchEvent) => {
     if (handleTouchStartY.current == null) return;
     const delta = e.changedTouches[0].clientY - handleTouchStartY.current;
-    if (delta > 40) onClose();
+    if (delta > 40) {
+      if (expanded) setExpanded(false);
+      else onClose();
+    } else if (delta < -40) {
+      setExpanded(true);
+    } else if (Math.abs(delta) < 10) {
+      setExpanded(v => !v);
+    }
     handleTouchStartY.current = null;
   };
 
@@ -147,25 +169,31 @@ const Sidebar: React.FC<SidebarProps> = ({
           // Desktop: absolute floating left panel
           'md:absolute md:left-6 md:top-[120px] md:bottom-6 md:w-[360px] md:rounded-3xl',
           // Mobile: fixed bottom sheet
-          'fixed bottom-0 left-0 right-0 rounded-t-3xl transition-transform duration-300 ease-in-out',
+          'fixed bottom-0 left-0 right-0 rounded-t-3xl transition-[transform,height] duration-300 ease-in-out',
           // Open/close state — mobile slides down, desktop slides off to the left
           isOpen
             ? 'translate-y-0 md:translate-x-0'
             : 'translate-y-full md:translate-y-0 md:-translate-x-[calc(100%+2rem)]',
-          // Mobile: half-height sheet so the map (and cafe pins) stay visible
-          // and pannable above it. Desktop: height driven by top/bottom.
-          'h-[50vh] md:h-auto',
+          // Mobile: two snap points — peek by default so the map (and cafe
+          // pins) stay visible/pannable above it, expands toward
+          // full-height when there's more filters than peek can hold.
+          // Desktop: height driven by top/bottom.
+          expanded ? 'h-[88vh]' : 'h-[50vh]',
+          'md:h-auto',
         ].join(' ')}
       >
         {/* Sidebar Header */}
         <div className="px-6 pt-5 pb-5 sm:px-8 sm:py-7 flex-shrink-0 border-b border-gray-100/50">
-          {/* Mobile drag handle — swipe down to close */}
+          {/* Mobile drag handle — swipe up/down or tap to expand/collapse, swipe down from peek closes */}
           <div
             onTouchStart={handleHandleTouchStart}
             onTouchEnd={handleHandleTouchEnd}
-            className="md:hidden flex items-center justify-center py-2 -mt-2 mb-2 touch-none"
+            className="md:hidden flex flex-col items-center justify-center gap-1 py-2 -mt-2 mb-2 touch-none"
           >
             <span className="w-10 h-1 bg-gray-300 rounded-full" />
+            {!expanded && (
+              <span className="text-[9px] font-medium text-gray-400">Tarik ke atas untuk semua filter</span>
+            )}
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-4">
