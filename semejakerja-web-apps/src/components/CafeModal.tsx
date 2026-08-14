@@ -233,6 +233,17 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
     touchStartX.current = null;
   };
 
+  // Swipe-down-to-close on the mobile drag handle — same threshold-delta
+  // technique as Sidebar's filter panel / Tebak Kafe's clue panel.
+  const dragStartY = React.useRef<number | null>(null);
+  const handleDragTouchStart = (e: React.TouchEvent) => { dragStartY.current = e.touches[0].clientY; };
+  const handleDragTouchEnd = (e: React.TouchEvent) => {
+    if (dragStartY.current == null) return;
+    const delta = e.changedTouches[0].clientY - dragStartY.current;
+    if (delta > 40) onClose();
+    dragStartY.current = null;
+  };
+
   // Salin link detail cafe ke clipboard (URL /cafe/:slug adalah sumber kebenaran).
   const handleShare = async () => {
     const url = `${window.location.origin}/cafe/${cafeSlug(cafe)}`;
@@ -299,8 +310,14 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
         ].join(' ')}
         onClick={e => e.stopPropagation()}
       >
-        {/* Mobile drag handle */}
-        <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-1 md:hidden" />
+        {/* Mobile drag handle — swipe down to close */}
+        <div
+          onTouchStart={handleDragTouchStart}
+          onTouchEnd={handleDragTouchEnd}
+          className="md:hidden flex items-center justify-center pt-3 pb-1 touch-none"
+        >
+          <span className="w-10 h-1 bg-gray-300 rounded-full" />
+        </div>
 
         {/* Header image area */}
         <div

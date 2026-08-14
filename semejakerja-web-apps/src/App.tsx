@@ -102,7 +102,7 @@ function MapApp() {
   }, [selectedCafe, navigate]);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#e9ecef]">
+    <div className="relative w-screen h-dvh overflow-hidden bg-[#e9ecef]">
       {cafeNotFound ? (
         <Seo
           title="Cafe Tidak Ditemukan | Peta Cafe Purwokerto"

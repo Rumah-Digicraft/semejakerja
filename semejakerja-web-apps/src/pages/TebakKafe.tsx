@@ -104,7 +104,7 @@ export default function TebakKafe() {
   const canStart = !loading && !error && cafes.length >= ROUND_COUNT;
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#e9ecef]">
+    <div className="relative w-screen h-dvh overflow-hidden bg-[#e9ecef]">
       <Seo
         title="Tebak Kafe | Semeja Kerja"
         description="Mini-game tebak lokasi kafe di Purwokerto dari ciri-cirinya, langsung di peta asli."

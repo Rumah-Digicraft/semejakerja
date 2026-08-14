@@ -49,12 +49,18 @@ body {
   background: #e9ecef;
   color: #1f2937;
   overflow: hidden;
+  /* vh dulu sebagai fallback browser lama; dvh menyesuaikan tinggi layar HP
+     yang sebenarnya (memperhitungkan address bar mobile yang muncul/hilang),
+     supaya konten bawah (badge jumlah cafe, tombol zoom, dst) tidak
+     kepotong di balik browser chrome saat address bar sedang tampil. */
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
 }
 
 #root {
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
 }
 
