@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState, type TouchEvent } from 'react';
 import {
   Wifi, Zap, Wind, BookOpen, Bike, Car,
   Volume2, VolumeX, Volume1, Clock, CheckCircle2, Moon,
@@ -83,6 +83,17 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [showNewCafeModal, setShowNewCafeModal] = useState(false);
 
+  // Swipe-down-to-close on the mobile drag handle — same threshold-delta
+  // technique as TebakKafe's clue panel / CafeModal's photo swipe.
+  const handleTouchStartY = useRef<number | null>(null);
+  const handleHandleTouchStart = (e: TouchEvent) => { handleTouchStartY.current = e.touches[0].clientY; };
+  const handleHandleTouchEnd = (e: TouchEvent) => {
+    if (handleTouchStartY.current == null) return;
+    const delta = e.changedTouches[0].clientY - handleTouchStartY.current;
+    if (delta > 40) onClose();
+    handleTouchStartY.current = null;
+  };
+
   const isGuest = access === 'guest';
   // "Maps lengkap" (filter WiFi/colokan/AC, suasana, waktu buka, mitra)
   // & crowdsource = Nongkrong+
@@ -148,8 +159,14 @@ const Sidebar: React.FC<SidebarProps> = ({
       >
         {/* Sidebar Header */}
         <div className="px-6 pt-5 pb-5 sm:px-8 sm:py-7 flex-shrink-0 border-b border-gray-100/50">
-          {/* Mobile drag handle */}
-          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4 md:hidden" />
+          {/* Mobile drag handle — swipe down to close */}
+          <div
+            onTouchStart={handleHandleTouchStart}
+            onTouchEnd={handleHandleTouchEnd}
+            className="md:hidden flex items-center justify-center py-2 -mt-2 mb-2 touch-none"
+          >
+            <span className="w-10 h-1 bg-gray-300 rounded-full" />
+          </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-4">
               <SlidersHorizontal size={20} className="text-purple-600" />
