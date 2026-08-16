@@ -1,10 +1,28 @@
 import React, { useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import { ZoomIn, ZoomOut, Compass, MapPin, Navigation } from 'lucide-react';
 import L from 'leaflet';
 import type { Cafe, FilterState } from '../types/cafe';
 import { createMarkerIcon, getMarkerTier, getZIndexOffset } from './MapMarker';
 import MapSearch from './MapSearch';
+
+// Cluster bubble matches the app's pin palette (verified purple / partner
+// green, see TIER_CFG in MapMarker.tsx) instead of leaflet.markercluster's
+// default green/yellow/orange theme — falls back to purple for mixed groups.
+function createClusterIcon(cluster: L.MarkerCluster): L.DivIcon {
+  const count = cluster.getChildCount();
+  const size = count < 10 ? 32 : count < 50 ? 38 : 46;
+  return L.divIcon({
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;` +
+      `background:#7c3aed;border:2.5px solid white;display:flex;align-items:center;` +
+      `justify-content:center;color:white;font-weight:700;font-family:inherit;` +
+      `font-size:${count < 100 ? 13 : 12}px;box-shadow:0 2px 8px rgba(124,58,237,0.45);">` +
+      `${count}</div>`,
+    className: 'custom-cluster-icon',
+    iconSize: L.point(size, size),
+  });
+}
 
 interface MapViewProps {
   cafes: Cafe[];
@@ -124,20 +142,6 @@ const FlyToCafe: React.FC<{ cafe: Cafe | null }> = ({ cafe }) => {
   return null;
 };
 
-// Reports the settled viewport (moveend fires after pan, zoom and flyTo) so
-// MapView can cull markers. Panning itself never re-renders React.
-const ViewportWatcher: React.FC<{
-  onChange: (bounds: L.LatLngBounds, zoom: number) => void;
-}> = ({ onChange }) => {
-  const map = useMapEvents({
-    moveend: () => onChange(map.getBounds(), map.getZoom()),
-  });
-  React.useEffect(() => {
-    onChange(map.getBounds(), map.getZoom());
-  }, [map, onChange]);
-  return null;
-};
-
 // One marker per cafe, memoized: re-renders only when the cafe object or the
 // click handler actually changes, never from unrelated MapView state.
 const CafeMarker = React.memo(function CafeMarker({
@@ -163,23 +167,8 @@ const CafeMarker = React.memo(function CafeMarker({
   );
 });
 
-// At far zoom-out every cafe sits in the viewport, so cap the basic-tier pins
-// to the most popular ones (cafes arrive sorted by total_reviews). At the
-// default zoom (14) and closer, nothing is capped — the map looks exactly as
-// before. Special tiers and the selected cafe always render.
-function maxBasicPins(zoom: number): number {
-  if (zoom >= 14) return Infinity;
-  if (zoom === 13) return 200;
-  return 120;
-}
-
 const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeClick }) => {
   const [userLocation, setUserLocation] = React.useState<[number, number] | null>(null);
-  const [viewport, setViewport] = React.useState<{ bounds: L.LatLngBounds; zoom: number } | null>(null);
-
-  const handleViewportChange = React.useCallback((bounds: L.LatLngBounds, zoom: number) => {
-    setViewport({ bounds, zoom });
-  }, []);
 
   // Custom icon for user location (blue dot)
   const userIcon = useMemo(() => {
@@ -215,27 +204,6 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeC
     });
   }, [cafes, filters]);
 
-  // Cull markers to the settled viewport (padded so pins don't pop in at the
-  // edges mid-pan) and cap basic pins at far zoom-out. Before the first
-  // moveend (viewport === null) only the zoom cap applies.
-  const visibleCafes = useMemo(() => {
-    const bounds = viewport ? viewport.bounds.pad(0.3) : null;
-    const maxBasic = maxBasicPins(viewport?.zoom ?? 14);
-    let basicCount = 0;
-    const visible: Cafe[] = [];
-    for (const cafe of filteredCafes) {
-      if (getMarkerTier(cafe) !== 'basic' || cafe.id === selectedCafe?.id) {
-        visible.push(cafe);
-        continue;
-      }
-      if (bounds && !bounds.contains([cafe.lat, cafe.lng])) continue;
-      if (basicCount >= maxBasic) continue;
-      basicCount++;
-      visible.push(cafe);
-    }
-    return visible;
-  }, [filteredCafes, viewport, selectedCafe]);
-
   // Center of Purwokerto
   const position: [number, number] = [-7.4245, 109.2302];
 
@@ -244,6 +212,12 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeC
       <MapContainer
         center={position}
         zoom={14}
+        // Leaflet defaults to whole-number zoom levels (zoomSnap: 1), so every
+        // scroll/pinch/button zoom jumps a full level in one step — the
+        // "patah-patah" feel vs. Google Maps' continuous zoom. Fractional
+        // steps let it settle anywhere on a 0.25 grid instead.
+        zoomSnap={0.25}
+        zoomDelta={0.5}
         zoomControl={false}
         attributionControl={false}
         className="w-full h-full"
@@ -252,15 +226,32 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeC
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
 
-        {visibleCafes.map(cafe => (
-          <CafeMarker key={cafe.id} cafe={cafe} onCafeClick={onCafeClick} />
-        ))}
+        {/* Clusters nearby pins into a single bubble instead of animating
+            every marker's DOM node on every zoom frame — with ~half the
+            cafes always eligible to render (verified/partner tiers are never
+            viewport-culled, see MapMarker.tsx), that's what kept zoom feeling
+            heavier than Google Maps. showCoverageOnHover off since hover
+            doesn't exist on touch anyway. */}
+        <MarkerClusterGroup
+          chunkedLoading
+          showCoverageOnHover={false}
+          iconCreateFunction={createClusterIcon}
+          // Two cafes can legitimately sit a few meters apart (same
+          // building/hotel — e.g. Kopi Arasta & WN Cafe are ~8m apart) and
+          // still be within the default 80px cluster radius even at the
+          // tile layer's max zoom (18), so they'd stay one bubble forever
+          // unless manually clicked to spiderfy. Disable clustering outright
+          // at max zoom so it's always individual pins with no extra tap.
+          disableClusteringAtZoom={18}
+        >
+          {filteredCafes.map(cafe => (
+            <CafeMarker key={cafe.id} cafe={cafe} onCafeClick={onCafeClick} />
+          ))}
+        </MarkerClusterGroup>
 
         <MapSearch cafes={cafes} onCafeClick={onCafeClick} />
 
         <FlyToCafe cafe={selectedCafe} />
-
-        <ViewportWatcher onChange={handleViewportChange} />
 
         {/* User Location Marker */}
         {userLocation && (
