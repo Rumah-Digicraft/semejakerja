@@ -117,10 +117,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const isGuest = access === 'guest';
-  // "Maps lengkap" (filter WiFi/colokan/AC, suasana, waktu buka, mitra)
-  // & crowdsource = Nongkrong+
-  const hasFullMaps = access === 'full';
-  // Tier Free (Nyantai): filter premium diblur dengan CTA upgrade.
+  // Tier Free (Nyantai): filter premium ("Maps lengkap" — WiFi/colokan/AC,
+  // suasana, waktu buka, mitra) diblur dengan CTA upgrade ke Nongkrong+.
+  // Kontribusi (usulkan cafe baru dkk.) tidak kena batas ini — lihat tombol
+  // "Tambahkan Tempat Baru" di bawah.
   const isFreeTier = access === 'basic';
 
   const toggleFacility = (id: string) => {
@@ -420,25 +420,16 @@ const Sidebar: React.FC<SidebarProps> = ({
             isGuest ? 'blur-[6px] pointer-events-none select-none' : '',
           ].join(' ')}
         >
-          {/* Crowdsource Maps (submit data) = Nongkrong+ */}
-          {hasFullMaps ? (
-            <button
-              onClick={() => setShowNewCafeModal(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-extrabold transition-all shadow-sm bg-purple-600 text-white hover:bg-purple-700"
-            >
-              <PlusCircle size={16} /> Tambahkan Tempat Baru
-            </button>
-          ) : (
-            <a
-              href={`${landingUrl}/membership`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-extrabold transition-all shadow-sm bg-gray-100 text-gray-400 border border-gray-200 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200"
-              title="Kontribusi tempat baru khusus member Nongkrong+"
-            >
-              <Lock size={14} /> Tambahkan Tempat Baru
-            </a>
-          )}
+          {/* Crowdsource Maps (usulkan cafe baru) — sama seperti koreksi info/
+              ulasan/foto, terbuka untuk semua tier member yang login (bukan
+              cuma Nongkrong+, lihat migration 045/046). Guest sudah digembok
+              oleh aria-hidden+blur di wrapper section ini. */}
+          <button
+            onClick={() => setShowNewCafeModal(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-extrabold transition-all shadow-sm bg-purple-600 text-white hover:bg-purple-700"
+          >
+            <PlusCircle size={16} /> Tambahkan Tempat Baru
+          </button>
           <button
             onClick={() => onFiltersChange({
               facilities: [],
