@@ -10,6 +10,8 @@ import { CafesLoadingOverlay, CafesErrorOverlay } from './components/CafesLoadin
 import Seo from './components/Seo';
 import NotFound from './pages/NotFound';
 import TebakKafe from './pages/TebakKafe';
+import PapanKontributor from './pages/PapanKontributor';
+import Kontribusiku from './pages/Kontribusiku';
 import { useCafes } from './hooks/useCafes';
 import { useAuth, mapsAccess } from './hooks/useAuth';
 import { supabase } from './lib/supabaseClient';
@@ -194,6 +196,8 @@ function App() {
         <Route path="cafe/:slug" element={null} />
       </Route>
       <Route path="/tebak-kafe" element={<TebakKafe />} />
+      <Route path="/papan-kontributor" element={<PapanKontributor />} />
+      <Route path="/kontribusiku" element={<Kontribusiku />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

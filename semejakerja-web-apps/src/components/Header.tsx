@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Coffee, MapPin, SlidersHorizontal, X, LogIn, LogOut, Crown, Gamepad2 } from 'lucide-react';
+import { Coffee, MapPin, SlidersHorizontal, X, LogIn, LogOut, Crown, Gamepad2, Trophy, Award } from 'lucide-react';
 import { useAuth, type MembershipTier } from '../hooks/useAuth';
 import { LoginModal } from './LoginModal';
 
@@ -55,9 +55,9 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
           <Coffee size={24} color="white" className="hidden sm:block" />
         </div>
         <div className="flex flex-col gap-0.5 sm:gap-1.5">
-          <h1 className="text-gray-900 font-extrabold text-base sm:text-xl leading-tight tracking-tight">
+          <h1 className="text-gray-900 font-extrabold text-base sm:text-xl leading-tight tracking-tight whitespace-nowrap">
             <span className="hidden sm:inline">Peta Cafe Purwokerto</span>
-            <span className="sm:hidden">Cafe Purwokerto</span>
+            <span className="sm:hidden">Purwokerto</span>
           </h1>
           <p className="text-purple-600 text-xs font-bold">By Semeja Kerja</p>
         </div>
@@ -70,15 +70,27 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
       </div>
 
       {/* Right actions */}
-      <div className="flex items-center gap-3 sm:gap-5">
-        {/* Tebak Kafe mini-game entry point */}
+      <div className="flex items-center gap-1.5 sm:gap-5">
+        {/* Tebak Kafe mini-game entry point — fixed square icon button on
+            mobile (matches the filter toggle's w-10 h-10) since the label
+            is hidden there anyway; pill shape with label kicks in at sm:. */}
         <Link
           to="/tebak-kafe"
           title="Main Tebak Kafe"
-          className="flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-white/60 hover:bg-white border border-white/80 transition-all shadow-sm text-purple-700 font-bold text-sm sm:text-base flex-shrink-0"
+          className="w-10 h-10 sm:w-auto flex items-center justify-center gap-2 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-white/60 hover:bg-white border border-white/80 transition-all shadow-sm text-purple-700 font-bold text-sm sm:text-base flex-shrink-0"
         >
           <Gamepad2 size={18} />
           <span className="hidden sm:inline">Tebak Kafe</span>
+        </Link>
+
+        {/* Papan Kontributor — publik, siapa pun bisa lihat tanpa login. */}
+        <Link
+          to="/papan-kontributor"
+          title="Papan Kontributor"
+          className="w-10 h-10 sm:w-auto flex items-center justify-center gap-2 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-white/60 hover:bg-white border border-white/80 transition-all shadow-sm text-purple-700 font-bold text-sm sm:text-base flex-shrink-0"
+        >
+          <Trophy size={18} />
+          <span className="hidden sm:inline">Kontributor</span>
         </Link>
 
         {/* Account: Google login (users) — admin has its own app */}
@@ -131,6 +143,13 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
                 >
                   <Crown size={16} className="text-purple-600" /> Kelola Membership
                 </a>
+                <Link
+                  to="/kontribusiku"
+                  onClick={() => setShowAccount(false)}
+                  className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-purple-50 transition-colors"
+                >
+                  <Award size={16} className="text-purple-600" /> Kontribusiku
+                </Link>
                 <button
                   onClick={() => { setShowAccount(false); signOut(); }}
                   className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
