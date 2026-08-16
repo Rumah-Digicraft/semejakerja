@@ -46,7 +46,10 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
 
   const submit = async (status: 'approved' | 'rejected') => {
     setLoading(true)
-    const payload: Record<string, any> = { status, review_note: note, reviewed_at: new Date().toISOString() }
+    // reviewed_by/reviewed_at TIDAK dikirim dari client — trigger
+    // set_reviewed_by (migration 048) yang memaksanya dari auth.uid() &
+    // now() di server, supaya gak bisa dipalsukan/di-backdate dari sini.
+    const payload: Record<string, any> = { status, review_note: note }
     // Foto publik tidak pernah kirim sort_order (default DB = 0) — kalau
     // dibiarkan, foto ini bisa "menyalip" jadi sampul karena tie-break-nya
     // created_at terbaru duluan. Taruh di urutan paling akhir, sama seperti
@@ -138,6 +141,7 @@ export default function ModerasiPage() {
   const [tab, setTab] = useState<TabType>('submissions')
   const [data, setData] = useState<any[]>([])
   const [cafeNames, setCafeNames] = useState<Record<string, string>>({})
+  const [reviewerNames, setReviewerNames] = useState<Record<string, string>>({})
   const [counts, setCounts] = useState({ submissions: 0, edits: 0, reviews: 0, photos: 0 })
   const [loading, setLoading] = useState(true)
   const [reviewItem, setReviewItem] = useState<any>(null)
@@ -169,6 +173,17 @@ export default function ModerasiPage() {
       } else {
         setCafeNames({})
       }
+    }
+
+    // reviewed_by (uuid) → nama/email admin, buat ditampilkan di kolom
+    // status ("Direview oleh ..."). admin_directory (migration 048) cuma
+    // kebaca kalau yang query juga admin yang login.
+    const reviewerIds = [...new Set((data ?? []).map(d => d.reviewed_by).filter(Boolean))]
+    if (reviewerIds.length > 0) {
+      const { data: admins } = await supabase.from('admin_directory').select('user_id, email, full_name').in('user_id', reviewerIds)
+      setReviewerNames(Object.fromEntries((admins ?? []).map(a => [a.user_id, a.full_name || a.email])))
+    } else {
+      setReviewerNames({})
     }
     setLoading(false)
   }, [tab])
@@ -282,6 +297,9 @@ export default function ModerasiPage() {
                       {item.status}
                     </span>
                     {item.review_note && <p className="text-xs text-slate-400 mt-0.5">"{item.review_note}"</p>}
+                    {item.reviewed_by && (
+                      <p className="text-xs text-slate-400 mt-0.5">Direview oleh {reviewerNames[item.reviewed_by] ?? '...'}</p>
+                    )}
                   </td>
                   <td className="px-5 py-4 text-xs text-slate-400">{formatDate(item.created_at)}</td>
                   <td className="px-5 py-4">
@@ -341,6 +359,9 @@ export default function ModerasiPage() {
                 {item.rating && <p className="text-xs text-amber-500 mt-0.5">⭐ {item.rating}/5</p>}
                 {item.notes && <p className="text-xs text-slate-400 mt-0.5">{item.notes}</p>}
                 {item.review_note && <p className="text-xs text-slate-400 mt-0.5">&quot;{item.review_note}&quot;</p>}
+                {item.reviewed_by && (
+                  <p className="text-xs text-slate-400 mt-0.5">Direview oleh {reviewerNames[item.reviewed_by] ?? '...'}</p>
+                )}
               </div>
 
               <div className="flex items-center justify-between">
