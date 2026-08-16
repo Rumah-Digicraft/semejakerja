@@ -66,6 +66,7 @@ export type ContributionStatus = 'pending' | 'approved' | 'rejected'
 export interface CafeSubmission {
   id: string
   status: ContributionStatus
+  user_id: string | null
   submitter_name: string
   submitter_wa: string
   name: string
@@ -86,6 +87,7 @@ export interface CafeEdit {
   id: string
   cafe_id: string
   status: ContributionStatus
+  user_id: string | null
   submitter_name: string
   submitter_wa: string
   suggested_data: Record<string, unknown>
@@ -119,6 +121,7 @@ export interface CafePhoto {
   id: string
   cafe_id: string
   status: ContributionStatus
+  user_id: string | null
   submitter_name: string
   storage_path: string
   caption: string | null

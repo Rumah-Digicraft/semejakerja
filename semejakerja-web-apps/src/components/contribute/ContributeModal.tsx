@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { X, CheckCircle2, Star, Upload, ChevronRight, Loader2 } from 'lucide-react';
+import { X, CheckCircle2, Star, Upload, Loader2 } from 'lucide-react';
 import {
   useSubmitNewCafe,
   useSubmitEdit,
@@ -42,60 +42,7 @@ function Label({ text, hint, optional }: { text: string; hint?: string; optional
   );
 }
 
-// ── Step 1: Identitas ─────────────────────────────────────────────────────────
-
-interface IdentityData {
-  name: string;
-  wa: string;
-}
-
-function StepIdentity({
-  data,
-  onChange,
-  onNext,
-}: {
-  data: IdentityData;
-  onChange: (d: IdentityData) => void;
-  onNext: () => void;
-}) {
-  return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-sm text-gray-500 mb-5">
-          Kontribusi kamu akan ditinjau oleh tim Semeja Kerja sebelum ditampilkan. Identitas bersifat opsional.
-        </p>
-        <div className="space-y-4">
-          <div>
-            <Label text="Nama" optional />
-            <input
-              className={inputCls}
-              placeholder="Nama kamu"
-              value={data.name}
-              onChange={(e) => onChange({ ...data, name: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label text="WhatsApp" optional hint="untuk dihubungi jika ada pertanyaan" />
-            <input
-              className={inputCls}
-              placeholder="08xxxxxxxxxx"
-              value={data.wa}
-              onChange={(e) => onChange({ ...data, wa: e.target.value })}
-            />
-          </div>
-        </div>
-      </div>
-      <button
-        onClick={onNext}
-        className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-all shadow-sm shadow-purple-600/20"
-      >
-        Lanjut <ChevronRight className="w-4 h-4" />
-      </button>
-    </div>
-  );
-}
-
-// ── Step 2: Form per tipe ─────────────────────────────────────────────────────
+// ── Step 1: Form per tipe ─────────────────────────────────────────────────────
 
 function NewCafeForm({
   onSubmit,
@@ -116,7 +63,7 @@ function NewCafeForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <Label text="Nama Café" />
+        <Label text="Nama Cafe" />
         <input required className={inputCls} placeholder="Contoh: Kopi Kenangan Purwokerto" value={form.name} onChange={(e) => set('name', e.target.value)} />
       </div>
       <div>
@@ -193,7 +140,7 @@ function EditForm({
       )}
 
       <div>
-        <Label text="Nama Café" optional />
+        <Label text="Nama Cafe" optional />
         <input className={inputCls} placeholder="Tulis nama yang benar..." value={form.name ?? ''} onChange={(e) => set('name', e.target.value)} />
       </div>
       <div>
@@ -423,14 +370,14 @@ function PhotoForm({ cafeId, onDone }: { cafeId: string; onDone: () => void }) {
   );
 }
 
-// ── Step 3: Success ───────────────────────────────────────────────────────────
+// ── Step 2: Success ───────────────────────────────────────────────────────────
 
 function SuccessScreen({ type, onClose }: { type: ContributeType; onClose: () => void }) {
   const messages: Record<ContributeType, { title: string; desc: string }> = {
-    'new-cafe': { title: 'Usulan Terkirim!', desc: 'Café yang kamu usulkan akan ditinjau oleh tim Semeja Kerja sebelum ditampilkan di peta.' },
-    'edit': { title: 'Saran Terkirim!', desc: 'Koreksi info café-mu sudah diterima dan akan ditinjau oleh tim.' },
+    'new-cafe': { title: 'Usulan Terkirim!', desc: 'Cafe yang kamu usulkan akan ditinjau oleh tim Semeja Kerja sebelum ditampilkan di peta.' },
+    'edit': { title: 'Saran Terkirim!', desc: 'Koreksi info Cafe-mu sudah diterima dan akan ditinjau oleh tim.' },
     'review': { title: 'Ulasan Terkirim!', desc: 'Terima kasih sudah berbagi pengalaman! Ulasanmu akan segera diverifikasi.' },
-    'photo': { title: 'Foto Terupload!', desc: 'Foto café-mu sudah diterima dan akan ditinjau oleh tim sebelum dipublikasikan.' },
+    'photo': { title: 'Foto Terupload!', desc: 'Foto Cafe-mu sudah diterima dan akan ditinjau oleh tim sebelum dipublikasikan.' },
   };
   const { title, desc } = messages[type];
 
@@ -456,28 +403,19 @@ function SuccessScreen({ type, onClose }: { type: ContributeType; onClose: () =>
 // ── Main Modal ────────────────────────────────────────────────────────────────
 
 const TITLES: Record<ContributeType, string> = {
-  'new-cafe': 'Usulkan Café Baru',
+  'new-cafe': 'Usulkan Cafe Baru',
   'edit': 'Saran Perbaikan Info',
   'review': 'Tulis Ulasan',
   'photo': 'Upload Foto',
 };
 
-type Step = 'identity' | 'form' | 'success';
+type Step = 'form' | 'success';
 
-// Koreksi info, ulasan & upload foto tidak punya step identitas — nama & WA
-// diambil dari akun yang login (server-side, migration 040/041), jadi
-// langsung ke step form. "Usulkan café baru" tetap pakai identitas bebas.
-const STEPS_FOR: Record<ContributeType, Step[]> = {
-  'new-cafe': ['identity', 'form'],
-  'edit': ['form'],
-  'review': ['form'],
-  'photo': ['form'],
-};
-
+// Semua jenis kontribusi (usulkan cafe baru, koreksi info, ulasan, upload
+// foto) langsung ke step form — nama & WA submitter diambil dari akun yang
+// login server-side (migration 041/046), tidak ada step identitas manual.
 export function ContributeModal({ type, cafeId, cafeName, currentValues, onClose }: ContributeModalProps) {
-  const steps = STEPS_FOR[type];
-  const [step, setStep] = useState<Step>(steps[0]);
-  const [identity, setIdentity] = useState<IdentityData>({ name: '', wa: '' });
+  const [step, setStep] = useState<Step>('form');
 
   const { mutate: submitNew, isPending: pendingNew } = useSubmitNewCafe();
   const { mutate: submitEdit, isPending: pendingEdit } = useSubmitEdit();
@@ -494,8 +432,6 @@ export function ContributeModal({ type, cafeId, cafeName, currentValues, onClose
         website: d.website,
         open_hours: d.open_hours,
         notes: d.notes,
-        submitterName: identity.name,
-        submitterWa: identity.wa,
       },
       { onSuccess: () => setStep('success') },
     );
@@ -539,25 +475,8 @@ export function ContributeModal({ type, cafeId, cafeName, currentValues, onClose
           </button>
         </div>
 
-        {/* Step indicator — cuma tampil kalau ada >1 step (review langsung ke form) */}
-        {step !== 'success' && steps.length > 1 && (
-          <div className="flex items-center gap-2 px-6 pt-4 shrink-0">
-            {steps.map((s, i) => (
-              <div key={s} className="flex items-center gap-2">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step === s ? 'bg-purple-600 text-white' : i < steps.indexOf(step) ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                  {i < steps.indexOf(step) ? '✓' : i + 1}
-                </div>
-                {i < steps.length - 1 && <div className={`flex-1 h-0.5 w-8 ${step === 'form' ? 'bg-purple-200' : 'bg-gray-100'}`} />}
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {step === 'identity' && (
-            <StepIdentity data={identity} onChange={setIdentity} onNext={() => setStep('form')} />
-          )}
           {step === 'form' && type === 'new-cafe' && (
             <NewCafeForm onSubmit={handleNewCafe} isLoading={isLoading} />
           )}

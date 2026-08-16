@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import type { CafeEditSuggestedData } from '../types/cafe';
 
-// ── Submit café baru ─────────────────────────────────────────────────────────
+// ── Submit Cafe baru ─────────────────────────────────────────────────────────
 
 export interface NewCafeData {
   cafeName: string;       // renamed from 'name' to avoid conflict with submitter name
@@ -13,14 +13,13 @@ export interface NewCafeData {
   website?: string;
   open_hours?: string;
   notes?: string;
-  submitterName?: string;
-  submitterWa?: string;
 }
 
+// Identitas (submitter_name/wa) TIDAK dikirim dari client — trigger
+// cafe_submissions_set_identity (migration 046) yang mengisinya dari akun
+// login, sama seperti cafe_edits.
 async function submitNewCafe(data: NewCafeData) {
   const { error } = await supabase.from('cafe_submissions').insert({
-    submitter_name: data.submitterName || null,
-    submitter_wa: data.submitterWa || null,
     name: data.cafeName,
     address: data.address,
     lat: data.lat ?? null,
