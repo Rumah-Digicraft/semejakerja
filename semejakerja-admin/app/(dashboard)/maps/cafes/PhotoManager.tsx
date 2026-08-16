@@ -240,7 +240,7 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
                 <GripVertical size={14} />
               </div>
 
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-end p-2 gap-1.5 opacity-0 group-hover:opacity-100">
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-end p-2 gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                 {photo.status === 'pending' && (
                   <>
                     <button
