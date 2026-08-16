@@ -81,7 +81,7 @@ export default function MembershipECard({
           </li>
           <li>
             <span className={styles.stepNum}>2</span>
-            Tunjukkan E-Card ini ke kasir <b>sebelum membayar</b>.
+            Tunjukkan E-Card ini ke kasir sebelum membayar.
           </li>
           <li>
             <span className={styles.stepNum}>3</span>
