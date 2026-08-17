@@ -39,8 +39,8 @@ export default function MembershipPage() {
   }, []);
 
   // Pricing based on Triwulan vs Bulanan (Triwulan is 3 months)
-  const priceNongkrong = isAnnual ? "90.000" : "36.000";
-  const priceSerius = isAnnual ? "135.000" : "54.000";
+  const priceNongkrong = isAnnual ? "41.000" : "19.000";
+  const priceSerius = isAnnual ? "74.000" : "31.000";
   const periodLabel = isAnnual ? "/triwulan" : "/bln";
   const linkParams = isAnnual ? "?period=triwulan" : "?period=bulanan";
 

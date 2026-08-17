@@ -9,7 +9,7 @@ import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import styles from "./checkout.module.css";
 
 // Biaya layanan flat per transaksi. Sinkron dengan v_service_fee di
-// migration 028 (RPC create_membership_checkout) — server yang otoritatif,
+// migration 034 (RPC create_membership_checkout) — server yang otoritatif,
 // ini hanya untuk tampilan ringkasan di checkout.
 const SERVICE_FEE = 1000;
 
@@ -55,8 +55,8 @@ function CheckoutContent() {
 
   // Pricing Logic
   const getBasePrice = () => {
-    if (tierParam === "nongkrong") return periodParam === "triwulan" ? 90000 : 36000;
-    if (tierParam === "mode_serius") return periodParam === "triwulan" ? 135000 : 54000;
+    if (tierParam === "nongkrong") return periodParam === "triwulan" ? 41000 : 19000;
+    if (tierParam === "mode_serius") return periodParam === "triwulan" ? 74000 : 31000;
     return 0;
   };
 
