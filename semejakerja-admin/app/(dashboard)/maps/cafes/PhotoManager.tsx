@@ -9,6 +9,7 @@ import PhotoCropModal from './PhotoCropModal'
 
 const BUCKET = 'cafe-photos'
 const MAX_FILE_BYTES = 10 * 1024 * 1024 // matches the bucket's file_size_limit
+const MAX_PHOTOS = 15 // batas foto tayang per kafe
 
 const STATUS_BADGE: Record<CafePhoto['status'], string> = {
   approved: 'bg-emerald-100 text-emerald-700',
@@ -58,10 +59,18 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
 
   const publicUrl = (path: string) => supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
 
+  const approvedCount = photos.filter(p => p.status === 'approved').length
+  const slotsLeft = Math.max(0, MAX_PHOTOS - approvedCount)
+
   // File selection just validates and queues — actual upload happens after
   // each file goes through the 4:3 crop step (see PhotoCropModal below).
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return
+    if (slotsLeft === 0) {
+      onToast(`Kafe ini sudah punya ${MAX_PHOTOS} foto (maksimal). Hapus foto lama dulu sebelum menambah.`)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
     const valid: File[] = []
     for (const file of Array.from(files)) {
       if (!file.type.startsWith('image/')) {
@@ -76,6 +85,10 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
     }
     if (fileInputRef.current) fileInputRef.current.value = ''
     if (valid.length === 0) return
+    if (valid.length > slotsLeft) {
+      onToast(`Cuma ${slotsLeft} foto yang diunggah — sisanya dilewati karena kafe ini maksimal ${MAX_PHOTOS} foto.`)
+      valid.length = slotsLeft
+    }
     nextOrderRef.current = photos.length // new uploads are appended after existing photos
     setQueueTotal(valid.length)
     setPendingFiles(valid)
@@ -173,6 +186,10 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
   }
 
   const setStatus = async (photo: CafePhoto, status: CafePhoto['status']) => {
+    if (status === 'approved' && slotsLeft === 0) {
+      onToast(`Kafe ini sudah punya ${MAX_PHOTOS} foto (maksimal). Hapus foto lama dulu sebelum menyetujui foto ini.`)
+      return
+    }
     setBusyId(photo.id)
     const { error } = await supabase
       .from('cafe_photos')
@@ -245,8 +262,8 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
                   <>
                     <button
                       onClick={() => setStatus(photo, 'approved')}
-                      disabled={busyId === photo.id}
-                      title="Setujui"
+                      disabled={busyId === photo.id || slotsLeft === 0}
+                      title={slotsLeft === 0 ? `Maksimal ${MAX_PHOTOS} foto — hapus foto lama dulu` : 'Setujui'}
                       className="w-8 h-8 rounded-lg bg-white/90 hover:bg-white flex items-center justify-center text-emerald-600 shadow-sm disabled:opacity-50"
                     >
                       {busyId === photo.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
@@ -277,11 +294,13 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || slotsLeft === 0}
           className="aspect-[3/4] rounded-xl border-2 border-dashed border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 transition-colors flex flex-col items-center justify-center gap-1.5 text-slate-400 hover:text-purple-500 disabled:opacity-50"
         >
           {uploading ? <Loader2 size={20} className="animate-spin" /> : <Camera size={20} />}
-          <span className="text-xs font-medium">{uploading ? 'Mengunggah...' : 'Tambah Foto'}</span>
+          <span className="text-xs font-medium">
+            {uploading ? 'Mengunggah...' : slotsLeft === 0 ? 'Maksimal 15 foto' : 'Tambah Foto'}
+          </span>
         </button>
       </div>
 
@@ -299,6 +318,11 @@ export default function PhotoManager({ cafeId, onToast }: PhotoManagerProps) {
       )}
       {!loading && photos.length > 1 && (
         <p className="text-xs text-slate-400 mt-3">Seret (drag) foto buat urutkan ulang — foto pertama jadi sampul di peta publik.</p>
+      )}
+      {!loading && (
+        <p className={`text-xs mt-1.5 ${slotsLeft === 0 ? 'text-amber-600 font-medium' : 'text-slate-400'}`}>
+          {approvedCount}/{MAX_PHOTOS} foto tayang{slotsLeft === 0 ? ' — hapus foto lama dulu untuk menambah atau menyetujui foto baru.' : ''}
+        </p>
       )}
 
       {pendingFiles.length > 0 && (

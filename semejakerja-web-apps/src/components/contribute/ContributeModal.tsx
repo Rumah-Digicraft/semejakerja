@@ -1,13 +1,34 @@
 import { useState, useRef } from 'react';
-import { X, CheckCircle2, Star, Upload, Loader2 } from 'lucide-react';
+import { X, CheckCircle2, Star, Upload, Loader2, MapPin } from 'lucide-react';
 import {
   useSubmitNewCafe,
   useSubmitEdit,
   useSubmitReview,
   useSubmitPhoto,
+  useResolveMapsLink,
 } from '../../hooks/useContribute';
 import type { CafeEditSuggestedData } from '../../types/cafe';
 import PhotoCropModal from './PhotoCropModal';
+import LocationPicker from './LocationPicker';
+import {
+  DAY_LABELS, type WeekHours, defaultWeekHours, serializeWeekdayText, suggestOpenHours,
+} from '../../lib/openHoursEditor';
+
+const PURWOKERTO_CENTER: [number, number] = [-7.424, 109.23];
+
+const PRICE_OPTIONS = [
+  { value: 0, label: 'Belum ada info harga' },
+  { value: 1, label: 'Rp 0 - 25.000' },
+  { value: 2, label: 'Rp 25.000 - 50.000' },
+  { value: 3, label: 'Rp 50.000 - 150.000' },
+  { value: 4, label: 'Rp 150.000 - 300.000' },
+];
+
+const VIBE_LEVELS = [
+  { value: 1, label: 'Tenang' },
+  { value: 2, label: 'Sedang' },
+  { value: 3, label: 'Ramai' },
+];
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // samain dengan limit bucket cafe-photos (lihat admin PhotoManager)
 
@@ -44,20 +65,91 @@ function Label({ text, hint, optional }: { text: string; hint?: string; optional
 
 // ── Step 1: Form per tipe ─────────────────────────────────────────────────────
 
+export interface NewCafeFormOutput {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  maps_url: string;
+  phone: string;
+  website: string;
+  open_hours: string;
+  weekday_text: string[];
+  price_level: number;
+  vibes: number;
+  rating: number;
+  total_reviews: number;
+  notes: string;
+}
+
 function NewCafeForm({
   onSubmit,
   isLoading,
 }: {
-  onSubmit: (d: Record<string, string>) => void;
+  onSubmit: (d: NewCafeFormOutput) => void;
   isLoading: boolean;
 }) {
-  const [form, setForm] = useState({ name: '', address: '', phone: '', website: '', open_hours: '', notes: '' });
-  const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+  const [form, setForm] = useState({
+    name: '', address: '', phone: '', website: '', notes: '',
+    mapsUrl: '', rating: '', totalReviews: '',
+  });
+  const set = (k: keyof typeof form, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
+  const [priceLevel, setPriceLevel] = useState(0);
+  const [vibes, setVibes] = useState(2);
+  const [week, setWeek] = useState<WeekHours>(defaultWeekHours());
+  const [openHours, setOpenHours] = useState(suggestOpenHours(defaultWeekHours()));
+  const [openHoursTouched, setOpenHoursTouched] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  const { mutate: resolveLink, isPending: resolving } = useResolveMapsLink();
+
+  const applyWeek = (nextWeek: WeekHours) => {
+    setWeek(nextWeek);
+    if (!openHoursTouched) setOpenHours(suggestOpenHours(nextWeek));
+  };
+  const setDay = (index: number, patch: Partial<WeekHours[number]>) => {
+    applyWeek(week.map((d, i) => (i === index ? { ...d, ...patch } : d)));
+  };
+
+  const handleResolveLink = () => {
+    if (!form.mapsUrl.trim()) return;
+    setLocationError(null);
+    resolveLink(form.mapsUrl.trim(), {
+      onSuccess: (loc) => {
+        setLat(loc.lat);
+        setLng(loc.lng);
+        if (loc.name && !form.name.trim()) set('name', loc.name);
+      },
+      onError: (err) => {
+        setLocationError(err instanceof Error ? err.message : 'Gagal membaca link, geser pin manual di bawah ya');
+      },
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
     if (!form.name.trim() || !form.address.trim()) return;
-    onSubmit(form);
+    if (lat == null || lng == null) return;
+    onSubmit({
+      name: form.name.trim(),
+      address: form.address.trim(),
+      lat, lng,
+      maps_url: form.mapsUrl.trim(),
+      phone: form.phone.trim(),
+      website: form.website.trim(),
+      open_hours: openHours,
+      weekday_text: serializeWeekdayText(week),
+      price_level: priceLevel,
+      vibes,
+      rating: form.rating ? Number(form.rating) : 0,
+      total_reviews: form.totalReviews ? Number(form.totalReviews) : 0,
+      notes: form.notes.trim(),
+    });
   };
 
   return (
@@ -70,16 +162,157 @@ function NewCafeForm({
         <Label text="Alamat Lengkap" />
         <textarea required className={`${inputCls} resize-none min-h-[72px]`} placeholder="Jl. Jendral Sudirman No. 1, Purwokerto..." value={form.address} onChange={(e) => set('address', e.target.value)} />
       </div>
+
+      {/* ── Lokasi ── */}
+      <div>
+        <Label text="Link Google Maps" optional hint="tempel link share dari Google Maps" />
+        <div className="flex gap-2">
+          <input
+            className={inputCls}
+            placeholder="https://maps.app.goo.gl/..."
+            value={form.mapsUrl}
+            onChange={(e) => set('mapsUrl', e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={handleResolveLink}
+            disabled={resolving || !form.mapsUrl.trim()}
+            className="shrink-0 px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+            Ambil Lokasi
+          </button>
+        </div>
+        {locationError && <p className="text-xs text-amber-600 mt-1.5">{locationError}</p>}
+        <p className="text-xs text-gray-400 mt-1.5">
+          {lat != null && lng != null ? 'Geser pin di peta kalau kurang pas.' : 'Atau langsung klik/geser pin di peta di bawah ini.'}
+        </p>
+        <div className="mt-2">
+          <LocationPicker
+            center={lat != null && lng != null ? [lat, lng] : PURWOKERTO_CENTER}
+            onLocationChange={(nlat, nlng) => { setLat(nlat); setLng(nlng); }}
+          />
+        </div>
+        {submitAttempted && (lat == null || lng == null) && (
+          <p className="text-xs text-red-500 mt-1.5">Tentukan lokasi cafe di peta dulu</p>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label text="Telepon" optional />
           <input className={inputCls} placeholder="08xx..." value={form.phone} onChange={(e) => set('phone', e.target.value)} />
         </div>
         <div>
-          <Label text="Jam Buka" optional hint="mis. 08:00-22:00" />
-          <input className={inputCls} placeholder="08:00 - 22:00" value={form.open_hours} onChange={(e) => set('open_hours', e.target.value)} />
+          <Label text="Rentang Harga" optional />
+          <select
+            className={`${inputCls} bg-white`}
+            value={priceLevel}
+            onChange={(e) => setPriceLevel(Number(e.target.value))}
+          >
+            {PRICE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
         </div>
       </div>
+
+      {/* ── Review Google Maps ── */}
+      <div>
+        <Label text="Review Google Maps" optional hint="salin dari halaman Google Maps cafe ini" />
+        <div className="grid grid-cols-2 gap-3">
+          <input
+            type="number" min={0} max={5} step="0.1"
+            className={inputCls} placeholder="Rating, mis. 4.8"
+            value={form.rating} onChange={(e) => set('rating', e.target.value)}
+          />
+          <input
+            type="number" min={0} step={1}
+            className={inputCls} placeholder="Jumlah review, mis. 834"
+            value={form.totalReviews} onChange={(e) => set('totalReviews', e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* ── Vibes ── */}
+      <div>
+        <Label text="Suasana (Vibes)" optional />
+        <div className="flex rounded-xl border border-gray-200 overflow-hidden">
+          {VIBE_LEVELS.map(({ value, label }) => (
+            <button
+              key={value} type="button" onClick={() => setVibes(value)}
+              className={`flex-1 py-2 text-sm font-medium transition border-l first:border-l-0 border-gray-200 ${
+                vibes === value ? 'bg-purple-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Jam Operasional ── */}
+      <div>
+        <Label text="Jam Operasional" optional />
+        <div className="flex gap-2 mb-2">
+          <button
+            type="button"
+            onClick={() => applyWeek(week.map(() => ({ ...week[0] })))}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs text-gray-600 transition"
+          >
+            Samakan semua hari
+          </button>
+          <button
+            type="button"
+            onClick={() => applyWeek(DAY_LABELS.map(() => ({ open: true, from: '00:00', to: '23:59' })))}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs text-gray-600 transition"
+          >
+            24 Jam
+          </button>
+        </div>
+        <div className="space-y-1.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
+          {week.map((day, i) => (
+            <div key={DAY_LABELS[i]} className="flex items-center gap-2">
+              <label className="flex items-center gap-2 w-24 cursor-pointer shrink-0">
+                <input
+                  type="checkbox" checked={day.open}
+                  onChange={(e) => setDay(i, { open: e.target.checked })}
+                  className="w-3.5 h-3.5 accent-purple-600"
+                />
+                <span className="text-sm text-gray-700">{DAY_LABELS[i]}</span>
+              </label>
+              {day.open ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="time" value={day.from} onChange={(e) => setDay(i, { from: e.target.value })}
+                    className="px-2 py-1 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  <span className="text-gray-400 text-sm">–</span>
+                  <input
+                    type="time" value={day.to} onChange={(e) => setDay(i, { to: e.target.value })}
+                    className="px-2 py-1 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                </div>
+              ) : (
+                <span className="text-sm text-gray-400 italic">Tutup</span>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-2">
+          <input
+            value={openHours}
+            onChange={(e) => { setOpenHoursTouched(true); setOpenHours(e.target.value); }}
+            className={inputCls} placeholder='Ringkasan jam, mis. "09:00 - 22:00"'
+          />
+          <button
+            type="button"
+            onClick={() => { setOpenHoursTouched(false); setOpenHours(suggestOpenHours(week)); }}
+            className="shrink-0 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs text-gray-600 transition"
+          >
+            Pakai saran
+          </button>
+        </div>
+      </div>
+
       <div>
         <Label text="Website / Instagram" optional />
         <input className={inputCls} placeholder="https://..." value={form.website} onChange={(e) => set('website', e.target.value)} />
@@ -423,14 +656,22 @@ export function ContributeModal({ type, cafeId, cafeName, currentValues, onClose
 
   const isLoading = pendingNew || pendingEdit || pendingReview;
 
-  const handleNewCafe = (d: Record<string, string>) => {
+  const handleNewCafe = (d: NewCafeFormOutput) => {
     submitNew(
       {
         cafeName: d.name,
         address: d.address,
+        lat: d.lat,
+        lng: d.lng,
+        maps_url: d.maps_url,
         phone: d.phone,
         website: d.website,
         open_hours: d.open_hours,
+        weekday_text: d.weekday_text,
+        price_level: d.price_level,
+        vibes: d.vibes,
+        rating: d.rating,
+        total_reviews: d.total_reviews,
         notes: d.notes,
       },
       { onSuccess: () => setStep('success') },
