@@ -128,6 +128,45 @@ export function createMarkerIcon(cafe: Cafe, tier: MarkerTier = 'basic'): L.Icon
   return icon;
 }
 
+// Blinking red pin + name label shown over the cafe currently open in the
+// detail sheet (from search selection, marker tap, or a deep link) so the
+// user isn't left scanning the map for which pin is theirs. Cached per cafe
+// name, same reasoning as the labeled tiers in iconCache below.
+const highlightIconCache = new Map<string, L.DivIcon>();
+
+const HIGHLIGHT_CFG: TierConfig = {
+  fill: '#DC2626', stroke: '#991B1B',
+  pinW: 34, pinH: 44,
+  badgeText: null, badgeFontSize: 0,
+  hasCheckmark: false, hasStar: false, hasPulse: false, hasLabel: true,
+  zOffset: 0,
+};
+
+export function createHighlightIcon(cafe: Cafe): L.DivIcon {
+  const cached = highlightIconCache.get(cafe.name);
+  if (cached) return cached;
+  const { pinW, pinH } = HIGHLIGHT_CFG;
+  const label =
+    `<div style="position:absolute;top:${pinH + 4}px;left:50%;transform:translateX(-50%);` +
+    `background:white;color:#1f2937;font-size:11px;font-weight:600;font-family:inherit;` +
+    `padding:2px 8px;border-radius:999px;white-space:nowrap;` +
+    `box-shadow:0 2px 6px rgba(0,0,0,0.18);pointer-events:none;">${cafe.name}</div>`;
+  const html =
+    `<div style="position:relative;width:${pinW}px;height:${pinH}px;overflow:visible;">` +
+    `<div class="marker-blink">${buildPinSvg(HIGHLIGHT_CFG)}</div>` +
+    label +
+    `</div>`;
+  const icon = L.divIcon({
+    html,
+    className: 'custom-leaflet-icon',
+    iconSize: [pinW, pinH],
+    iconAnchor: [pinW / 2, pinH],
+    popupAnchor: [0, -pinH],
+  });
+  highlightIconCache.set(cafe.name, icon);
+  return icon;
+}
+
 function buildIcon(cafe: Cafe, cfg: TierConfig): L.Icon | L.DivIcon {
   const { pinW, pinH, badgeText, badgeFontSize, hasPulse, hasLabel, fill, stroke } = cfg;
 

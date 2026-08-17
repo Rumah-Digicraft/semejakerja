@@ -122,7 +122,7 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
     onSubmit(toDbPayload(values))
   }
 
-  // Sama persis flow "Ambil Lokasi" di form publik (semejakerja-web-apps
+  // Sama persis flow "Cari Lokasi" di form publik (semejakerja-web-apps
   // ContributeModal.tsx) — resolve link share Google Maps lewat edge
   // function resolve-maps-link (follow redirect short link -> koordinat),
   // dipakai supaya admin gak perlu copy-paste lat/lng manual dari Maps.
@@ -191,7 +191,7 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
                   className="shrink-0 px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-sm font-medium transition disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {resolvingLocation ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
-                  Ambil Lokasi
+                  Cari Lokasi
                 </button>
               </div>
               {locationError && <p className="text-xs text-amber-600 mt-1.5">{locationError}</p>}

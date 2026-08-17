@@ -4,7 +4,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster';
 import { ZoomIn, ZoomOut, Compass, MapPin, Navigation } from 'lucide-react';
 import L from 'leaflet';
 import type { Cafe, FilterState } from '../types/cafe';
-import { createMarkerIcon, getMarkerTier, getZIndexOffset } from './MapMarker';
+import { createHighlightIcon, createMarkerIcon, getMarkerTier, getZIndexOffset } from './MapMarker';
 import MapSearch from './MapSearch';
 
 // Cluster bubble matches the app's pin palette (verified purple / partner
@@ -127,7 +127,7 @@ const FlyToCafe: React.FC<{ cafe: Cafe | null }> = ({ cafe }) => {
   const map = useMap();
   React.useEffect(() => {
     if (!cafe) return;
-    const zoom = 16;
+    const zoom = 18; // tile layer's max zoom — search/tap always lands fully zoomed in
     // On phones the detail sheet covers the lower ~50vh, so nudge the map
     // target down (center below the pin) to keep the tapped cafe in the
     // visible upper strip instead of behind the sheet.
@@ -147,16 +147,19 @@ const FlyToCafe: React.FC<{ cafe: Cafe | null }> = ({ cafe }) => {
 const CafeMarker = React.memo(function CafeMarker({
   cafe,
   onCafeClick,
+  highlighted,
 }: {
   cafe: Cafe;
   onCafeClick: (cafe: Cafe) => void;
+  highlighted: boolean;
 }) {
   const tier = getMarkerTier(cafe);
   return (
     <Marker
       position={[cafe.lat, cafe.lng]}
-      icon={createMarkerIcon(cafe, tier)}
-      zIndexOffset={getZIndexOffset(tier)}
+      icon={highlighted ? createHighlightIcon(cafe) : createMarkerIcon(cafe, tier)}
+      // Always on top while blinking, so it isn't hidden behind other pins/clusters.
+      zIndexOffset={highlighted ? 2000 : getZIndexOffset(tier)}
       eventHandlers={{
         // Tapping a pin opens the full CafeModal sheet directly — no
         // intermediate popup. A separate mini-card here used to show
@@ -245,7 +248,12 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeC
           disableClusteringAtZoom={18}
         >
           {filteredCafes.map(cafe => (
-            <CafeMarker key={cafe.id} cafe={cafe} onCafeClick={onCafeClick} />
+            <CafeMarker
+              key={cafe.id}
+              cafe={cafe}
+              onCafeClick={onCafeClick}
+              highlighted={selectedCafe?.id === cafe.id}
+            />
           ))}
         </MarkerClusterGroup>
 

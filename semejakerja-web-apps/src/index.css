@@ -153,6 +153,15 @@ body {
   animation: markerPulse 2s ease-out infinite;
 }
 
+/* Blinking red pin — marks the cafe the user just searched for/selected */
+@keyframes markerBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.25; }
+}
+.marker-blink {
+  animation: markerBlink 0.9s ease-in-out infinite;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
