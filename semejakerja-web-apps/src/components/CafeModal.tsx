@@ -429,7 +429,13 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
         </div>
 
         {/* Content (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 sm:space-y-6">
+        {/* min-h-0 is required here: flex items default to min-height:auto,
+            so without it this div refuses to shrink below its content's
+            natural height (name/rating/address/hours/facilities/wifi/
+            reviews is a lot) and pushes the footer buttons below the
+            sheet's visible bounds in peek mode — swiping to expanded was
+            the only way to reach "Upload Foto" until this was set. */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-5 sm:space-y-6">
 
           {/* Name + Rating */}
           <div className="space-y-2">

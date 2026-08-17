@@ -11,6 +11,7 @@ import { CheckCircle, XCircle, Clock, Loader2, MessageSquare, Image, MapPin, Edi
 type TabType = 'submissions' | 'edits' | 'reviews' | 'photos'
 
 const BUCKET = 'cafe-photos'
+const MAX_PHOTOS = 15 // batas foto tayang per kafe — samakan dengan PhotoManager.tsx
 
 const EDIT_FIELD_LABELS: Record<string, string> = {
   name: 'Nama Kafe',
@@ -19,6 +20,16 @@ const EDIT_FIELD_LABELS: Record<string, string> = {
   website: 'Website',
   open_hours: 'Jam Buka',
 }
+
+// Label harga & vibes — samakan dengan PRICE_OPTIONS/VIBE_LEVELS di CafeForm.tsx.
+const PRICE_LABELS: Record<number, string> = {
+  0: 'Belum ada info harga',
+  1: 'Rp 0 - 25.000',
+  2: 'Rp 25.000 - 50.000',
+  3: 'Rp 50.000 - 150.000',
+  4: 'Rp 150.000 - 300.000',
+}
+const VIBE_LABELS: Record<number, string> = { 1: 'Tenang', 2: 'Sedang', 3: 'Ramai' }
 
 function Badge({ count }: { count: number }) {
   if (count === 0) return null
@@ -30,6 +41,8 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [currentCafe, setCurrentCafe] = useState<Record<string, any> | null>(null)
+  const [approvedPhotoCount, setApprovedPhotoCount] = useState<number | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const table = { submissions: 'cafe_submissions', edits: 'cafe_edits', reviews: 'cafe_reviews', photos: 'cafe_photos' }[type] as string
 
@@ -40,12 +53,27 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
       .then(({ data }) => setCurrentCafe(data))
   }, [type, item.cafe_id])
 
+  // Kafe dibatasi maksimal MAX_PHOTOS foto tayang — cek dulu sebelum
+  // menawarkan tombol approve buat kontribusi foto.
+  useEffect(() => {
+    if (type !== 'photos' || !item.cafe_id) return
+    supabase.from('cafe_photos').select('id', { count: 'exact', head: true }).eq('cafe_id', item.cafe_id).eq('status', 'approved')
+      .then(({ count }) => setApprovedPhotoCount(count ?? 0))
+  }, [type, item.cafe_id])
+
+  const photoLimitReached = type === 'photos' && (approvedPhotoCount ?? 0) >= MAX_PHOTOS
+  // Trigger create_cafe_from_submission (migration 049) menolak approve
+  // kalau lat/lng kosong — cek di sini juga supaya tombol Setujui sudah
+  // nonaktif dari awal, bukan cuma gagal senyap di server.
+  const submissionLocationMissing = type === 'submissions' && (item.lat == null || item.lng == null)
+
   const photoUrl = type === 'photos' && item.storage_path
     ? supabase.storage.from(BUCKET).getPublicUrl(item.storage_path).data.publicUrl
     : null
 
   const submit = async (status: 'approved' | 'rejected') => {
     setLoading(true)
+    setSubmitError(null)
     // reviewed_by/reviewed_at TIDAK dikirim dari client — trigger
     // set_reviewed_by (migration 048) yang memaksanya dari auth.uid() &
     // now() di server, supaya gak bisa dipalsukan/di-backdate dari sini.
@@ -56,10 +84,25 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
     // upload admin.
     if (type === 'photos' && status === 'approved') {
       const { count } = await supabase.from('cafe_photos').select('id', { count: 'exact', head: true }).eq('cafe_id', item.cafe_id).eq('status', 'approved')
+      // Re-cek langsung ke DB (bukan cuma pakai approvedPhotoCount di state)
+      // buat jaga-jaga kalau ada approval lain nyelip di antara modal dibuka
+      // dan tombol ini diklik.
+      if ((count ?? 0) >= MAX_PHOTOS) {
+        setApprovedPhotoCount(count ?? 0)
+        setLoading(false)
+        return
+      }
       payload.sort_order = count ?? 0
     }
-    await supabase.from(table).update(payload).eq('id', item.id)
+    // Approve "submissions" -> trigger create_cafe_from_submission bikin
+    // baris cafes baru sekaligus (lihat migration 049); trigger itu bisa
+    // RAISE EXCEPTION (mis. lokasi kosong) yang muncul sebagai error di sini.
+    const { error } = await supabase.from(table).update(payload).eq('id', item.id)
     setLoading(false)
+    if (error) {
+      setSubmitError(error.message)
+      return
+    }
     onDone()
     onClose()
   }
@@ -74,6 +117,41 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
           {item.comment && <p><span className="text-slate-500">Komentar:</span> {item.comment}</p>}
           {item.rating && <p><span className="text-slate-500">Rating:</span> ⭐ {item.rating}/5</p>}
         </div>
+
+        {type === 'submissions' && (
+          <div className="bg-slate-50 rounded-xl p-4 mb-4 text-sm space-y-1.5">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Detail Usulan</p>
+            <p><span className="text-slate-500">Harga:</span> {PRICE_LABELS[item.price_level ?? 0] ?? '–'}</p>
+            <p><span className="text-slate-500">Vibes:</span> {VIBE_LABELS[item.vibes ?? 2] ?? '–'}</p>
+            {(item.rating > 0 || item.total_reviews > 0) && (
+              <p><span className="text-slate-500">Review Google:</span> ⭐ {item.rating ?? 0} ({item.total_reviews ?? 0} review)</p>
+            )}
+            {item.open_hours && <p><span className="text-slate-500">Jam:</span> {item.open_hours}</p>}
+            {Array.isArray(item.weekday_text) && item.weekday_text.length > 0 && (
+              <div className="pt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                {item.weekday_text.map((line: string) => <span key={line}>{line}</span>)}
+              </div>
+            )}
+            <p>
+              <span className="text-slate-500">Lokasi:</span>{' '}
+              {submissionLocationMissing ? (
+                <span className="text-amber-600 font-medium">Belum diisi kontributor</span>
+              ) : (
+                <>{item.lat}, {item.lng}</>
+              )}
+            </p>
+            {item.maps_url && (
+              <a href={item.maps_url} target="_blank" rel="noreferrer" className="inline-block text-purple-600 hover:underline text-xs font-medium">
+                Buka di Google Maps →
+              </a>
+            )}
+            {submissionLocationMissing && (
+              <p className="text-xs text-amber-600 font-medium pt-1">
+                Tidak bisa disetujui sampai lokasi terisi — reject dan minta kontributor kirim ulang, atau tambahkan kafe ini manual lewat halaman Kafe.
+              </p>
+            )}
+          </div>
+        )}
 
         {type === 'edits' && item.suggested_data && (
           <div className="bg-slate-50 rounded-xl p-4 mb-4 text-sm space-y-3">
@@ -108,7 +186,13 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
             {/* eslint-disable-next-line @next/next/no-img-element -- Supabase Storage public URL */}
             <img src={photoUrl} alt={item.caption ?? 'Foto kafe'} className="w-full max-w-[220px] mx-auto aspect-[3/4] object-cover rounded-xl border border-slate-100" />
             {item.caption && <p className="text-xs text-slate-500 mt-1.5 text-center">&quot;{item.caption}&quot;</p>}
-            <p className="text-xs text-slate-400 mt-2 text-center">Kalau disetujui, foto ini langsung tayang di galeri foto publik kafe ini.</p>
+            {photoLimitReached ? (
+              <p className="text-xs text-amber-600 font-medium mt-2 text-center">
+                Kafe ini sudah punya {approvedPhotoCount}/{MAX_PHOTOS} foto (maksimal). Hapus foto lama dulu di halaman Kafe sebelum bisa menyetujui foto ini.
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400 mt-2 text-center">Kalau disetujui, foto ini langsung tayang di galeri foto publik kafe ini.</p>
+            )}
           </div>
         )}
 
@@ -122,12 +206,20 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
             className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
           />
         </div>
+        {submitError && (
+          <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3">{submitError}</p>
+        )}
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-sm">Batal</button>
           <button onClick={() => submit('rejected')} disabled={loading} className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-sm font-medium flex items-center gap-1.5">
             <XCircle size={14} /> Tolak
           </button>
-          <button onClick={() => submit('approved')} disabled={loading} className="px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl text-sm font-medium flex items-center gap-1.5">
+          <button
+            onClick={() => submit('approved')}
+            disabled={loading || photoLimitReached || submissionLocationMissing}
+            title={photoLimitReached ? `Maksimal ${MAX_PHOTOS} foto per kafe` : submissionLocationMissing ? 'Lokasi belum diisi' : undefined}
+            className="px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl text-sm font-medium flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />} Setujui
           </button>
         </div>

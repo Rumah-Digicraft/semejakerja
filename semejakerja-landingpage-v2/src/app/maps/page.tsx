@@ -38,7 +38,7 @@ const moods = [
 const features = [
   {
     icon: Coffee,
-    name: "350+ Ruang Kopi",
+    name: "100+ Ruang Kopi",
     desc: "Database cafe terlengkap di Purwokerto, di-review langsung oleh member komunitas.",
   },
   {
@@ -77,7 +77,7 @@ export default function MapsPage() {
         <div className={`container ${styles.heroContent}`}>
           <div className={styles.badge}>
             <MapPin size={14} />
-            350+ ruang kopi WFC · Purwokerto
+            100+ Ruang Kopi WFC · Purwokerto
           </div>
           <h1 className={styles.title}>
             Cafe WFC Purwokerto

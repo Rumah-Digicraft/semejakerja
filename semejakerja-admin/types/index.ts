@@ -71,11 +71,20 @@ export interface CafeSubmission {
   submitter_wa: string
   name: string
   address: string
-  lat: number
-  lng: number
+  // Nullable di DB — submission lama (sebelum migration 049) atau kalau
+  // kontributor gagal set lokasi tidak punya lat/lng. Trigger
+  // create_cafe_from_submission menolak approve kalau ini kosong.
+  lat: number | null
+  lng: number | null
+  maps_url: string | null
   phone: string | null
   website: string | null
   open_hours: string | null
+  weekday_text: string[] | null
+  price_level: number
+  vibes: number
+  rating: number
+  total_reviews: number
   notes: string | null
   reviewed_by: string | null
   reviewed_at: string | null

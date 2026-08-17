@@ -9,24 +9,39 @@ export interface NewCafeData {
   address: string;
   lat?: number;
   lng?: number;
+  maps_url?: string;
   phone?: string;
   website?: string;
   open_hours?: string;
+  weekday_text?: string[];
+  price_level?: number;
+  vibes?: number;
+  rating?: number;
+  total_reviews?: number;
   notes?: string;
 }
 
 // Identitas (submitter_name/wa) TIDAK dikirim dari client — trigger
 // cafe_submissions_set_identity (migration 046) yang mengisinya dari akun
-// login, sama seperti cafe_edits.
+// login, sama seperti cafe_edits. lat/lng WAJIB di form (lihat NewCafeForm)
+// — begitu admin approve, trigger create_cafe_from_submission (migration
+// 049) langsung bikin baris cafes baru dari data ini, dan trigger itu
+// menolak approve kalau lat/lng kosong.
 async function submitNewCafe(data: NewCafeData) {
   const { error } = await supabase.from('cafe_submissions').insert({
     name: data.cafeName,
     address: data.address,
     lat: data.lat ?? null,
     lng: data.lng ?? null,
+    maps_url: data.maps_url || null,
     phone: data.phone || null,
     website: data.website || null,
     open_hours: data.open_hours || null,
+    weekday_text: data.weekday_text ?? null,
+    price_level: data.price_level ?? 0,
+    vibes: data.vibes ?? 2,
+    rating: data.rating ?? 0,
+    total_reviews: data.total_reviews ?? 0,
     notes: data.notes || null,
   });
   if (error) throw new Error(error.message);
@@ -34,6 +49,33 @@ async function submitNewCafe(data: NewCafeData) {
 
 export function useSubmitNewCafe() {
   return useMutation({ mutationFn: submitNewCafe });
+}
+
+// ── Resolve link Google Maps -> lat/lng ──────────────────────────────────
+// Short link (maps.app.goo.gl/xxx) redirect ke URL panjang yang mengandung
+// koordinat, tapi browser tidak bisa follow-lalu-baca redirect cross-origin
+// itu sendiri — jadi di-resolve lewat edge function (lihat
+// semejakerja-admin/supabase/functions/resolve-maps-link). Gagal (link
+// expired/format berubah/dll) BUKAN error fatal — NewCafeForm fallback ke
+// pin manual, bukan blocking submit.
+export interface ResolvedMapsLocation {
+  lat: number;
+  lng: number;
+  name: string | null;
+  resolvedUrl: string;
+}
+
+async function resolveMapsLink(url: string): Promise<ResolvedMapsLocation> {
+  const { data, error } = await supabase.functions.invoke('resolve-maps-link', { body: { url } });
+  if (error) {
+    const body = await error.context?.json?.().catch(() => null);
+    throw new Error(body?.error || error.message);
+  }
+  return data as ResolvedMapsLocation;
+}
+
+export function useResolveMapsLink() {
+  return useMutation({ mutationFn: resolveMapsLink });
 }
 
 // ── Submit saran edit ────────────────────────────────────────────────────────
