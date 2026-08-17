@@ -61,9 +61,11 @@ export default function LocationPicker({ center, zoom = 14, onLocationChange }: 
   return (
     <div className="h-[220px] rounded-xl overflow-hidden border border-gray-200">
       <MapContainer center={position} zoom={zoom} style={{ height: '100%', width: '100%' }}>
+        {/* Samain dengan MapPicker.tsx admin (CartoDB Voyager) biar dua
+            picker lokasi ini konsisten tampilannya. */}
         <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         <LocationMarker position={position} onChange={handleChange} />
       </MapContainer>

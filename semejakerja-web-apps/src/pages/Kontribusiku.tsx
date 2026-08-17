@@ -1,21 +1,28 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Award, Coffee, LogIn, Loader2, MapPin, Trophy } from 'lucide-react';
+import {
+  ArrowLeft, Award, CheckCircle2, Clock, Coffee, LogIn, Loader2, MapPin, Trophy, XCircle,
+} from 'lucide-react';
 import Seo from '../components/Seo';
 import { LoginModal } from '../components/LoginModal';
 import { useAuth } from '../hooks/useAuth';
 import { useCafes } from '../hooks/useCafes';
-import {
-  CONTRIBUTION_LABELS, useMyContributionRank, useMyContributions,
-} from '../hooks/useContributionPoints';
+import { CONTRIBUTION_LABELS, useMyContributionRank } from '../hooks/useContributionPoints';
+import { POINTS_BY_SOURCE, useMyContributionStatus } from '../hooks/useMyContributionStatus';
 
-const formatAwardedAt = (iso: string) =>
+const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+const STATUS_STYLE: Record<'pending' | 'approved' | 'rejected', { icon: ReactNode; label: string; badgeCls: string; iconCls: string }> = {
+  pending: { icon: <Clock size={16} />, label: 'Menunggu review', badgeCls: 'bg-amber-50 text-amber-600 border-amber-100', iconCls: 'bg-amber-100 text-amber-600' },
+  approved: { icon: <CheckCircle2 size={16} />, label: 'Disetujui', badgeCls: 'bg-emerald-50 text-emerald-600 border-emerald-100', iconCls: 'bg-purple-100 text-purple-600' },
+  rejected: { icon: <XCircle size={16} />, label: 'Ditolak', badgeCls: 'bg-red-50 text-red-600 border-red-100', iconCls: 'bg-red-100 text-red-600' },
+};
 
 function ContributionsList({ userId }: { userId: string }) {
   const { cafes } = useCafes();
   const { data: myRank } = useMyContributionRank(userId);
-  const { data: entries, isLoading, error } = useMyContributions(userId);
+  const { data: entries, isLoading, error } = useMyContributionStatus(userId);
 
   const cafeNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -51,30 +58,46 @@ function ContributionsList({ userId }: { userId: string }) {
           <p className="text-sm text-red-500 text-center py-4">Gagal memuat riwayat kontribusi.</p>
         ) : !entries || entries.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-6">
-            Belum ada kontribusi yang disetujui. Usulkan cafe baru, koreksi info, atau upload foto lewat peta!
+            Belum ada kontribusi. Usulkan cafe baru, koreksi info, atau upload foto lewat peta!
           </p>
         ) : (
           <div className="flex flex-col gap-2">
-            {entries.map(entry => (
-              <div
-                key={entry.id}
-                className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-gray-50/80 border border-gray-100"
-              >
-                <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center flex-none">
-                  <Award size={16} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">
-                    {CONTRIBUTION_LABELS[entry.sourceTable]}
-                    {entry.cafeId && cafeNameById.get(entry.cafeId) && (
-                      <span className="text-gray-400 font-normal"> — {cafeNameById.get(entry.cafeId)}</span>
+            {entries.map(entry => {
+              const style = STATUS_STYLE[entry.status];
+              const cafeName = entry.proposedName ?? (entry.cafeId ? cafeNameById.get(entry.cafeId) : undefined);
+              return (
+                <div
+                  key={entry.id}
+                  className="flex flex-col gap-2 px-3.5 py-3 rounded-xl bg-gray-50/80 border border-gray-100"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-none ${style.iconCls}`}>
+                      {entry.status === 'approved' ? <Award size={16} /> : style.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">
+                        {CONTRIBUTION_LABELS[entry.sourceTable]}
+                        {cafeName && <span className="text-gray-400 font-normal"> — {cafeName}</span>}
+                      </p>
+                      <p className="text-xs text-gray-400">{formatDate(entry.createdAt)}</p>
+                    </div>
+                    {entry.status === 'approved' ? (
+                      <span className="font-bold text-purple-600 tabular-nums text-sm flex-none">+{POINTS_BY_SOURCE[entry.sourceTable]}</span>
+                    ) : (
+                      <span className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${style.badgeCls}`}>
+                        {style.icon} {style.label}
+                      </span>
                     )}
-                  </p>
-                  <p className="text-xs text-gray-400">{formatAwardedAt(entry.awardedAt)}</p>
+                  </div>
+                  {entry.status === 'rejected' && (
+                    <p className="text-xs text-gray-500 bg-white border border-gray-100 rounded-lg px-3 py-2 ml-12">
+                      <span className="font-semibold text-gray-600">Alasan: </span>
+                      {entry.reviewNote?.trim() || 'Tidak ada catatan dari admin.'}
+                    </p>
+                  )}
                 </div>
-                <span className="font-bold text-purple-600 tabular-nums text-sm flex-none">+{entry.points}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

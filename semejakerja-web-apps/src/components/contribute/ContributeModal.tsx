@@ -1,5 +1,8 @@
-import { useState, useRef } from 'react';
-import { X, CheckCircle2, Star, Upload, Loader2, MapPin } from 'lucide-react';
+import { useState, useRef, type ReactNode } from 'react';
+import {
+  X, CheckCircle2, Star, Upload, Loader2, MapPin,
+  Wifi, Wind, BookOpen, Presentation, Trees, UtensilsCrossed, Maximize, Bike, Car, Zap,
+} from 'lucide-react';
 import {
   useSubmitNewCafe,
   useSubmitEdit,
@@ -7,7 +10,7 @@ import {
   useSubmitPhoto,
   useResolveMapsLink,
 } from '../../hooks/useContribute';
-import type { CafeEditSuggestedData } from '../../types/cafe';
+import type { CafeEditSuggestedData, CafeFacility, CafeScale } from '../../types/cafe';
 import PhotoCropModal from './PhotoCropModal';
 import LocationPicker from './LocationPicker';
 import {
@@ -29,6 +32,43 @@ const VIBE_LEVELS = [
   { value: 2, label: 'Sedang' },
   { value: 3, label: 'Ramai' },
 ];
+
+// Sama persis dengan FACILITY_CONFIG/SCALE_CONFIG di
+// semejakerja-admin/app/(dashboard)/maps/cafes/CafeForm.tsx — 6 fasilitas
+// yang ditoggle langsung; motorParking/carParking/powerOutlets diturunkan
+// dari scales (bukan chip terpisah), lihat deriveFacilities() di bawah.
+const DEFAULT_FACILITIES: CafeFacility = {
+  wifi: false, ac: false, powerOutlets: false, mushola: false, motorParking: false, carParking: false,
+  meetingRoom: false, outdoor: false, heavyMeal: false,
+};
+const DEFAULT_SCALES: CafeScale = { area: 0, motorParking: 0, carParking: 0, outlets: 0 };
+
+const FACILITY_CONFIG: Array<{ key: keyof CafeFacility; label: string; icon: ReactNode }> = [
+  { key: 'wifi', label: 'WiFi Cepat', icon: <Wifi size={15} /> },
+  { key: 'ac', label: 'AC Sejuk', icon: <Wind size={15} /> },
+  { key: 'mushola', label: 'Mushola', icon: <BookOpen size={15} /> },
+  { key: 'meetingRoom', label: 'Ruang Meeting', icon: <Presentation size={15} /> },
+  { key: 'outdoor', label: 'Area Outdoor', icon: <Trees size={15} /> },
+  { key: 'heavyMeal', label: 'Makanan Berat', icon: <UtensilsCrossed size={15} /> },
+];
+
+const SCALE_CONFIG: Array<{ key: keyof CafeScale; label: string; icon: ReactNode; levels: [string, string, string, string] }> = [
+  { key: 'area', label: 'Luas Area', icon: <Maximize size={15} />, levels: ['Belum ada info', 'Kecil', 'Sedang', 'Luas'] },
+  { key: 'motorParking', label: 'Parkir Motor', icon: <Bike size={15} />, levels: ['Tidak ada', 'Sempit', 'Sedang', 'Luas'] },
+  { key: 'carParking', label: 'Parkir Mobil', icon: <Car size={15} />, levels: ['Tidak ada', 'Sempit', 'Sedang', 'Luas'] },
+  { key: 'outlets', label: 'Colokan', icon: <Zap size={15} />, levels: ['Tidak ada', 'Sedikit', 'Sedang', 'Banyak (tiap meja)'] },
+];
+
+// Parkir motor/mobil & colokan sumber kebenarannya skala, bukan chip
+// terpisah — sama persis derivasi toDbPayload() di admin lib.ts.
+function deriveFacilities(facilities: CafeFacility, scales: CafeScale): CafeFacility {
+  return {
+    ...facilities,
+    motorParking: scales.motorParking > 0,
+    carParking: scales.carParking > 0,
+    powerOutlets: scales.outlets > 0,
+  };
+}
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // samain dengan limit bucket cafe-photos (lihat admin PhotoManager)
 
@@ -79,6 +119,8 @@ export interface NewCafeFormOutput {
   vibes: number;
   rating: number;
   total_reviews: number;
+  facilities: CafeFacility;
+  scales: CafeScale;
   notes: string;
 }
 
@@ -99,6 +141,8 @@ function NewCafeForm({
   const [lng, setLng] = useState<number | null>(null);
   const [priceLevel, setPriceLevel] = useState(0);
   const [vibes, setVibes] = useState(2);
+  const [facilities, setFacilities] = useState<CafeFacility>(DEFAULT_FACILITIES);
+  const [scales, setScales] = useState<CafeScale>(DEFAULT_SCALES);
   const [week, setWeek] = useState<WeekHours>(defaultWeekHours());
   const [openHours, setOpenHours] = useState(suggestOpenHours(defaultWeekHours()));
   const [openHoursTouched, setOpenHoursTouched] = useState(false);
@@ -148,6 +192,8 @@ function NewCafeForm({
       vibes,
       rating: form.rating ? Number(form.rating) : 0,
       total_reviews: form.totalReviews ? Number(form.totalReviews) : 0,
+      facilities: deriveFacilities(facilities, scales),
+      scales,
       notes: form.notes.trim(),
     });
   };
@@ -232,20 +278,71 @@ function NewCafeForm({
         </div>
       </div>
 
-      {/* ── Vibes ── */}
-      <div>
-        <Label text="Suasana (Vibes)" optional />
-        <div className="flex rounded-xl border border-gray-200 overflow-hidden">
-          {VIBE_LEVELS.map(({ value, label }) => (
-            <button
-              key={value} type="button" onClick={() => setVibes(value)}
-              className={`flex-1 py-2 text-sm font-medium transition border-l first:border-l-0 border-gray-200 ${
-                vibes === value ? 'bg-purple-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      {/* ── Fasilitas & Suasana ── */}
+      <div className="space-y-4 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4">
+        <div>
+          <Label text="Fasilitas WFC" optional />
+          <div className="flex flex-wrap gap-2">
+            {FACILITY_CONFIG.map((f) => {
+              const active = facilities[f.key];
+              return (
+                <button
+                  key={f.key} type="button"
+                  onClick={() => setFacilities((p) => ({ ...p, [f.key]: !active }))}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                    active ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:border-purple-300'
+                  }`}
+                >
+                  {f.icon} {f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <Label text="Tingkat Suasana (vibes)" optional />
+          <div className="flex rounded-xl border border-gray-200 overflow-hidden bg-white">
+            {VIBE_LEVELS.map(({ value, label }) => (
+              <button
+                key={value} type="button" onClick={() => setVibes(value)}
+                className={`flex-1 py-2 text-sm font-medium transition border-l first:border-l-0 border-gray-200 ${
+                  vibes === value ? 'bg-purple-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {SCALE_CONFIG.map((s) => {
+            const level = scales[s.key];
+            return (
+              <div key={s.key}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                    <span className="text-purple-500">{s.icon}</span> {s.label}
+                  </span>
+                  <span className="text-xs text-gray-400">{s.levels[level]}</span>
+                </div>
+                <div className="flex rounded-xl border border-gray-200 overflow-hidden bg-white">
+                  {s.levels.map((_lvl, n) => (
+                    <button
+                      key={n} type="button"
+                      onClick={() => setScales((p) => ({ ...p, [s.key]: n }))}
+                      className={`flex-1 h-9 text-xs font-medium transition border-l first:border-l-0 border-gray-200 ${
+                        level === n ? 'bg-purple-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {n === 0 ? '–' : n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -672,6 +769,8 @@ export function ContributeModal({ type, cafeId, cafeName, currentValues, onClose
         vibes: d.vibes,
         rating: d.rating,
         total_reviews: d.total_reviews,
+        facilities: d.facilities,
+        scales: d.scales,
         notes: d.notes,
       },
       { onSuccess: () => setStep('success') },

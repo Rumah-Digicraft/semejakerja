@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import type { CafeFacilities, CafeScales } from '@/types'
 import {
   type CafeDbPayload, type CafeFormValues, type WeekHours,
@@ -84,8 +85,12 @@ interface CafeFormProps {
 
 export default function CafeForm({ initial, saving, submitLabel, onSubmit }: CafeFormProps) {
   const router = useRouter()
+  const supabase = createClient()
   const [values, setValues] = useState<CafeFormValues>(initial)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [mapsUrl, setMapsUrl] = useState('')
+  const [resolvingLocation, setResolvingLocation] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
   // open_hours mengikuti saran dari jadwal per-hari sampai diedit manual.
   const [openHoursTouched, setOpenHoursTouched] = useState(initial.open_hours.trim() !== '')
   // Section "Atur jam per hari" selalu mulai tertutup, walau kafe sudah
@@ -115,6 +120,25 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
     onSubmit(toDbPayload(values))
+  }
+
+  // Sama persis flow "Ambil Lokasi" di form publik (semejakerja-web-apps
+  // ContributeModal.tsx) — resolve link share Google Maps lewat edge
+  // function resolve-maps-link (follow redirect short link -> koordinat),
+  // dipakai supaya admin gak perlu copy-paste lat/lng manual dari Maps.
+  const handleResolveLink = async () => {
+    if (!mapsUrl.trim()) return
+    setResolvingLocation(true)
+    setLocationError(null)
+    const { data, error } = await supabase.functions.invoke('resolve-maps-link', { body: { url: mapsUrl.trim() } })
+    setResolvingLocation(false)
+    if (error) {
+      const body = await (error as { context?: Response }).context?.json?.().catch(() => null)
+      setLocationError(body?.error || error.message || 'Gagal membaca link, geser pin manual di bawah ya')
+      return
+    }
+    set({ lat: data.lat, lng: data.lng })
+    if (data.name && !values.name.trim()) set({ name: data.name })
   }
 
   const err = (key: string) =>
@@ -152,6 +176,26 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
         {/* ── Lokasi ── */}
         <SectionCard icon={<MapPin size={16} />} title="Lokasi">
           <div className="space-y-3">
+            <div>
+              <label className={labelCls}>Link Google Maps</label>
+              <div className="flex gap-2">
+                <input
+                  value={mapsUrl}
+                  onChange={e => setMapsUrl(e.target.value)}
+                  className={inputCls} placeholder="https://maps.app.goo.gl/..."
+                />
+                <button
+                  type="button"
+                  onClick={handleResolveLink}
+                  disabled={resolvingLocation || !mapsUrl.trim()}
+                  className="shrink-0 px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-sm font-medium transition disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {resolvingLocation ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
+                  Ambil Lokasi
+                </button>
+              </div>
+              {locationError && <p className="text-xs text-amber-600 mt-1.5">{locationError}</p>}
+            </div>
             <MapPicker
               center={[values.lat ?? PURWOKERTO_CENTER[0], values.lng ?? PURWOKERTO_CENTER[1]]}
               onLocationChange={(lat, lng) => set({ lat, lng })}
