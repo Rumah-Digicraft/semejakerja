@@ -798,7 +798,12 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
           type={contributeType}
           cafeId={cafe.id}
           cafeName={cafe.name}
-          currentValues={{ phone: cafe.phone ?? '', website: cafe.website ?? '', open_hours: cafe.openHours, name: cafe.name, address: cafe.address }}
+          currentValues={{
+            phone: cafe.phone ?? '', website: cafe.website ?? '', open_hours: cafe.openHours,
+            name: cafe.name, address: cafe.address, lat: cafe.lat, lng: cafe.lng,
+            weekday_text: cafe.schedule, price_level: cafe.priceLevel, vibes: cafe.vibes,
+            facilities: cafe.facilities, scales: cafe.scales,
+          }}
           onClose={() => setContributeType(null)}
         />
       )}

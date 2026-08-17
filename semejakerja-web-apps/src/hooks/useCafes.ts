@@ -190,6 +190,7 @@ function mapRowToCafe(row: CafeRow): Cafe {
     images: [],
     logoColor: color,
     markerColor: color,
+    priceLevel: row.price_level ?? 0,
     priceRange: PRICE_RANGE[row.price_level] ?? PRICE_RANGE[0],
     phone: row.phone,
     website: row.website,

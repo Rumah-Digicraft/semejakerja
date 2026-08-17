@@ -95,6 +95,7 @@ export interface Cafe {
   images: string[];
   logoColor: string;
   markerColor: string;
+  priceLevel: number; // 0-4, raw kolom cafes.price_level — priceRange di bawah cuma versi terformat
   priceRange: string;
   // Extra fields from actual DB (optional so mock data doesn't need them)
   phone?: string | null;
@@ -142,14 +143,26 @@ export interface CafeSubmission {
   created_at: string;
 }
 
+// Field selain _notes semuanya opsional — form publik cuma kirim yang
+// memang dikoreksi kontributor (lihat EditForm di ContributeModal.tsx).
+// Section non-teks (lokasi/jam/harga/vibe/fasilitas) dikirim lengkap kalau
+// section-nya di-centang, bukan per-field, karena toggle/select selalu
+// punya nilai terpilih (tidak ada state "kosong" alami seperti input teks).
 export interface CafeEditSuggestedData {
   name?: string;
   address?: string;
   phone?: string;
   website?: string;
   open_hours?: string;
+  weekday_text?: string[];
+  lat?: number;
+  lng?: number;
+  maps_url?: string;
+  price_level?: number;
+  vibes?: number;
+  facilities?: CafeFacility;
+  scales?: CafeScale;
   _notes?: string; // internal: alasan perubahan, distrip sebelum kirim ke DB
-  [key: string]: string | undefined;
 }
 
 export interface CafeEdit {
