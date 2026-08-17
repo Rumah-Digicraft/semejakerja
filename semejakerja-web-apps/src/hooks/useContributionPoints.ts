@@ -64,37 +64,3 @@ export function useMyContributionRank(userId: string | undefined) {
     staleTime: 60 * 1000,
   });
 }
-
-export interface ContributionEntry {
-  id: string;
-  sourceTable: ContributionSourceTable;
-  points: number;
-  cafeId: string | null;
-  awardedAt: string;
-}
-
-// Riwayat lengkap (semua waktu, bukan cuma bulan ini) kontribusi milik
-// user yang login — RLS di contribution_points sudah membatasi ke baris
-// sendiri, jadi query ini gak perlu filter tambahan selain user_id.
-export function useMyContributions(userId: string | undefined) {
-  return useQuery({
-    queryKey: ['my-contributions', userId],
-    enabled: !!userId,
-    queryFn: async (): Promise<ContributionEntry[]> => {
-      const { data, error } = await supabase
-        .from('contribution_points')
-        .select('id, source_table, points, cafe_id, awarded_at')
-        .eq('user_id', userId as string)
-        .order('awarded_at', { ascending: false });
-      if (error) throw new Error(error.message);
-      return (data ?? []).map(row => ({
-        id: row.id,
-        sourceTable: row.source_table as ContributionSourceTable,
-        points: row.points,
-        cafeId: row.cafe_id,
-        awardedAt: row.awarded_at,
-      }));
-    },
-    staleTime: 30 * 1000,
-  });
-}
