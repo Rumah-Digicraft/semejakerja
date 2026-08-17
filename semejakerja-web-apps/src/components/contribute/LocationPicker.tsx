@@ -44,7 +44,7 @@ function LocationMarker({ position, onChange }: { position: L.LatLngExpression; 
 
 export default function LocationPicker({ center, zoom = 14, onLocationChange }: LocationPickerProps) {
   const [position, setPosition] = useState<L.LatLngExpression>(center);
-  // Sinkron posisi pin dari `center` (mis. setelah "Ambil Lokasi" resolve
+  // Sinkron posisi pin dari `center` (mis. setelah "Cari Lokasi" resolve
   // sukses) tanpa efek terpisah — pola "adjusting state during render" dari
   // dokumentasi React, dijalankan langsung di body render, bukan di effect.
   const [prevCenter, setPrevCenter] = useState(center);
