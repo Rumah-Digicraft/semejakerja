@@ -22,6 +22,17 @@ export function serializeWeekdayText(week: WeekHours): string[] {
   return week.map((d, i) => `${DAY_LABELS[i]}: ${d.open ? `${d.from} - ${d.to}` : 'Tutup'}`);
 }
 
+// Kebalikan serializeWeekdayText — isi editor jam dari weekday_text yang
+// sudah ada (mis. kontributor koreksi jam operasional cafe yang sudah
+// punya jadwal), bukan selalu mulai dari defaultWeekHours() kosong.
+export function parseWeekdayText(lines: string[] | null | undefined): WeekHours {
+  if (!lines || lines.length !== 7) return defaultWeekHours();
+  return lines.map((line): DayHours => {
+    const m = line.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
+    return m ? { open: true, from: m[1], to: m[2] } : { open: false, from: '09:00', to: '22:00' };
+  });
+}
+
 // Saran isi open_hours (string ringkas dipakai peta publik buat filter
 // "Buka Malam" & fallback status buka): rentang tersering di hari buka.
 export function suggestOpenHours(week: WeekHours): string {

@@ -15,7 +15,7 @@ import { searchAddress, type GeocodeResult } from '../../lib/geocode';
 import PhotoCropModal from './PhotoCropModal';
 import LocationPicker from './LocationPicker';
 import {
-  DAY_LABELS, type WeekHours, defaultWeekHours, serializeWeekdayText, suggestOpenHours,
+  DAY_LABELS, type WeekHours, defaultWeekHours, parseWeekdayText, serializeWeekdayText, suggestOpenHours,
 } from '../../lib/openHoursEditor';
 
 const PURWOKERTO_CENTER: [number, number] = [-7.424, 109.23];
@@ -80,7 +80,7 @@ interface ContributeModalProps {
   cafeId?: string;
   cafeName?: string;
   // Current values for pre-filling edit form
-  currentValues?: CafeEditSuggestedData & { open_hours?: string; phone?: string; website?: string; name?: string; address?: string };
+  currentValues?: CafeEditSuggestedData;
   onClose: () => void;
 }
 
@@ -531,6 +531,33 @@ function NewCafeForm({
   );
 }
 
+// Section non-teks (lokasi/jam/harga/vibe/fasilitas) di EditForm dibungkus
+// checkbox opt-in — toggle/select selalu punya nilai terpilih, jadi tidak
+// ada state "kosong" alami buat nandain "nggak dikoreksi" seperti input teks.
+function OptInSection({
+  label, checked, onToggle, children,
+}: {
+  label: string;
+  checked: boolean;
+  onToggle: (v: boolean) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="border border-gray-100 rounded-2xl overflow-hidden">
+      <label className="flex items-center gap-2.5 px-4 py-3 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onToggle(e.target.checked)}
+          className="w-4 h-4 accent-purple-600 shrink-0"
+        />
+        <span className="text-sm font-semibold text-gray-700">{label}</span>
+      </label>
+      {checked && <div className="px-4 py-4 space-y-3 border-t border-gray-100">{children}</div>}
+    </div>
+  );
+}
+
 function EditForm({
   currentValues,
   onSubmit,
@@ -540,19 +567,108 @@ function EditForm({
   onSubmit: (d: CafeEditSuggestedData) => void;
   isLoading: boolean;
 }) {
-  // Start empty — user hanya isi field yang ingin dikoreksi
-  const [form, setForm] = useState<CafeEditSuggestedData>({
-    name: '', address: '', phone: '', website: '', open_hours: '',
-  });
-  const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+  // Start empty — user hanya isi field teks yang ingin dikoreksi
+  const [form, setForm] = useState({ name: '', address: '', phone: '', website: '' });
+  const set = (k: keyof typeof form, v: string) => setForm((p) => ({ ...p, [k]: v }));
   const [notes, setNotes] = useState('');
+
+  // ── Lokasi (opt-in) — mulai dari titik lokasi cafe saat ini, bukan kosong ──
+  const [locationOptIn, setLocationOptIn] = useState(false);
+  const [lat, setLat] = useState<number | null>(currentValues?.lat ?? null);
+  const [lng, setLng] = useState<number | null>(currentValues?.lng ?? null);
+  const [mapsUrl, setMapsUrl] = useState('');
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [addressResults, setAddressResults] = useState<GeocodeResult[]>([]);
+  const [addressSearching, setAddressSearching] = useState(false);
+  const [addressSearchError, setAddressSearchError] = useState<string | null>(null);
+  const [showLinkFallback, setShowLinkFallback] = useState(false);
+  const { mutate: resolveLink, isPending: resolving } = useResolveMapsLink();
+
+  // ── Jam operasional (opt-in) — mulai dari jadwal cafe saat ini ──
+  const [hoursOptIn, setHoursOptIn] = useState(false);
+  const [week, setWeek] = useState<WeekHours>(() => parseWeekdayText(currentValues?.weekday_text));
+  const [openHours, setOpenHours] = useState(() => suggestOpenHours(parseWeekdayText(currentValues?.weekday_text)));
+  const [openHoursTouched, setOpenHoursTouched] = useState(false);
+  const applyWeek = (nextWeek: WeekHours) => {
+    setWeek(nextWeek);
+    if (!openHoursTouched) setOpenHours(suggestOpenHours(nextWeek));
+  };
+  const setDay = (index: number, patch: Partial<WeekHours[number]>) => {
+    applyWeek(week.map((d, i) => (i === index ? { ...d, ...patch } : d)));
+  };
+
+  // ── Harga & Vibe & Fasilitas (opt-in) — mulai dari nilai cafe saat ini ──
+  const [priceOptIn, setPriceOptIn] = useState(false);
+  const [priceLevel, setPriceLevel] = useState(currentValues?.price_level ?? 0);
+  const [vibeOptIn, setVibeOptIn] = useState(false);
+  const [vibes, setVibes] = useState(currentValues?.vibes ?? 2);
+  const [facilitiesOptIn, setFacilitiesOptIn] = useState(false);
+  const [facilities, setFacilities] = useState<CafeFacility>(currentValues?.facilities ?? DEFAULT_FACILITIES);
+  const [scales, setScales] = useState<CafeScale>(currentValues?.scales ?? DEFAULT_SCALES);
+
+  // Nama/alamat buat query lokasi: pakai koreksi user kalau diisi, kalau
+  // belum ya pakai nama/alamat cafe yang sekarang (biasanya belum berubah).
+  const queryName = form.name || currentValues?.name || '';
+  const queryAddress = form.address || currentValues?.address || '';
+
+  const handleSearchAddress = async () => {
+    if (!queryName.trim() && !queryAddress.trim()) return;
+    setAddressSearchError(null);
+    setAddressSearching(true);
+    try {
+      const results = await searchAddress(queryName, queryAddress);
+      setAddressResults(results);
+      if (results.length === 0) {
+        setAddressSearchError('Lokasi tidak ketemu otomatis.');
+        setShowLinkFallback(true);
+      }
+    } catch {
+      setAddressSearchError('Gagal mencari lokasi, coba lagi.');
+    } finally {
+      setAddressSearching(false);
+    }
+  };
+  const handlePickAddressResult = (r: GeocodeResult) => {
+    setLat(r.lat);
+    setLng(r.lng);
+    setAddressResults([]);
+  };
+  const handleOpenGoogleMapsSearch = () => {
+    const query = [queryName, queryAddress].filter((s) => s.trim()).join(', ').trim();
+    if (!query) return;
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer');
+  };
+  const handleResolveLink = () => {
+    if (!mapsUrl.trim()) return;
+    setLocationError(null);
+    resolveLink(mapsUrl.trim(), {
+      onSuccess: (loc) => { setLat(loc.lat); setLng(loc.lng); },
+      onError: (err) => {
+        setLocationError(err instanceof Error ? err.message : 'Gagal membaca link, geser pin manual di bawah ya');
+      },
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Kirim semua field yang diisi (tidak kosong)
     const payload: CafeEditSuggestedData = {};
-    for (const [k, v] of Object.entries(form)) {
-      if (v && v.trim()) payload[k] = v.trim();
+    if (form.name.trim()) payload.name = form.name.trim();
+    if (form.address.trim()) payload.address = form.address.trim();
+    if (form.phone.trim()) payload.phone = form.phone.trim();
+    if (form.website.trim()) payload.website = form.website.trim();
+    if (locationOptIn && lat != null && lng != null) {
+      payload.lat = lat;
+      payload.lng = lng;
+    }
+    if (hoursOptIn) {
+      payload.open_hours = openHours;
+      payload.weekday_text = serializeWeekdayText(week);
+    }
+    if (priceOptIn) payload.price_level = priceLevel;
+    if (vibeOptIn) payload.vibes = vibes;
+    if (facilitiesOptIn) {
+      payload.facilities = deriveFacilities(facilities, scales);
+      payload.scales = scales;
     }
     if (Object.keys(payload).length === 0) return;
     onSubmit({ ...payload, _notes: notes });
@@ -561,7 +677,7 @@ function EditForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-xs text-gray-500 bg-purple-50 border border-purple-100 rounded-xl px-3 py-2">
-        Isi hanya field yang ingin kamu koreksi. Field yang dikosongkan tidak akan dikirim.
+        Isi hanya field yang ingin kamu koreksi. Field teks yang dikosongkan dan bagian yang tidak dicentang tidak akan dikirim.
       </p>
 
       {/* Tampilkan nilai saat ini sebagai referensi */}
@@ -569,34 +685,247 @@ function EditForm({
         <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 space-y-1">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Data saat ini (referensi)</p>
           {currentValues.name && <p className="text-xs text-gray-500"><span className="font-medium">Nama:</span> {currentValues.name}</p>}
+          {currentValues.address && <p className="text-xs text-gray-500"><span className="font-medium">Alamat:</span> {currentValues.address}</p>}
           {currentValues.phone && <p className="text-xs text-gray-500"><span className="font-medium">Telepon:</span> {currentValues.phone}</p>}
           {currentValues.open_hours && <p className="text-xs text-gray-500"><span className="font-medium">Jam Buka:</span> {currentValues.open_hours}</p>}
           {currentValues.website && <p className="text-xs text-gray-500"><span className="font-medium">Website:</span> {currentValues.website}</p>}
+          {currentValues.price_level != null && (
+            <p className="text-xs text-gray-500"><span className="font-medium">Harga:</span> {PRICE_OPTIONS.find((o) => o.value === currentValues.price_level)?.label}</p>
+          )}
+          {currentValues.vibes != null && (
+            <p className="text-xs text-gray-500"><span className="font-medium">Suasana:</span> {VIBE_LEVELS.find((v) => v.value === currentValues.vibes)?.label}</p>
+          )}
         </div>
       )}
 
       <div>
         <Label text="Nama Cafe" optional />
-        <input className={inputCls} placeholder="Tulis nama yang benar..." value={form.name ?? ''} onChange={(e) => set('name', e.target.value)} />
+        <input className={inputCls} placeholder="Tulis nama yang benar..." value={form.name} onChange={(e) => set('name', e.target.value)} />
       </div>
       <div>
         <Label text="Alamat" optional />
-        <textarea className={`${inputCls} resize-none min-h-[60px]`} placeholder="Tulis alamat yang benar..." value={form.address ?? ''} onChange={(e) => set('address', e.target.value)} />
+        <textarea className={`${inputCls} resize-none min-h-[60px]`} placeholder="Tulis alamat yang benar..." value={form.address} onChange={(e) => set('address', e.target.value)} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label text="Telepon" optional />
-          <input className={inputCls} placeholder="08xx..." value={form.phone ?? ''} onChange={(e) => set('phone', e.target.value)} />
-        </div>
-        <div>
-          <Label text="Jam Buka" optional />
-          <input className={inputCls} placeholder="08:00 - 22:00" value={form.open_hours ?? ''} onChange={(e) => set('open_hours', e.target.value)} />
-        </div>
+      <div>
+        <Label text="Telepon" optional />
+        <input className={inputCls} placeholder="08xx..." value={form.phone} onChange={(e) => set('phone', e.target.value)} />
       </div>
       <div>
         <Label text="Website / Instagram" optional />
-        <input className={inputCls} placeholder="https://..." value={form.website ?? ''} onChange={(e) => set('website', e.target.value)} />
+        <input className={inputCls} placeholder="https://..." value={form.website} onChange={(e) => set('website', e.target.value)} />
       </div>
+
+      {/* ── Lokasi ── */}
+      <OptInSection label="Koreksi Titik Lokasi di Peta" checked={locationOptIn} onToggle={setLocationOptIn}>
+        <button
+          type="button"
+          onClick={handleSearchAddress}
+          disabled={addressSearching || (!queryName.trim() && !queryAddress.trim())}
+          className="w-full px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+        >
+          {addressSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          Cari Lokasi Otomatis
+        </button>
+        {addressSearchError && <p className="text-xs text-amber-600">{addressSearchError}</p>}
+        {addressResults.length > 0 && (
+          <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+            {addressResults.map((r, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => handlePickAddressResult(r)}
+                className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-start gap-2"
+              >
+                <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-purple-500" />
+                <span className="line-clamp-2">{r.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!showLinkFallback ? (
+          <button type="button" onClick={() => setShowLinkFallback(true)} className="text-xs font-semibold text-purple-600 hover:underline">
+            Nggak ketemu? Pakai link Google Maps →
+          </button>
+        ) : (
+          <div className="pt-1 border-t border-gray-100 space-y-1.5">
+            <p className="text-xs text-gray-500">
+              Klik{' '}
+              <button
+                type="button"
+                onClick={handleOpenGoogleMapsSearch}
+                disabled={!queryName.trim() && !queryAddress.trim()}
+                className="font-semibold text-purple-600 hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-0.5"
+              >
+                buka Google Maps <ExternalLink className="w-3 h-3" />
+              </button>
+              , cari & pastikan pin-nya di tempat yang benar, lalu copy link dari address bar dan tempel di sini:
+            </p>
+            <div className="flex gap-2">
+              <input
+                className={inputCls}
+                placeholder="https://maps.app.goo.gl/..."
+                value={mapsUrl}
+                onChange={(e) => setMapsUrl(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={handleResolveLink}
+                disabled={resolving || !mapsUrl.trim()}
+                className="shrink-0 px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                Pakai Link Ini
+              </button>
+            </div>
+            {locationError && <p className="text-xs text-amber-600">{locationError}</p>}
+          </div>
+        )}
+
+        <p className="text-xs text-gray-400">Geser pin di peta kalau kurang pas.</p>
+        <LocationPicker
+          center={lat != null && lng != null ? [lat, lng] : PURWOKERTO_CENTER}
+          onLocationChange={(nlat, nlng) => { setLat(nlat); setLng(nlng); }}
+        />
+      </OptInSection>
+
+      {/* ── Harga ── */}
+      <OptInSection label="Koreksi Rentang Harga" checked={priceOptIn} onToggle={setPriceOptIn}>
+        <select className={`${inputCls} bg-white`} value={priceLevel} onChange={(e) => setPriceLevel(Number(e.target.value))}>
+          {PRICE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </OptInSection>
+
+      {/* ── Fasilitas & Suasana ── */}
+      <OptInSection label="Koreksi Fasilitas & Suasana" checked={facilitiesOptIn} onToggle={setFacilitiesOptIn}>
+        <div>
+          <Label text="Fasilitas WFC" optional />
+          <div className="flex flex-wrap gap-2">
+            {FACILITY_CONFIG.map((f) => {
+              const active = facilities[f.key];
+              return (
+                <button
+                  key={f.key} type="button"
+                  onClick={() => setFacilities((p) => ({ ...p, [f.key]: !active }))}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                    active ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:border-purple-300'
+                  }`}
+                >
+                  {f.icon} {f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="space-y-3">
+          {SCALE_CONFIG.map((s) => {
+            const level = scales[s.key];
+            return (
+              <div key={s.key}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                    <span className="text-purple-500">{s.icon}</span> {s.label}
+                  </span>
+                  <span className="text-xs text-gray-400">{s.levels[level]}</span>
+                </div>
+                <div className="flex rounded-xl border border-gray-200 overflow-hidden bg-white">
+                  {s.levels.map((_lvl, n) => (
+                    <button
+                      key={n} type="button"
+                      onClick={() => setScales((p) => ({ ...p, [s.key]: n }))}
+                      className={`flex-1 h-9 text-xs font-medium transition border-l first:border-l-0 border-gray-200 ${
+                        level === n ? 'bg-purple-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {n === 0 ? '–' : n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </OptInSection>
+
+      {/* ── Vibe ── */}
+      <OptInSection label="Koreksi Tingkat Suasana (vibes)" checked={vibeOptIn} onToggle={setVibeOptIn}>
+        <div className="flex rounded-xl border border-gray-200 overflow-hidden bg-white">
+          {VIBE_LEVELS.map(({ value, label }) => (
+            <button
+              key={value} type="button" onClick={() => setVibes(value)}
+              className={`flex-1 py-2 text-sm font-medium transition border-l first:border-l-0 border-gray-200 ${
+                vibes === value ? 'bg-purple-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </OptInSection>
+
+      {/* ── Jam Operasional ── */}
+      <OptInSection label="Koreksi Jam Operasional" checked={hoursOptIn} onToggle={setHoursOptIn}>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => applyWeek(week.map(() => ({ ...week[0] })))}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs text-gray-600 transition"
+          >
+            Samakan semua hari
+          </button>
+          <button
+            type="button"
+            onClick={() => applyWeek(DAY_LABELS.map(() => ({ open: true, from: '00:00', to: '23:59' })))}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs text-gray-600 transition"
+          >
+            24 Jam
+          </button>
+        </div>
+        <div className="space-y-1.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
+          {week.map((day, i) => (
+            <div key={DAY_LABELS[i]} className="flex items-center gap-2">
+              <label className="flex items-center gap-2 w-24 cursor-pointer shrink-0">
+                <input
+                  type="checkbox" checked={day.open}
+                  onChange={(e) => setDay(i, { open: e.target.checked })}
+                  className="w-3.5 h-3.5 accent-purple-600"
+                />
+                <span className="text-sm text-gray-700">{DAY_LABELS[i]}</span>
+              </label>
+              {day.open ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="time" value={day.from} onChange={(e) => setDay(i, { from: e.target.value })}
+                    className="px-2 py-1 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  <span className="text-gray-400 text-sm">–</span>
+                  <input
+                    type="time" value={day.to} onChange={(e) => setDay(i, { to: e.target.value })}
+                    className="px-2 py-1 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                </div>
+              ) : (
+                <span className="text-sm text-gray-400 italic">Tutup</span>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={openHours}
+            onChange={(e) => { setOpenHoursTouched(true); setOpenHours(e.target.value); }}
+            className={inputCls} placeholder='Ringkasan jam, mis. "09:00 - 22:00"'
+          />
+          <button
+            type="button"
+            onClick={() => { setOpenHoursTouched(false); setOpenHours(suggestOpenHours(week)); }}
+            className="shrink-0 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs text-gray-600 transition"
+          >
+            Pakai saran
+          </button>
+        </div>
+      </OptInSection>
+
       <div>
         <Label text="Alasan Perubahan" optional />
         <textarea className={`${inputCls} resize-none min-h-[60px]`} placeholder="Kenapa info ini perlu diubah?" value={notes} onChange={(e) => setNotes(e.target.value)} />
