@@ -213,11 +213,15 @@ const Sidebar: React.FC<SidebarProps> = ({
           </p>
         </div>
 
-        {/* Filters Body — blurred for guests (Rule: wajib login untuk pakai filter) */}
+        {/* Filters Body — blurred for guests (Rule: wajib login untuk pakai filter).
+            min-h-0 needed for the same reason as CafeModal's scrollable
+            content div — without it this flex item won't shrink below its
+            content height and pushes the Reset/Tambahkan Tempat Baru
+            footer below the sheet's visible bounds in peek mode. */}
         <div
           aria-hidden={isGuest}
           className={[
-            'flex-1 overflow-y-auto px-6 py-8 sm:px-6 sm:py-8 space-y-9 sm:space-y-11',
+            'flex-1 min-h-0 overflow-y-auto px-6 py-8 sm:px-6 sm:py-8 space-y-9 sm:space-y-11',
             isGuest ? 'blur-[6px] pointer-events-none select-none' : '',
           ].join(' ')}
         >
