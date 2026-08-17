@@ -85,6 +85,8 @@ export interface CafeSubmission {
   vibes: number
   rating: number
   total_reviews: number
+  facilities: CafeFacilities | null
+  scales: CafeScales | null
   notes: string | null
   reviewed_by: string | null
   reviewed_at: string | null

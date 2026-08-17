@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
-import type { CafeEditSuggestedData } from '../types/cafe';
+import type { CafeEditSuggestedData, CafeFacility, CafeScale } from '../types/cafe';
 
 // ── Submit Cafe baru ─────────────────────────────────────────────────────────
 
@@ -18,6 +18,8 @@ export interface NewCafeData {
   vibes?: number;
   rating?: number;
   total_reviews?: number;
+  facilities?: CafeFacility;
+  scales?: CafeScale;
   notes?: string;
 }
 
@@ -42,6 +44,8 @@ async function submitNewCafe(data: NewCafeData) {
     vibes: data.vibes ?? 2,
     rating: data.rating ?? 0,
     total_reviews: data.total_reviews ?? 0,
+    facilities: data.facilities ?? null,
+    scales: data.scales ?? null,
     notes: data.notes || null,
   });
   if (error) throw new Error(error.message);

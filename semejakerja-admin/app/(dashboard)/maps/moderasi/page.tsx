@@ -31,6 +31,23 @@ const PRICE_LABELS: Record<number, string> = {
 }
 const VIBE_LABELS: Record<number, string> = { 1: 'Tenang', 2: 'Sedang', 3: 'Ramai' }
 
+// Sama dengan FACILITY_CONFIG/SCALE_CONFIG di cafes/CafeForm.tsx — cuma
+// label buat preview read-only di sini, tidak perlu icon/interaktif.
+const FACILITY_LABELS: Array<{ key: string; label: string }> = [
+  { key: 'wifi', label: 'WiFi Cepat' },
+  { key: 'ac', label: 'AC Sejuk' },
+  { key: 'mushola', label: 'Mushola' },
+  { key: 'meetingRoom', label: 'Ruang Meeting' },
+  { key: 'outdoor', label: 'Area Outdoor' },
+  { key: 'heavyMeal', label: 'Makanan Berat' },
+]
+const SCALE_LABELS: Record<string, { label: string; levels: string[] }> = {
+  area: { label: 'Luas Area', levels: ['Belum ada info', 'Kecil', 'Sedang', 'Luas'] },
+  motorParking: { label: 'Parkir Motor', levels: ['Tidak ada', 'Sempit', 'Sedang', 'Luas'] },
+  carParking: { label: 'Parkir Mobil', levels: ['Tidak ada', 'Sempit', 'Sedang', 'Luas'] },
+  outlets: { label: 'Colokan', levels: ['Tidak ada', 'Sedikit', 'Sedang', 'Banyak (tiap meja)'] },
+}
+
 function Badge({ count }: { count: number }) {
   if (count === 0) return null
   return <span className="ml-1.5 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{count}</span>
@@ -123,6 +140,17 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Detail Usulan</p>
             <p><span className="text-slate-500">Harga:</span> {PRICE_LABELS[item.price_level ?? 0] ?? '–'}</p>
             <p><span className="text-slate-500">Vibes:</span> {VIBE_LABELS[item.vibes ?? 2] ?? '–'}</p>
+            {item.facilities && (
+              <p>
+                <span className="text-slate-500">Fasilitas:</span>{' '}
+                {FACILITY_LABELS.filter(f => item.facilities[f.key]).map(f => f.label).join(', ') || '–'}
+              </p>
+            )}
+            {item.scales && (
+              <p className="text-xs text-slate-500">
+                {Object.entries(SCALE_LABELS).map(([key, cfg]) => `${cfg.label}: ${cfg.levels[item.scales[key] ?? 0]}`).join(' · ')}
+              </p>
+            )}
             {(item.rating > 0 || item.total_reviews > 0) && (
               <p><span className="text-slate-500">Review Google:</span> ⭐ {item.rating ?? 0} ({item.total_reviews ?? 0} review)</p>
             )}
@@ -228,9 +256,21 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
   )
 }
 
+type StatusFilter = 'pending' | 'approved' | 'rejected' | 'all'
+
+const STATUS_FILTERS: Array<{ id: StatusFilter; label: string }> = [
+  { id: 'pending', label: 'Belum Dicek' },
+  { id: 'approved', label: 'Disetujui' },
+  { id: 'rejected', label: 'Ditolak' },
+  { id: 'all', label: 'Semua' },
+]
+
 export default function ModerasiPage() {
   const supabase = createClient()
   const [tab, setTab] = useState<TabType>('submissions')
+  // Default "Belum Dicek" — itu yang paling perlu ditindaklanjuti admin;
+  // "Semua"/"Disetujui"/"Ditolak" masih bisa dipilih buat audit riwayat.
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending')
   const [data, setData] = useState<any[]>([])
   const [cafeNames, setCafeNames] = useState<Record<string, string>>({})
   const [reviewerNames, setReviewerNames] = useState<Record<string, string>>({})
@@ -251,7 +291,13 @@ export default function ModerasiPage() {
   const loadTab = useCallback(async () => {
     setLoading(true)
     const tableMap = { submissions: 'cafe_submissions', edits: 'cafe_edits', reviews: 'cafe_reviews', photos: 'cafe_photos' }
-    const { data } = await supabase.from(tableMap[tab]).select('*').order('created_at', { ascending: false }).limit(50)
+    // Filter status di query (bukan cuma di client) supaya "ambil 50 baris
+    // terlama" itu 50 baris TERLAMA YANG BELUM DICEK, bukan ketiban baris
+    // lama yang sebenarnya sudah lama disetujui/ditolak. Ascending = adil,
+    // yang antre paling lama duluan direview, tidak keselip entry baru.
+    let query = supabase.from(tableMap[tab]).select('*').order('created_at', { ascending: true }).limit(50)
+    if (statusFilter !== 'all') query = query.eq('status', statusFilter)
+    const { data } = await query
     setData(data ?? [])
 
     // submissions = usulan kafe baru, tidak punya cafe_id (belum ada kafenya).
@@ -278,11 +324,11 @@ export default function ModerasiPage() {
       setReviewerNames({})
     }
     setLoading(false)
-  }, [tab])
+  }, [tab, statusFilter])
 
   useEffect(() => { loadCounts(); loadTab() }, [loadCounts, loadTab])
 
-  const { page, setPage, pageCount, pageItems, pageSize, total } = usePagination(data, tab)
+  const { page, setPage, pageCount, pageItems, pageSize, total } = usePagination(data, `${tab}-${statusFilter}`, 10)
 
   const STATUS_STYLE: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-700',
@@ -315,7 +361,7 @@ export default function ModerasiPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 w-fit max-w-full overflow-x-auto">
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-4 w-fit max-w-full overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -325,6 +371,24 @@ export default function ModerasiPage() {
             }`}
           >
             {t.icon} {t.label} <Badge count={t.count} />
+          </button>
+        ))}
+      </div>
+
+      {/* Filter status */}
+      <div className="flex items-center gap-1.5 mb-6 flex-wrap">
+        <span className="text-xs font-medium text-slate-400 mr-1">Status:</span>
+        {STATUS_FILTERS.map(f => (
+          <button
+            key={f.id}
+            onClick={() => setStatusFilter(f.id)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition border ${
+              statusFilter === f.id
+                ? 'bg-purple-600 border-purple-600 text-white shadow-sm'
+                : 'bg-white border-slate-200 text-slate-500 hover:border-purple-300'
+            }`}
+          >
+            {f.label}
           </button>
         ))}
       </div>
