@@ -1,6 +1,6 @@
 import { useState, useRef, type ReactNode } from 'react';
 import {
-  X, CheckCircle2, Star, Upload, Loader2, MapPin,
+  X, CheckCircle2, Star, Upload, Loader2, MapPin, Search, ExternalLink,
   Wifi, Wind, BookOpen, Presentation, Trees, UtensilsCrossed, Maximize, Bike, Car, Zap,
 } from 'lucide-react';
 import {
@@ -11,6 +11,7 @@ import {
   useResolveMapsLink,
 } from '../../hooks/useContribute';
 import type { CafeEditSuggestedData, CafeFacility, CafeScale } from '../../types/cafe';
+import { searchAddress, type GeocodeResult } from '../../lib/geocode';
 import PhotoCropModal from './PhotoCropModal';
 import LocationPicker from './LocationPicker';
 import {
@@ -148,6 +149,14 @@ function NewCafeForm({
   const [openHoursTouched, setOpenHoursTouched] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [addressResults, setAddressResults] = useState<GeocodeResult[]>([]);
+  const [addressSearching, setAddressSearching] = useState(false);
+  const [addressSearchError, setAddressSearchError] = useState<string | null>(null);
+  // Opsi Google Maps + paste-link disembunyikan sampai memang dibutuhkan
+  // (pencarian otomatis gagal, atau user memang sudah punya link) — biar
+  // nggak numpuk 4 kontrol sekaligus di layar buat kasus umum yang biasanya
+  // langsung ketemu dari pencarian otomatis.
+  const [showLinkFallback, setShowLinkFallback] = useState(false);
 
   const { mutate: resolveLink, isPending: resolving } = useResolveMapsLink();
 
@@ -172,6 +181,47 @@ function NewCafeForm({
         setLocationError(err instanceof Error ? err.message : 'Gagal membaca link, geser pin manual di bawah ya');
       },
     });
+  };
+
+  // Alternatif gratis buat "Link Google Maps" — geocoding pakai OpenStreetMap
+  // Nominatim (tanpa API key) dari Nama Cafe + Alamat yang sudah diisi.
+  // Ada karena link share Google Maps dari app HP sering nggak bisa dibaca
+  // koordinatnya (lihat komen di resolve-maps-link edge function), jadi user
+  // nggak harus bolak-balik ke Google Maps buat dapetin link yang "benar".
+  const handleSearchAddress = async () => {
+    if (!form.name.trim() && !form.address.trim()) return;
+    setAddressSearchError(null);
+    setAddressSearching(true);
+    try {
+      const results = await searchAddress(form.name, form.address);
+      setAddressResults(results);
+      if (results.length === 0) {
+        setAddressSearchError('Lokasi tidak ketemu otomatis.');
+        setShowLinkFallback(true);
+      }
+    } catch {
+      setAddressSearchError('Gagal mencari lokasi, coba lagi.');
+    } finally {
+      setAddressSearching(false);
+    }
+  };
+
+  const handlePickAddressResult = (r: GeocodeResult) => {
+    setLat(r.lat);
+    setLng(r.lng);
+    setAddressResults([]);
+  };
+
+  // Nominatim (di atas) sering nggak nemu bisnis kecil/jalan yang belum ditag
+  // di OSM. Google punya data yang jauh lebih lengkap — buka tab baru ke URL
+  // pencarian resmi Google Maps (bukan scraping, ini skema URL yang memang
+  // didokumentasikan Google buat deep-link), user tinggal cek pin-nya lalu
+  // copy link dari address bar & tempel di kolom "Link Google Maps" di bawah.
+  const handleOpenGoogleMapsSearch = () => {
+    const query = [form.name, form.address].filter((s) => s.trim()).join(', ').trim();
+    if (!query) return;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -211,26 +261,82 @@ function NewCafeForm({
 
       {/* ── Lokasi ── */}
       <div>
-        <Label text="Link Google Maps" optional hint="tempel link share dari Google Maps" />
-        <div className="flex gap-2">
-          <input
-            className={inputCls}
-            placeholder="https://maps.app.goo.gl/..."
-            value={form.mapsUrl}
-            onChange={(e) => set('mapsUrl', e.target.value)}
-          />
+        <Label text="Titik Lokasi di Peta" />
+
+        <button
+          type="button"
+          onClick={handleSearchAddress}
+          disabled={addressSearching || (!form.name.trim() && !form.address.trim())}
+          className="w-full px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+        >
+          {addressSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          Cari Lokasi Otomatis
+        </button>
+        {addressSearchError && <p className="text-xs text-amber-600 mt-1.5">{addressSearchError}</p>}
+        {addressResults.length > 0 && (
+          <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+            {addressResults.map((r, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => handlePickAddressResult(r)}
+                className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-start gap-2"
+              >
+                <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-purple-500" />
+                <span className="line-clamp-2">{r.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Fallback (link Google Maps) — disembunyikan sampai pencarian
+            otomatis gagal, atau user klik toggle-nya sendiri kalau memang
+            sudah pegang link. Menghindari numpuk 4 kontrol lokasi sekaligus
+            buat kasus umum yang biasanya langsung ketemu di atas. */}
+        {!showLinkFallback ? (
           <button
             type="button"
-            onClick={handleResolveLink}
-            disabled={resolving || !form.mapsUrl.trim()}
-            className="shrink-0 px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all disabled:opacity-50 flex items-center gap-1.5"
+            onClick={() => setShowLinkFallback(true)}
+            className="text-xs font-semibold text-purple-600 hover:underline mt-2"
           >
-            {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-            Ambil Lokasi
+            Nggak ketemu? Pakai link Google Maps →
           </button>
-        </div>
-        {locationError && <p className="text-xs text-amber-600 mt-1.5">{locationError}</p>}
-        <p className="text-xs text-gray-400 mt-1.5">
+        ) : (
+          <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+            <p className="text-xs text-gray-500">
+              Klik{' '}
+              <button
+                type="button"
+                onClick={handleOpenGoogleMapsSearch}
+                disabled={!form.name.trim() && !form.address.trim()}
+                className="font-semibold text-purple-600 hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-0.5"
+              >
+                buka Google Maps <ExternalLink className="w-3 h-3" />
+              </button>
+              , cari & pastikan pin-nya di tempat yang benar, lalu copy link dari address bar dan tempel di sini:
+            </p>
+            <div className="flex gap-2">
+              <input
+                className={inputCls}
+                placeholder="https://maps.app.goo.gl/..."
+                value={form.mapsUrl}
+                onChange={(e) => set('mapsUrl', e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={handleResolveLink}
+                disabled={resolving || !form.mapsUrl.trim()}
+                className="shrink-0 px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                Pakai Link Ini
+              </button>
+            </div>
+            {locationError && <p className="text-xs text-amber-600">{locationError}</p>}
+          </div>
+        )}
+
+        <p className="text-xs text-gray-400 mt-2">
           {lat != null && lng != null ? 'Geser pin di peta kalau kurang pas.' : 'Atau langsung klik/geser pin di peta di bawah ini.'}
         </p>
         <div className="mt-2">
