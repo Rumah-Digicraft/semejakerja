@@ -40,7 +40,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ cafes, onCafeClick }) => {
   const handleSelect = (cafe: Cafe) => {
     setQuery('');
     setIsOpen(false);
-    map.flyTo([cafe.lat, cafe.lng], 16, { animate: true, duration: 1.5 });
+    map.flyTo([cafe.lat, cafe.lng], 18, { animate: true, duration: 1.5 });
     
     // Call the parent handler to open modal and track click
     setTimeout(() => {
