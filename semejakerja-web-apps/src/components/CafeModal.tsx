@@ -6,6 +6,7 @@ import {
   Pencil, MessageSquare, Camera, Users, FileText,
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Lock, Crown, LogIn,
   Presentation, Trees, UtensilsCrossed, Maximize,
+  VolumeX, Volume1, Volume2,
 } from 'lucide-react';
 import type { Cafe, CafeReview } from '../types/cafe';
 import type { MapsAccess } from '../hooks/useAuth';
@@ -48,6 +49,14 @@ const facilityConfig: Record<string, { label: string; icon: React.FC<{ size?: nu
   meetingRoom: { label: 'Ruang Meeting', icon: Presentation, color: '#7c3aed' },
   outdoor: { label: 'Area Outdoor', icon: Trees, color: '#16a34a' },
   heavyMeal: { label: 'Makanan Berat', icon: UtensilsCrossed, color: '#d97706' },
+};
+
+// Suasana — 1/2/3 tetap (bukan skala 0-3 opsional seperti scaleConfig di
+// bawah), selaras VIBE_LEVELS di Sidebar.tsx (filter pakai ikon yang sama).
+const vibeConfig: Record<number, { label: string; icon: React.FC<{ size?: number; style?: React.CSSProperties }> }> = {
+  1: { label: 'Tenang', icon: VolumeX },
+  2: { label: 'Sedang', icon: Volume1 },
+  3: { label: 'Ramai', icon: Volume2 },
 };
 
 // Skala 0-3 → label per level (index 0 tak ditampilkan). Selaras SCALE_CONFIG admin.
@@ -578,6 +587,24 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
                   </div>
                 </>
               )}
+
+              {/* Suasana — Tenang/Sedang/Ramai, sejalan dg filter "Suasana" di Sidebar.
+                  Perlu caption: "Sedang" doang ambigu kalau berdiri sendiri —
+                  scale lain di section ini (Luas Area, Colokan) juga pakai
+                  kata "Sedang" buat sumbu yang beda sama sekali. */}
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Suasana</h3>
+              <p className="text-[11px] text-gray-400 -mt-1">Tingkat keramaian pengunjung di cafe ini</p>
+              <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-gray-50/80 border border-gray-100">
+                {(() => {
+                  const { label, icon: Icon } = vibeConfig[cafe.vibes] ?? vibeConfig[2];
+                  return (
+                    <>
+                      <Icon size={14} style={{ color: '#7c3aed' }} />
+                      <span className="text-xs font-semibold text-gray-700">{label}</span>
+                    </>
+                  );
+                })()}
+              </div>
             </div>
             {facilitiesLocked && (
               <div className="absolute inset-0 z-10 flex items-center justify-center px-4">
