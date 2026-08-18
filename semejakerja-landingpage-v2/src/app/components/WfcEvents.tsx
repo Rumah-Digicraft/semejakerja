@@ -1,9 +1,11 @@
 "use client";
 
-// Homepage section that surfaces open WFC "Bareng Strangers" events.
+// Homepage section "Event Semeja" — surfaces open community events (WFC
+// Bareng Strangers, lomba, kumpul komunitas; semua dari form builder admin).
 // Auto show/hide: renders nothing when there are no featured open events
 // (admin controls this via the show_on_landing toggle + status='open').
-// Same pattern as LaunchBanner.
+// Same pattern as LaunchBanner. Route & component names keep the "wfc"
+// naming — /wfc is a stable shared URL, only the copy is generalized.
 
 import Link from "next/link";
 import { Users, ArrowRight } from "lucide-react";
@@ -26,12 +28,12 @@ export default function WfcEvents() {
       <div className="container">
         <ScrollReveal className={styles.header}>
           <span className={styles.badge}>
-            <Users size={14} /> WFC Bareng Strangers
+            <Users size={14} /> Event Semeja
           </span>
-          <h2 className={styles.title}>Ikut event WFC bareng cafe partner</h2>
+          <h2 className={styles.title}>Ikut event bareng teman semeja</h2>
           <p className={styles.subtitle}>
-            Kerja bareng orang baru di cafe pilihan, dapat diskon, dan perluas
-            networking. Slot terbatas daftar sebelum penuh!
+            WFC bareng strangers, lomba, sampai kumpul komunitas. Kuota tiap
+            event terbatas, daftar sebelum penuh ya!
           </p>
         </ScrollReveal>
 

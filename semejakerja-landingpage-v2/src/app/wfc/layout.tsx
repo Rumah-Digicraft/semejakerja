@@ -4,9 +4,9 @@ import type { Metadata } from "next";
 // metadata lives in this segment layout (client pages can't export metadata
 // in a static export). Gives shared, shareable OG/SEO for the events hub.
 export const metadata: Metadata = {
-  title: "Event WFC Bareng Strangers",
+  title: "Event Semeja",
   description:
-    "Ikut event WFC (Work From Cafe) Bareng Strangers dari Semeja Kerja — kerja bareng orang baru di cafe partner di Purwokerto, dapat diskon, dan perluas networking.",
+    "Event komunitas Semeja Kerja di Purwokerto: WFC (Work From Cafe) Bareng Strangers di cafe partner, lomba, dan kumpul komunitas. Daftar gratis, kuota tiap event terbatas.",
   alternates: { canonical: "/wfc" },
   openGraph: { url: "/wfc" },
 };

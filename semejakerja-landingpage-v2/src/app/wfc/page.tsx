@@ -1,9 +1,10 @@
 "use client";
 
-// Public index of WFC "Bareng Strangers" events. Lists every form that is
-// open + show_on_landing (via the public_wfc_events view). Unlike the homepage
-// section, this page always renders (with an empty state) so the URL is a
-// stable, shareable hub for the events.
+// Public index of community events ("Event Semeja" — WFC Bareng Strangers,
+// lomba, kumpul komunitas). Lists every form that is open + show_on_landing
+// (via the public_wfc_events view). Unlike the homepage section, this page
+// always renders (with an empty state) so the URL is a stable, shareable hub
+// for the events. The /wfc route name is kept for link stability.
 
 import { Loader2, Users } from "lucide-react";
 import { useWfcEvents, WfcEventCard, WfcEventFeatured } from "./shared";
@@ -17,12 +18,13 @@ export default function WfcIndexPage() {
       <div className={styles.pageInner}>
         <div className={styles.header}>
           <span className={styles.badge}>
-            <Users size={14} /> WFC Bareng Strangers
+            <Users size={14} /> Event Semeja
           </span>
-          <h1 className={styles.title}>Event WFC Semeja Kerja</h1>
+          <h1 className={styles.title}>Event Komunitas Semeja Kerja</h1>
           <p className={styles.subtitle}>
-            Kerja bareng orang baru di cafe partner, dapat diskon, dan perluas
-            networking. Pilih event yang cocok dan daftar sebelum kuota penuh.
+            Semua event yang lagi buka pendaftaran ada di sini: WFC bareng
+            strangers, lomba, dan acara komunitas lainnya. Pilih yang cocok,
+            daftar sebelum kuota penuh.
           </p>
         </div>
 
@@ -34,8 +36,8 @@ export default function WfcIndexPage() {
           <div className={styles.empty}>
             <div className={styles.emptyEmoji}>☕️</div>
             <p className={styles.emptyText}>
-              Belum ada event WFC yang dibuka. Pantau terus Instagram
-              @semejakerja ya — event baru bakal muncul di sini!
+              Belum ada event yang dibuka. Pantau terus Instagram @semejakerja
+              ya, event baru bakal muncul di sini!
             </p>
           </div>
         ) : events.length === 1 ? (
