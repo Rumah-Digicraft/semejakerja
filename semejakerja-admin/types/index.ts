@@ -272,9 +272,11 @@ export type FormStatus = 'draft' | 'open' | 'closed'
 
 // Tipe pertanyaan form builder. 'section' = blok info statis (tanpa jawaban),
 // sisanya menampung jawaban. 'radio'/'checkbox'/'dropdown' pakai `options`.
+// 'image' = peserta upload 1 gambar (mis. bukti follow IG) ke bucket
+// form-uploads; jawabannya public URL string (migration 053).
 export type FormQuestionType =
   | 'short_text' | 'paragraph' | 'radio' | 'checkbox'
-  | 'dropdown' | 'email' | 'phone' | 'section'
+  | 'dropdown' | 'email' | 'phone' | 'image' | 'section'
 
 // Field user_profiles yang bisa disinkron dua arah dari sebuah pertanyaan
 // (autofill dari profil + write-back saat submit). Cocok dengan kolom di
@@ -299,6 +301,10 @@ export interface Form {
   cafe_name: string | null
   questions: FormQuestion[]
   quota: number | null
+  // Tampilkan kuota/max peserta di halaman publik (kartu landing + list
+  // peserta register). false → public_wfc_events nge-NULL-kan quota
+  // (migration 054); kuota tetap ditegakkan server-side saat submit.
+  show_quota: boolean
   whatsapp_group_url: string | null
   whatsapp_group_label: string | null
   success_message: string | null

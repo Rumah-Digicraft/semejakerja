@@ -37,6 +37,7 @@ interface SettingsState {
   location: string
   event_maps_url: string
   quota: string
+  show_quota: boolean
   whatsapp_group_url: string
   whatsapp_group_label: string
   success_message: string
@@ -78,6 +79,7 @@ export default function FormDetailPage() {
       location: row.location ?? '',
       event_maps_url: row.event_maps_url ?? '',
       quota: row.quota != null ? String(row.quota) : '',
+      show_quota: row.show_quota !== false,
       whatsapp_group_url: row.whatsapp_group_url ?? '',
       whatsapp_group_label: row.whatsapp_group_label ?? 'Klik Sini',
       success_message: row.success_message ?? '',
@@ -105,6 +107,8 @@ export default function FormDetailPage() {
     setSettings(s => (s ? ({ ...s, [k]: v } as SettingsState) : s))
   const toggleShowOnLanding = () =>
     setSettings(s => (s ? { ...s, show_on_landing: !s.show_on_landing } : s))
+  const toggleShowQuota = () =>
+    setSettings(s => (s ? { ...s, show_quota: !s.show_quota } : s))
   const setRequiresApproval = (v: boolean) =>
     setSettings(s => (s ? { ...s, requires_approval: v } : s))
 
@@ -177,6 +181,7 @@ export default function FormDetailPage() {
       location: settings.location || null,
       event_maps_url: settings.event_maps_url || null,
       quota: settings.quota === '' ? null : Number(settings.quota),
+      show_quota: settings.show_quota,
       whatsapp_group_url: settings.whatsapp_group_url || null,
       whatsapp_group_label: settings.whatsapp_group_label || null,
       success_message: settings.success_message || null,
@@ -316,7 +321,15 @@ export default function FormDetailPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div><label className={label}>Cafe (kolab)</label><input className={input} value={settings.cafe_name} onChange={e => setS('cafe_name', e.target.value)} placeholder="Cold 'N Brew" /></div>
-            <div><label className={label}>Kuota</label><input type="number" min={1} className={input} value={settings.quota} onChange={e => setS('quota', e.target.value)} placeholder="mis. 20 (kosong = tak terbatas)" /></div>
+            <div>
+              <label className={label}>Kuota</label>
+              <input type="number" min={1} className={input} value={settings.quota} onChange={e => setS('quota', e.target.value)} placeholder="mis. 20 (kosong = tak terbatas)" />
+              <label className="flex items-center gap-2 text-xs text-slate-600 mt-2 cursor-pointer">
+                <input type="checkbox" className="accent-purple-600" checked={settings.show_quota} onChange={toggleShowQuota} />
+                Tampilkan kuota di halaman publik
+              </label>
+              {!settings.show_quota && <p className="text-[11px] text-slate-400 mt-1">User cuma lihat jumlah pendaftar, tanpa max &amp; sisa slot. Kuota tetap ditegakkan saat submit.</p>}
+            </div>
             <div><label className={label}>Status</label>
               <select className={input + ' bg-white'} value={settings.status} onChange={e => setS('status', e.target.value)}>
                 {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -411,6 +424,10 @@ export default function FormDetailPage() {
                       </div>
                     )}
 
+                    {q.type === 'image' && (
+                      <p className="text-xs text-slate-400">Peserta meng-upload 1 gambar (maks 5MB) — mis. screenshot bukti follow IG. Jawabannya tersimpan sebagai link gambar.</p>
+                    )}
+
                     {canSyncProfile(q.type) && (
                       <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
                         <span className="text-xs font-medium text-slate-500">Sinkron ke profil user</span>
@@ -484,6 +501,17 @@ export default function FormDetailPage() {
                   {answerCols.map(q => {
                     const v = r.answers?.[q.id]
                     const text = v == null ? '' : Array.isArray(v) ? v.join(', ') : String(v)
+                    if (q.type === 'image') {
+                      return (
+                        <td key={q.id} className="px-4 py-3">
+                          {text ? (
+                            <a href={text} target="_blank" rel="noopener noreferrer" title="Buka gambar">
+                              <img src={text} alt={q.label || 'Gambar'} className="h-12 w-12 object-cover rounded-lg border border-slate-200 hover:ring-2 hover:ring-purple-300" />
+                            </a>
+                          ) : <span className="text-slate-300">—</span>}
+                        </td>
+                      )
+                    }
                     return <td key={q.id} className="px-4 py-3 text-slate-700 max-w-[240px]"><span className="line-clamp-3 break-words">{text || <span className="text-slate-300">—</span>}</span></td>
                   })}
                   <td className="px-4 py-3">

@@ -13,18 +13,18 @@
 // of the form, and can cancel via the cancel_form_response RPC. Cancelled/
 // rejected rows can be resubmitted (same row gets reused server-side).
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2 } from "lucide-react";
+import { ImagePlus, Loader2, Users } from "lucide-react";
 import OAuthButtons from "../../auth/OAuthButtons";
 import styles from "./register.module.css";
 
 // Local mirror of the admin `Form` shape (types aren't shared across apps).
 type FormQuestionType =
   | "short_text" | "paragraph" | "radio" | "checkbox"
-  | "dropdown" | "email" | "phone" | "section";
+  | "dropdown" | "email" | "phone" | "image" | "section";
 
 // Field user_profiles yang bisa disinkron dua arah (autofill + write-back).
 type ProfileField = "full_name" | "nickname" | "occupation" | "city" | "phone";
@@ -47,6 +47,9 @@ interface FormRow {
   cafe_name: string | null;
   questions: FormQuestion[];
   quota: number | null;
+  // Tampilkan kuota/max peserta ke user (migration 054). false → list
+  // peserta cuma nampilin jumlah pendaftar tanpa "/ max".
+  show_quota: boolean;
   whatsapp_group_url: string | null;
   whatsapp_group_label: string | null;
   success_message: string | null;
@@ -130,9 +133,46 @@ function FormRunner({
   });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  // Pertanyaan 'image' yang lagi upload — submit diblokir selama masih ada.
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
 
   const setAnswer = (qid: string, val: AnswerValue) =>
     setAnswers((a) => ({ ...a, [qid]: val }));
+
+  // Upload langsung saat file dipilih ke bucket form-uploads (migration 053,
+  // authenticated only — form ini memang di balik login). Jawabannya public
+  // URL string, jadi lolos validasi required & tampil sebagai thumbnail di
+  // tabel respons admin tanpa perubahan skema.
+  const handleImageUpload = async (qid: string, file: File) => {
+    setErrorMsg("");
+    if (!file.type.startsWith("image/")) {
+      setErrorMsg("File harus berupa gambar (JPG/PNG) ya.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg("Ukuran gambar maksimal 5MB ya.");
+      return;
+    }
+    setUploading((u) => ({ ...u, [qid]: true }));
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const path = `${form.id}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage
+        .from("form-uploads")
+        .upload(path, file, { contentType: file.type });
+      if (error) throw new Error(error.message);
+      const { data } = supabase.storage.from("form-uploads").getPublicUrl(path);
+      setAnswer(qid, data.publicUrl);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error
+          ? `Gagal upload gambar: ${err.message}`
+          : "Gagal upload gambar, coba lagi ya."
+      );
+    } finally {
+      setUploading((u) => ({ ...u, [qid]: false }));
+    }
+  };
 
   const toggleCheckbox = (qid: string, opt: string) =>
     setAnswers((a) => {
@@ -146,6 +186,11 @@ function FormRunner({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
+
+    if (Object.values(uploading).some(Boolean)) {
+      setErrorMsg("Tunggu upload gambarnya selesai dulu ya.");
+      return;
+    }
 
     // Client-side required validation (server only guards status + quota).
     for (const q of form.questions.filter((x) => isAnswerable(x.type))) {
@@ -310,6 +355,53 @@ function FormRunner({
                   })}
                 </div>
               )}
+
+              {q.type === "image" && (
+                <div className={styles.uploadWrap}>
+                  {typeof value === "string" && value && (
+                    <a
+                      href={value}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.uploadPreview}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={value} alt="Gambar yang di-upload" />
+                    </a>
+                  )}
+                  <label
+                    className={`${styles.uploadButton} ${
+                      uploading[q.id] ? styles.uploadButtonBusy : ""
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      disabled={!!uploading[q.id]}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        // Reset supaya pilih file yang sama masih men-trigger onChange.
+                        e.target.value = "";
+                        if (file) handleImageUpload(q.id, file);
+                      }}
+                    />
+                    {uploading[q.id] ? (
+                      <>
+                        <Loader2 size={15} className={styles.spinner} /> Mengupload…
+                      </>
+                    ) : (
+                      <>
+                        <ImagePlus size={15} />
+                        {typeof value === "string" && value
+                          ? "Ganti gambar"
+                          : "Pilih gambar"}
+                      </>
+                    )}
+                  </label>
+                  <p className={styles.uploadHint}>JPG/PNG, maksimal 5MB.</p>
+                </div>
+              )}
             </div>
           );
         })}
@@ -429,6 +521,35 @@ function RegistrationStatus({
   );
 }
 
+// ── List peserta terdaftar — nama aja (social proof) ────────────
+// Data dari RPC get_form_participants (migration 053): SECURITY DEFINER
+// yang cuma balikin array nama respons status='registered', jadi jawaban
+// lain (nomor WA, email, dst) tetap tertutup buat publik.
+function ParticipantList({
+  names,
+  quota,
+}: {
+  names: string[];
+  // Max peserta — null kalau tak terbatas ATAU admin milih sembunyikan
+  // kuota (forms.show_quota=false, migration 054).
+  quota: number | null;
+}) {
+  if (names.length === 0) return null;
+  return (
+    <div className={styles.participantsCard}>
+      <p className={styles.participantsTitle}>
+        <Users size={15} /> Yang udah daftar (
+        {quota != null ? `${names.length} / ${quota}` : names.length})
+      </p>
+      <div className={styles.participantChips}>
+        {names.map((name, i) => (
+          <span key={i} className={styles.participantChip}>{name}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Loader: cek sesi + ambil form by token ──────────────────────
 function RegisterContent() {
   const token = useSearchParams().get("token");
@@ -443,6 +564,30 @@ function RegisterContent() {
   const [myResponseReady, setMyResponseReady] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
+  const [participants, setParticipants] = useState<string[]>([]);
+
+  // Nama peserta terdaftar (best-effort; kalau RPC gagal list cuma nggak
+  // tampil, form tetap jalan). Di-refresh setelah submit/cancel supaya
+  // nama user langsung muncul/hilang dari list.
+  const loadParticipants = useCallback(async () => {
+    if (!token) return;
+    const { data } = await createClient().rpc("get_form_participants", {
+      p_token: token,
+    });
+    if (Array.isArray(data)) {
+      setParticipants(data.filter((n): n is string => typeof n === "string"));
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (!form) return;
+    // Defer a frame (react-hooks/set-state-in-effect) — same pattern as
+    // the my-response loader below.
+    const raf = requestAnimationFrame(() => {
+      loadParticipants();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [form, loadParticipants]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -552,6 +697,7 @@ function RegisterContent() {
       return;
     }
     setMyResponse((r) => (r ? { ...r, status: "cancelled" } : r));
+    loadParticipants();
   };
 
   if (loading || !profileReady || (authState === "in" && form && !myResponseReady)) {
@@ -575,15 +721,15 @@ function RegisterContent() {
     );
   }
 
-  // Wajib login Google dulu sebelum bisa buka/isi form.
-  if (authState === "out") {
-    return <LoginGate form={form} token={token ?? ""} />;
-  }
-
-  // Sudah punya baris aktif (pending/registered) → tampilkan status +
-  // opsi batalkan, bukan form kosong lagi (satu user cuma 1x submit).
-  if (myResponse && (myResponse.status === "registered" || myResponse.status === "pending")) {
-    return (
+  // Wajib login Google dulu sebelum bisa buka/isi form. Semua state di
+  // bawah tetap menampilkan list peserta terdaftar di bagian bawah.
+  const main =
+    authState === "out" ? (
+      <LoginGate form={form} token={token ?? ""} />
+    ) : myResponse &&
+      (myResponse.status === "registered" || myResponse.status === "pending") ? (
+      // Sudah punya baris aktif (pending/registered) → tampilkan status +
+      // opsi batalkan, bukan form kosong lagi (satu user cuma 1x submit).
       <RegistrationStatus
         form={form}
         status={myResponse.status}
@@ -591,24 +737,32 @@ function RegisterContent() {
         cancelling={cancelling}
         cancelError={cancelError}
       />
+    ) : (
+      <FormRunner
+        form={form}
+        userId={userId}
+        userEmail={userEmail}
+        profile={profile}
+        previousStatus={
+          myResponse?.status === "cancelled" || myResponse?.status === "rejected"
+            ? myResponse.status
+            : null
+        }
+        onSubmitted={(result) => {
+          setMyResponse({ id: result.response_id, status: result.status });
+          loadParticipants();
+        }}
+      />
     );
-  }
 
   return (
-    <FormRunner
-      form={form}
-      userId={userId}
-      userEmail={userEmail}
-      profile={profile}
-      previousStatus={
-        myResponse?.status === "cancelled" || myResponse?.status === "rejected"
-          ? myResponse.status
-          : null
-      }
-      onSubmitted={(result) =>
-        setMyResponse({ id: result.response_id, status: result.status })
-      }
-    />
+    <>
+      {main}
+      <ParticipantList
+        names={participants}
+        quota={form.show_quota !== false ? form.quota : null}
+      />
+    </>
   );
 }
 

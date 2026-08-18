@@ -48,6 +48,7 @@ export const QUESTION_TYPE_LABELS: Record<FormQuestionType, string> = {
   dropdown: 'Dropdown',
   email: 'Email',
   phone: 'No. WhatsApp',
+  image: 'Upload gambar',
   section: 'Blok info (tanpa jawaban)',
 }
 
