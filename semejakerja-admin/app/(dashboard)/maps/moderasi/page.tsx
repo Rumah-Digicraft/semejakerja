@@ -66,7 +66,7 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
   // Buat perbandingan "nilai sekarang → disarankan" di tab edit.
   useEffect(() => {
     if (type !== 'edits' || !item.cafe_id) return
-    supabase.from('cafes').select('name, address, phone, website, open_hours').eq('id', item.cafe_id).single()
+    supabase.from('cafes').select('name, address, phone, website, open_hours, lat, lng, price_level, vibes, facilities, scales, weekday_text').eq('id', item.cafe_id).single()
       .then(({ data }) => setCurrentCafe(data))
   }, [type, item.cafe_id])
 
@@ -184,8 +184,15 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
         {type === 'edits' && item.suggested_data && (
           <div className="bg-slate-50 rounded-xl p-4 mb-4 text-sm space-y-3">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Perubahan yang Disarankan</p>
-            {Object.entries(item.suggested_data as Record<string, string>)
-              .filter(([key, value]) => key !== '_notes' && value)
+
+            {/* Field teks sederhana — ditangani generik dari EDIT_FIELD_LABELS.
+                Field non-teks (lokasi/harga/vibe/fasilitas/scales/jam) dikeluarkan
+                dari sini & dirender manual di bawah, karena nilainya objek/array/
+                angka — bukan string yang aman langsung dijadikan children JSX. */}
+            {Object.entries(item.suggested_data as Record<string, unknown>)
+              .filter(([key, value]) =>
+                !['_notes', 'lat', 'lng', 'maps_url', 'weekday_text', 'facilities', 'scales', 'price_level', 'vibes'].includes(key)
+                && typeof value === 'string' && value)
               .map(([key, value]) => (
                 <div key={key}>
                   <p className="text-xs text-slate-400">{EDIT_FIELD_LABELS[key] ?? key}</p>
@@ -193,13 +200,76 @@ function ReviewModal({ item, type, cafeName, onClose, onDone }: { item: any, typ
                     <p>
                       <span className="text-slate-400 line-through">{currentCafe[key]}</span>
                       {' → '}
-                      <span className="font-medium text-slate-900">{value}</span>
+                      <span className="font-medium text-slate-900">{value as string}</span>
                     </p>
                   ) : (
-                    <p className="font-medium text-slate-900">{value}</p>
+                    <p className="font-medium text-slate-900">{value as string}</p>
                   )}
                 </div>
               ))}
+
+            {(item.suggested_data.lat != null && item.suggested_data.lng != null) && (
+              <div>
+                <p className="text-xs text-slate-400">Titik Lokasi</p>
+                {currentCafe?.lat != null && (
+                  <p className="text-xs text-slate-400 line-through">{currentCafe.lat}, {currentCafe.lng}</p>
+                )}
+                <p className="font-medium text-slate-900">{item.suggested_data.lat}, {item.suggested_data.lng}</p>
+                {item.suggested_data.maps_url && (
+                  <a href={item.suggested_data.maps_url} target="_blank" rel="noreferrer" className="inline-block text-purple-600 hover:underline text-xs font-medium mt-0.5">
+                    Buka di Google Maps →
+                  </a>
+                )}
+              </div>
+            )}
+
+            {item.suggested_data.price_level != null && (
+              <div>
+                <p className="text-xs text-slate-400">Rentang Harga</p>
+                {currentCafe?.price_level != null && (
+                  <p className="text-xs text-slate-400 line-through">{PRICE_LABELS[currentCafe.price_level] ?? '–'}</p>
+                )}
+                <p className="font-medium text-slate-900">{PRICE_LABELS[item.suggested_data.price_level] ?? '–'}</p>
+              </div>
+            )}
+
+            {item.suggested_data.vibes != null && (
+              <div>
+                <p className="text-xs text-slate-400">Suasana (vibes)</p>
+                {currentCafe?.vibes != null && (
+                  <p className="text-xs text-slate-400 line-through">{VIBE_LABELS[currentCafe.vibes] ?? '–'}</p>
+                )}
+                <p className="font-medium text-slate-900">{VIBE_LABELS[item.suggested_data.vibes] ?? '–'}</p>
+              </div>
+            )}
+
+            {item.suggested_data.facilities && (
+              <div>
+                <p className="text-xs text-slate-400">Fasilitas</p>
+                <p className="font-medium text-slate-900">
+                  {FACILITY_LABELS.filter(f => item.suggested_data.facilities[f.key]).map(f => f.label).join(', ') || '–'}
+                </p>
+              </div>
+            )}
+
+            {item.suggested_data.scales && (
+              <div>
+                <p className="text-xs text-slate-400">Skala</p>
+                <p className="text-xs text-slate-700">
+                  {Object.entries(SCALE_LABELS).map(([key, cfg]) => `${cfg.label}: ${cfg.levels[item.suggested_data.scales[key] ?? 0]}`).join(' · ')}
+                </p>
+              </div>
+            )}
+
+            {Array.isArray(item.suggested_data.weekday_text) && item.suggested_data.weekday_text.length > 0 && (
+              <div>
+                <p className="text-xs text-slate-400">Jam Operasional (per hari)</p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-slate-700">
+                  {item.suggested_data.weekday_text.map((line: string) => <span key={line}>{line}</span>)}
+                </div>
+              </div>
+            )}
+
             {item.notes && (
               <div className="pt-2 border-t border-slate-200">
                 <p className="text-xs text-slate-400">Alasan dari kontributor</p>

@@ -6,7 +6,7 @@ import type { Cafe, CafeFacility } from '../types/cafe';
 type MockFacilities = Pick<CafeFacility,
   'wifi' | 'ac' | 'powerOutlets' | 'mushola' | 'motorParking' | 'carParking'>;
 const rawCafesData: (Omit<Cafe, 'schedule' | 'clicks' | 'scales' | 'facilities'
-  | 'wifiDownload' | 'wifiUpload' | 'wifiLatency' | 'wifiTestedAt'>
+  | 'wifiDownload' | 'wifiUpload' | 'wifiLatency' | 'wifiTestedAt' | 'priceLevel'>
   & { facilities: MockFacilities; wifiSpeed: number })[] = [
   {
     id: '1',
@@ -351,6 +351,7 @@ export const cafesData: Cafe[] = rawCafesData.map(({ wifiSpeed, ...cafe }) => ({
   ...cafe,
   facilities: { meetingRoom: false, outdoor: false, heavyMeal: false, ...cafe.facilities },
   scales: { area: 0, motorParking: 0, carParking: 0, outlets: 0 },
+  priceLevel: 0,
   wifiDownload: wifiSpeed,
   wifiUpload: 0,
   wifiLatency: null,
