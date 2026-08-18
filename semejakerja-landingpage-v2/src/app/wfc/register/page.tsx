@@ -50,6 +50,9 @@ interface FormRow {
   // Tampilkan kuota/max peserta ke user (migration 054). false → list
   // peserta cuma nampilin jumlah pendaftar tanpa "/ max".
   show_quota: boolean;
+  // Biaya pendaftaran rupiah (migration 055). NULL/0 = gratis; > 0 =
+  // submit masuk 'pending_payment' lalu bayar QRIS via DOKU.
+  price: number | null;
   whatsapp_group_url: string | null;
   whatsapp_group_label: string | null;
   success_message: string | null;
@@ -61,8 +64,9 @@ interface FormRow {
 type AnswerValue = string | string[];
 type Answers = Record<string, AnswerValue>;
 
-// Mirrors form_responses.status (migration 034).
-type FormResponseStatus = "pending" | "registered" | "cancelled" | "rejected";
+// Mirrors form_responses.status (migration 034/055).
+type FormResponseStatus =
+  | "pending" | "pending_payment" | "registered" | "cancelled" | "rejected";
 
 interface MyResponse {
   id: string;
@@ -78,6 +82,133 @@ interface SubmitResult {
 }
 
 const isAnswerable = (t: FormQuestionType) => t !== "section";
+
+const isPaid = (form: FormRow) => form.price != null && form.price > 0;
+const formatRp = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
+
+// ── Pembayaran event berbayar (migration 055/056) ───────────────
+// Kode promo tervalidasi yang lagi dipasang user (preview_form_promo).
+interface AppliedPromo {
+  code: string;
+  discount_percent: number;
+  final_price: number;
+}
+
+// Minta invoice DOKU (QRIS) ke edge function form-create-payment lalu
+// redirect ke halaman bayarnya. Harga & diskon SELALU dihitung
+// server-side. `free: true` = diskon 100% — udah langsung terdaftar
+// tanpa lewat DOKU; `error` = gagal (tanpa redirect).
+async function startPayment(
+  token: string,
+  promoCode?: string | null
+): Promise<{ error?: string; free?: boolean }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.functions.invoke("form-create-payment", {
+    body: {
+      token,
+      promo_code: promoCode || null,
+      return_url: `${window.location.origin}/wfc/register?token=${token}`,
+    },
+  });
+  if (error) {
+    // invoke() flags any non-2xx as error; the real message is in the body.
+    let msg = "Gagal memproses pembayaran. Coba lagi ya.";
+    try {
+      const body = await error.context.json();
+      if (body?.error) msg = body.error;
+    } catch { /* ignore parse error */ }
+    return { error: msg };
+  }
+  if (data?.free) return { free: true };
+  if (data?.payment_url) {
+    window.location.href = data.payment_url; // ke halaman bayar DOKU
+    return {};
+  }
+  return { error: "Tidak dapat memulai pembayaran. Coba lagi ya." };
+}
+
+// ── Input kode promo (event berbayar, migration 056) ────────────
+// State kode yang TERPASANG di-lift ke RegisterContent supaya tetap
+// kebawa saat pindah layar form → layar pembayaran (coba lagi).
+function PromoBox({
+  formToken,
+  applied,
+  onApplied,
+}: {
+  formToken: string;
+  applied: AppliedPromo | null;
+  onApplied: (promo: AppliedPromo | null) => void;
+}) {
+  const [code, setCode] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [promoError, setPromoError] = useState("");
+
+  const applyCode = async () => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setChecking(true);
+    setPromoError("");
+    const { data, error } = await createClient().rpc("preview_form_promo", {
+      p_form_token: formToken,
+      p_code: trimmed,
+    });
+    setChecking(false);
+    if (error) {
+      setPromoError("Gagal cek kode, coba lagi ya.");
+      return;
+    }
+    if (data?.valid) {
+      onApplied({
+        code: data.code as string,
+        discount_percent: data.discount_percent as number,
+        final_price: data.final_price as number,
+      });
+      setCode("");
+    } else {
+      setPromoError((data?.reason as string) ?? "Kode promo tidak valid");
+    }
+  };
+
+  if (applied) {
+    return (
+      <div className={styles.promoApplied}>
+        <span>
+          Kode <strong>{applied.code}</strong> (−{applied.discount_percent}%)
+          terpasang
+        </span>
+        <button
+          type="button"
+          onClick={() => onApplied(null)}
+          className={styles.promoRemove}
+        >
+          Hapus
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.promoWrap}>
+      <div className={styles.promoRow}>
+        <input
+          className={styles.input}
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          placeholder="Punya kode promo?"
+        />
+        <button
+          type="button"
+          onClick={applyCode}
+          disabled={checking || !code.trim()}
+          className={`btn btn--secondary ${styles.promoApply}`}
+        >
+          {checking ? "Cek..." : "Pakai"}
+        </button>
+      </div>
+      {promoError && <p className={styles.promoError}>{promoError}</p>}
+    </div>
+  );
+}
 
 // ── Kompresi gambar client-side sebelum upload ──────────────────
 // Bukti follow IG = screenshot teks; downscale ke 1600px + re-encode JPEG
@@ -148,6 +279,8 @@ function FormRunner({
   userEmail,
   profile,
   previousStatus,
+  appliedPromo,
+  onPromoApplied,
   onSubmitted,
 }: {
   form: FormRow;
@@ -157,6 +290,8 @@ function FormRunner({
   // Set kalau user pernah punya baris respons yang cancelled/rejected —
   // dipakai buat banner "isi ulang untuk daftar lagi".
   previousStatus: "cancelled" | "rejected" | null;
+  appliedPromo: AppliedPromo | null;
+  onPromoApplied: (promo: AppliedPromo | null) => void;
   onSubmitted: (result: SubmitResult) => void;
 }) {
   const supabase = createClient();
@@ -284,7 +419,20 @@ function FormRunner({
         }
       }
 
-      onSubmitted(data as SubmitResult);
+      const result = data as SubmitResult;
+
+      // Event berbayar: langsung lempar ke halaman bayar DOKU (QRIS).
+      // Diskon 100% → udah terdaftar tanpa lewat DOKU. Kalau invoice
+      // gagal dibuat, user tetap pindah ke layar "Selesaikan pembayaran"
+      // yang punya tombol coba lagi.
+      if (result.status === "pending_payment") {
+        const pay = await startPayment(form.token, appliedPromo?.code ?? null);
+        if (pay.free) {
+          onSubmitted({ ...result, status: "registered" });
+          return;
+        }
+      }
+      onSubmitted(result);
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : "Terjadi kesalahan sistem."
@@ -463,6 +611,38 @@ function FormRunner({
           );
         })}
 
+        {isPaid(form) && (
+          <>
+            <PromoBox
+              formToken={form.token}
+              applied={appliedPromo}
+              onApplied={onPromoApplied}
+            />
+            <div className={styles.priceBox}>
+              {appliedPromo ? (
+                appliedPromo.final_price === 0 ? (
+                  <>
+                    Biaya pendaftaran <s>{formatRp(form.price ?? 0)}</s>{" "}
+                    <strong>GRATIS</strong> — kirim dan kamu langsung
+                    terdaftar.
+                  </>
+                ) : (
+                  <>
+                    Biaya pendaftaran <s>{formatRp(form.price ?? 0)}</s>{" "}
+                    <strong>{formatRp(appliedPromo.final_price)}</strong> —
+                    setelah kirim, kamu langsung diarahkan ke pembayaran QRIS.
+                  </>
+                )
+              ) : (
+                <>
+                  Biaya pendaftaran <strong>{formatRp(form.price ?? 0)}</strong>{" "}
+                  — setelah kirim, kamu langsung diarahkan ke pembayaran QRIS.
+                </>
+              )}
+            </div>
+          </>
+        )}
+
         {errorMsg && <div className={styles.errorBox}>{errorMsg}</div>}
 
         <button
@@ -470,7 +650,13 @@ function FormRunner({
           disabled={submitting}
           className={`btn btn--primary ${styles.submitBtn}`}
         >
-          {submitting ? "Mengirim..." : "Kirim Pendaftaran"}
+          {submitting
+            ? "Mengirim..."
+            : !isPaid(form)
+              ? "Kirim Pendaftaran"
+              : appliedPromo?.final_price === 0
+                ? "Kirim (Gratis via kode)"
+                : `Kirim & Bayar ${formatRp(appliedPromo?.final_price ?? form.price ?? 0)}`}
         </button>
       </form>
     </>
@@ -510,12 +696,16 @@ function RegistrationStatus({
   onCancel,
   cancelling,
   cancelError,
+  canCancel,
 }: {
   form: FormRow;
   status: "pending" | "registered";
   onCancel: () => void;
   cancelling: boolean;
   cancelError: string;
+  // Event berbayar: registered = sudah bayar → nggak bisa self-cancel
+  // (refund manual via admin, RPC-nya juga nolak). Tombolnya disembunyiin.
+  canCancel: boolean;
 }) {
   const isPending = status === "pending";
   return (
@@ -558,21 +748,103 @@ function RegistrationStatus({
           </Link>
         </div>
 
-        <div className={styles.cancelSection}>
-          {cancelError && (
-            <div className={styles.errorBox} style={{ marginBottom: "var(--space-3)", width: "100%" }}>
-              {cancelError}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={cancelling}
-            className={styles.cancelButton}
-          >
-            {cancelling ? "Membatalkan..." : "Batalkan pendaftaran"}
-          </button>
+        {canCancel && (
+          <div className={styles.cancelSection}>
+            {cancelError && (
+              <div className={styles.errorBox} style={{ marginBottom: "var(--space-3)", width: "100%" }}>
+                {cancelError}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={cancelling}
+              className={styles.cancelButton}
+            >
+              {cancelling ? "Membatalkan..." : "Batalkan pendaftaran"}
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ── Selesaikan pembayaran: baris pending_payment (event berbayar) ──
+// Webhook DOKU yang flip status ke 'registered' begitu QRIS dibayar —
+// RegisterContent nge-poll baris respons selama layar ini tampil, jadi
+// halaman update sendiri tanpa refresh.
+function PaymentPending({
+  form,
+  appliedPromo,
+  onPromoApplied,
+}: {
+  form: FormRow;
+  appliedPromo: AppliedPromo | null;
+  onPromoApplied: (promo: AppliedPromo | null) => void;
+}) {
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState("");
+
+  const payAmount = appliedPromo?.final_price ?? form.price ?? 0;
+
+  const handlePay = async () => {
+    setPaying(true);
+    setPayError("");
+    const res = await startPayment(form.token, appliedPromo?.code ?? null);
+    // free = terdaftar gratis via kode — poll di RegisterContent bakal
+    // flip layar sebentar lagi; biarkan tombol disabled biar nggak dobel.
+    if (res.free) return;
+    // Sukses = browser lagi pindah ke DOKU; beresin state cuma kalau gagal.
+    if (res.error) {
+      setPayError(res.error);
+      setPaying(false);
+    }
+  };
+
+  return (
+    <>
+      <div className={styles.header}>
+        <h1 className={styles.title}>{form.title}</h1>
+        {form.cafe_name && (
+          <p className={styles.subtitle}>Kolaborasi dengan {form.cafe_name}</p>
+        )}
+      </div>
+      <div className={styles.statusCard}>
+        <div className={styles.statusEmoji}>💳</div>
+        <h2 className={styles.statusTitle}>Selesaikan pembayaran</h2>
+        <p className={styles.statusText}>
+          Pendaftaran kamu udah kesimpen tapi belum lunas. Bayar pakai QRIS
+          ya — begitu pembayaran terkonfirmasi, kamu otomatis terdaftar dan
+          halaman ini bakal update sendiri.
+        </p>
+        <div className={styles.promoSection}>
+          <PromoBox
+            formToken={form.token}
+            applied={appliedPromo}
+            onApplied={onPromoApplied}
+          />
         </div>
+        {payError && (
+          <div
+            className={styles.errorBox}
+            style={{ marginTop: "var(--space-4)", width: "100%" }}
+          >
+            {payError}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={handlePay}
+          disabled={paying}
+          className={`btn btn--primary ${styles.waButton}`}
+        >
+          {paying
+            ? "Memproses..."
+            : payAmount === 0
+              ? "Daftar (Gratis via kode)"
+              : `Bayar ${formatRp(payAmount)} (QRIS)`}
+        </button>
       </div>
     </>
   );
@@ -622,6 +894,9 @@ function RegisterContent() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
   const [participants, setParticipants] = useState<string[]>([]);
+  // Kode promo tervalidasi (event berbayar) — di-lift ke sini supaya
+  // tetap kepasang saat pindah layar form → layar pembayaran.
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
 
   // Nama peserta terdaftar (best-effort; kalau RPC gagal list cuma nggak
   // tampil, form tetap jalan). Di-refresh setelah submit/cancel supaya
@@ -740,6 +1015,30 @@ function RegisterContent() {
     };
   }, [form?.id, userId]);
 
+  // Event berbayar: selama status pending_payment, poll baris respons
+  // sendiri tiap 4 detik — webhook DOKU yang flip ke 'registered', jadi
+  // begitu QRIS kebayar halaman langsung ganti ke layar "Kamu terdaftar".
+  useEffect(() => {
+    if (!form?.id || !userId || myResponse?.status !== "pending_payment") return;
+    const formId = form.id;
+    const interval = setInterval(() => {
+      createClient()
+        .from("form_responses")
+        .select("id, status")
+        .eq("form_id", formId)
+        .eq("user_id", userId)
+        .maybeSingle()
+        .then(({ data }) => {
+          const next = data as MyResponse | null;
+          if (next && next.status !== "pending_payment") {
+            setMyResponse(next);
+            loadParticipants();
+          }
+        });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [form?.id, userId, myResponse?.status, loadParticipants]);
+
   const handleCancel = async () => {
     if (!token) return;
     if (!confirm("Batalkan pendaftaran kamu di event ini?")) return;
@@ -786,6 +1085,13 @@ function RegisterContent() {
   const main =
     authState === "out" ? (
       <LoginGate form={form} token={token ?? ""} />
+    ) : myResponse && myResponse.status === "pending_payment" ? (
+      // Event berbayar yang belum lunas → layar bayar (bukan form lagi).
+      <PaymentPending
+        form={form}
+        appliedPromo={appliedPromo}
+        onPromoApplied={setAppliedPromo}
+      />
     ) : myResponse &&
       (myResponse.status === "registered" || myResponse.status === "pending") ? (
       // Sudah punya baris aktif (pending/registered) → tampilkan status +
@@ -796,6 +1102,7 @@ function RegisterContent() {
         onCancel={handleCancel}
         cancelling={cancelling}
         cancelError={cancelError}
+        canCancel={!isPaid(form)}
       />
     ) : (
       <FormRunner
@@ -808,6 +1115,8 @@ function RegisterContent() {
             ? myResponse.status
             : null
         }
+        appliedPromo={appliedPromo}
+        onPromoApplied={setAppliedPromo}
         onSubmitted={(result) => {
           setMyResponse({ id: result.response_id, status: result.status });
           loadParticipants();

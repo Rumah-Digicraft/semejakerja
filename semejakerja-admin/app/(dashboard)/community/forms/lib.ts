@@ -27,6 +27,7 @@ export const APPROVAL_MODE_OPTIONS: { value: boolean; label: string; hint: strin
 // ── Status respons ────────────────────────────────────────────
 export const RESPONSE_STATUS_LABELS: Record<FormResponseStatus, string> = {
   pending: 'Menunggu Approval',
+  pending_payment: 'Menunggu Pembayaran',
   registered: 'Terdaftar',
   cancelled: 'Dibatalkan',
   rejected: 'Ditolak',
@@ -34,6 +35,7 @@ export const RESPONSE_STATUS_LABELS: Record<FormResponseStatus, string> = {
 
 export const RESPONSE_STATUS_COLORS: Record<FormResponseStatus, string> = {
   pending: 'bg-amber-100 text-amber-700',
+  pending_payment: 'bg-orange-100 text-orange-700',
   registered: 'bg-green-100 text-green-700',
   cancelled: 'bg-slate-200 text-slate-500',
   rejected: 'bg-red-100 text-red-600',

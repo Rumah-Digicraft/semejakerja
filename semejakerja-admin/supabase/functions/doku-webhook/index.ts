@@ -101,7 +101,51 @@ Deno.serve(async (req) => {
     return new Response("OK", { status: 200 });
   }
 
-  // ── 4b. Semeja Moves payment (funminton/padel) ──
+  // ── 4b. Form event payment (WFC/lomba, migration 055) ──
+  // Prefix EVT- lives in form_payment_transactions; on SUCCESS the
+  // response row flips to 'registered' — bayar = terdaftar, no approval.
+  const { data: ftx, error: fErr } = await admin
+    .from("form_payment_transactions")
+    .select("id, response_id, user_id, promo_code_id, status")
+    .eq("invoice_number", invoiceNumber)
+    .maybeSingle();
+
+  if (fErr) return new Response("DB error", { status: 500 });
+
+  if (ftx) {
+    // Idempotency: DOKU may resend the same notification.
+    if (ftx.status === "success") {
+      return new Response("Already processed", { status: 200 });
+    }
+
+    await admin.from("form_payment_transactions").update({
+      status: "success",
+      payment_method: method,
+      paid_at: new Date().toISOString(),
+      raw_response: payload,
+    }).eq("id", ftx.id);
+
+    // Uang sudah masuk → registered, apa pun status baris saat ini
+    // (slot direservasi saat invoice dibuat; lihat 055).
+    await admin.from("form_responses").update({
+      status: "registered",
+      payment_expires_at: null,
+    }).eq("id", ftx.response_id);
+
+    // Pemakaian kode promo dicatat DI SINI — saat pembayaran sukses,
+    // bukan saat invoice dibuat (migration 056). Guard idempoten di atas
+    // (status === 'success') menjamin cuma sekali per transaksi.
+    if (ftx.promo_code_id) {
+      await admin.rpc("record_form_promo_usage", {
+        p_code_id: ftx.promo_code_id,
+        p_user_id: ftx.user_id,
+      });
+    }
+
+    return new Response("OK", { status: 200 });
+  }
+
+  // ── 4c. Semeja Moves payment (funminton/padel) ──
   const { data: mtx, error: mErr } = await admin
     .from("moves_payment_transactions")
     .select(

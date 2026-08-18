@@ -221,6 +221,83 @@
   color: var(--color-gray-600);
 }
 
+/* ── Kode promo (event berbayar) ── */
+.promoWrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.promoRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.promoRow input {
+  flex: 1;
+  text-transform: uppercase;
+}
+
+.promoApply {
+  flex-shrink: 0;
+}
+
+.promoError {
+  font-size: var(--text-xs);
+  color: #b91c1c;
+  margin: 0;
+}
+
+.promoApplied {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: #166534;
+}
+
+.promoRemove {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-gray-500);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.promoRemove:hover {
+  color: #b91c1c;
+}
+
+/* PromoBox di layar "Selesaikan pembayaran" (statusCard center-aligned) */
+.promoSection {
+  width: 100%;
+  max-width: 320px;
+  margin-top: var(--space-5);
+  text-align: left;
+}
+
+/* Info biaya pendaftaran (event berbayar) — di atas tombol submit. */
+.priceBox {
+  background-color: var(--color-background-alt);
+  border: 1px solid var(--color-gray-200);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-gray-700);
+}
+
 .errorBox {
   background-color: #fef2f2;
   border: 1px solid #fecaca;

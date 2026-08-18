@@ -189,6 +189,10 @@ export interface PromoCode {
   expires_at: string | null
   is_active: boolean
   campaign_id: string | null
+  // Scope ke satu form event (migration 056) — hanya relevan buat type
+  // 'event': NULL = berlaku di semua event berbayar, diisi = cuma di
+  // form itu. Type lain selalu NULL.
+  form_id: string | null
   created_by: string | null
   created_at: string
 }
@@ -305,6 +309,10 @@ export interface Form {
   // peserta register). false → public_wfc_events nge-NULL-kan quota
   // (migration 054); kuota tetap ditegakkan server-side saat submit.
   show_quota: boolean
+  // Biaya pendaftaran dalam rupiah (migration 055). NULL/0 = gratis.
+  // > 0 = submit masuk 'pending_payment' → DOKU Checkout (QRIS) →
+  // webhook flip ke 'registered'; mode approval TIDAK berlaku.
+  price: number | null
   whatsapp_group_url: string | null
   whatsapp_group_label: string | null
   success_message: string | null
@@ -339,11 +347,13 @@ export interface Form {
 export type FormAnswerValue = string | string[]
 
 // pending: menunggu approval admin (form requires_approval).
+// pending_payment: event berbayar, nunggu bayar DOKU (migration 055) —
+//   ikut menghitung kuota selama payment_expires_at belum lewat.
 // registered: peserta terkonfirmasi, dihitung ke kuota.
 // cancelled: dibatalkan user sendiri. rejected: ditolak admin.
 // Kedua state terakhir tidak dihitung ke kuota, dan user boleh submit
 // ulang (baris di-reuse, lihat submit_form_response migration 034).
-export type FormResponseStatus = 'pending' | 'registered' | 'cancelled' | 'rejected'
+export type FormResponseStatus = 'pending' | 'pending_payment' | 'registered' | 'cancelled' | 'rejected'
 
 export interface FormResponse {
   id: string
@@ -352,6 +362,7 @@ export interface FormResponse {
   status: FormResponseStatus
   answers: Record<string, FormAnswerValue>
   attended: boolean
+  payment_expires_at: string | null
   created_at: string
 }
 

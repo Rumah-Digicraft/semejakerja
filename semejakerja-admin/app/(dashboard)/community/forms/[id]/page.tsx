@@ -38,6 +38,7 @@ interface SettingsState {
   event_maps_url: string
   quota: string
   show_quota: boolean
+  price: string
   whatsapp_group_url: string
   whatsapp_group_label: string
   success_message: string
@@ -80,6 +81,7 @@ export default function FormDetailPage() {
       event_maps_url: row.event_maps_url ?? '',
       quota: row.quota != null ? String(row.quota) : '',
       show_quota: row.show_quota !== false,
+      price: row.price != null && row.price > 0 ? String(row.price) : '',
       whatsapp_group_url: row.whatsapp_group_url ?? '',
       whatsapp_group_label: row.whatsapp_group_label ?? 'Klik Sini',
       success_message: row.success_message ?? '',
@@ -182,6 +184,7 @@ export default function FormDetailPage() {
       event_maps_url: settings.event_maps_url || null,
       quota: settings.quota === '' ? null : Number(settings.quota),
       show_quota: settings.show_quota,
+      price: settings.price === '' ? null : Number(settings.price),
       whatsapp_group_url: settings.whatsapp_group_url || null,
       whatsapp_group_label: settings.whatsapp_group_label || null,
       success_message: settings.success_message || null,
@@ -336,6 +339,13 @@ export default function FormDetailPage() {
               </select>
             </div>
           </div>
+          <div>
+            <label className={label}>Biaya pendaftaran (Rp) <span className="text-slate-400 font-normal">(kosong = gratis)</span></label>
+            <input type="number" min={0} step={1000} className={input} value={settings.price} onChange={e => setS('price', e.target.value)} placeholder="mis. 15000" />
+            <p className="text-xs text-slate-400 mt-1">
+              Event berbayar: setelah submit, peserta diarahkan ke pembayaran QRIS (DOKU) dan otomatis terdaftar begitu lunas. Harga dibaca server-side — ubah di sini langsung berlaku buat pendaftar berikutnya.
+            </p>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className={label}>Link grup WhatsApp</label><input className={input} value={settings.whatsapp_group_url} onChange={e => setS('whatsapp_group_url', e.target.value)} placeholder="https://chat.whatsapp.com/…" /></div>
             <div><label className={label}>Label tombol WhatsApp</label><input className={input} value={settings.whatsapp_group_label} onChange={e => setS('whatsapp_group_label', e.target.value)} placeholder="Klik Sini" /></div>
@@ -356,19 +366,25 @@ export default function FormDetailPage() {
           </div>
           <div>
             <label className={label}>Jenis event</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {APPROVAL_MODE_OPTIONS.map(o => (
-                <button
-                  key={String(o.value)}
-                  type="button"
-                  onClick={() => setRequiresApproval(o.value)}
-                  className={`text-left p-3 rounded-xl border transition ${settings.requires_approval === o.value ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-200' : 'border-slate-200 hover:bg-slate-50'}`}
-                >
-                  <span className="block text-sm font-semibold text-slate-800">{o.label}</span>
-                  <span className="block text-xs text-slate-500 mt-1">{o.hint}</span>
-                </button>
-              ))}
-            </div>
+            {Number(settings.price) > 0 ? (
+              <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
+                Event berbayar: submit → bayar QRIS → langsung terdaftar. Mode approval tidak berlaku (kosongkan biaya kalau mau pakai approval).
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {APPROVAL_MODE_OPTIONS.map(o => (
+                  <button
+                    key={String(o.value)}
+                    type="button"
+                    onClick={() => setRequiresApproval(o.value)}
+                    className={`text-left p-3 rounded-xl border transition ${settings.requires_approval === o.value ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-200' : 'border-slate-200 hover:bg-slate-50'}`}
+                  >
+                    <span className="block text-sm font-semibold text-slate-800">{o.label}</span>
+                    <span className="block text-xs text-slate-500 mt-1">{o.hint}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

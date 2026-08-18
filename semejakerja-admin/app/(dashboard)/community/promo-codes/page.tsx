@@ -30,6 +30,8 @@ export default function PromoCodesPage() {
   const supabase = createClient()
   const [codes, setCodes] = useState<PromoCode[]>([])
   const [campaigns, setCampaigns] = useState<Pick<Campaign, 'id' | 'name'>[]>([])
+  // Form event buat scoping kode type 'event' (migration 056).
+  const [eventForms, setEventForms] = useState<{ id: string; title: string }[]>([])
   const [emailsByCode, setEmailsByCode] = useState<Map<string, string[]>>(new Map())
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -54,6 +56,7 @@ export default function PromoCodesPage() {
     max_usage: '' as string | number,
     expires_at: '',
     campaign_id: '' as string,
+    form_id: '' as string,
     allowed_emails: '',
   })
 
@@ -61,13 +64,15 @@ export default function PromoCodesPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: codeRows }, { data: campRows }, { data: emailRows }] = await Promise.all([
+    const [{ data: codeRows }, { data: campRows }, { data: emailRows }, { data: formRows }] = await Promise.all([
       supabase.from('promo_codes').select('*').order('created_at', { ascending: false }),
       supabase.from('campaigns').select('id, name').order('created_at', { ascending: false }),
       supabase.from('promo_code_allowed_emails').select('code_id, email'),
+      supabase.from('forms').select('id, title').order('created_at', { ascending: false }),
     ])
     setCodes((codeRows ?? []) as PromoCode[])
     setCampaigns((campRows ?? []) as Pick<Campaign, 'id' | 'name'>[])
+    setEventForms((formRows ?? []) as { id: string; title: string }[])
     const map = new Map<string, string[]>()
     for (const row of (emailRows ?? []) as { code_id: string; email: string }[]) {
       const list = map.get(row.code_id) ?? []
@@ -78,7 +83,12 @@ export default function PromoCodesPage() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    // Defer a frame so setLoading(true) inside load() isn't a sync
+    // setState in the effect body (react-hooks/set-state-in-effect).
+    const raf = requestAnimationFrame(() => { load() })
+    return () => cancelAnimationFrame(raf)
+  }, [load])
 
   const campaignName = useMemo(
     () => new Map(campaigns.map(c => [c.id, c.name])),
@@ -98,7 +108,7 @@ export default function PromoCodesPage() {
     usePagination(filtered, `${filterType}|${filterActive}|${filterCampaign}`)
 
   const resetForm = () =>
-    setForm({ code: '', type: 'community', discount_percent: 10, max_usage: '', expires_at: '', campaign_id: '', allowed_emails: '' })
+    setForm({ code: '', type: 'community', discount_percent: 10, max_usage: '', expires_at: '', campaign_id: '', form_id: '', allowed_emails: '' })
 
   const openCreate = () => {
     setEditingId(null)
@@ -115,6 +125,7 @@ export default function PromoCodesPage() {
       max_usage: code.max_usage ?? '',
       expires_at: code.expires_at ? code.expires_at.slice(0, 10) : '',
       campaign_id: code.campaign_id ?? '',
+      form_id: code.form_id ?? '',
       allowed_emails: '', // email dikelola lewat tombol ✉️ terpisah
     })
     setShowModal(true)
@@ -132,6 +143,8 @@ export default function PromoCodesPage() {
       max_usage: form.max_usage === '' ? null : Number(form.max_usage),
       expires_at: form.expires_at || null,
       campaign_id: form.campaign_id || null,
+      // Scope event cuma berlaku buat type 'event' (migration 056).
+      form_id: form.type === 'event' && form.form_id ? form.form_id : null,
     }
 
     // ── Mode edit: update kolom, email tidak disentuh (pakai tombol ✉️) ──
@@ -458,6 +471,16 @@ export default function PromoCodesPage() {
                   {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
+              {form.type === 'event' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Khusus event (opsional)</label>
+                  <select value={form.form_id} onChange={e => setForm({ ...form, form_id: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none">
+                    <option value="">— Semua event berbayar —</option>
+                    {eventForms.map(f => <option key={f.id} value={f.id}>{f.title || 'Tanpa judul'}</option>)}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1">Kode type Event dipakai di form event berbayar. Pilih satu event buat ngunci kodenya ke situ aja.</p>
+                </div>
+              )}
               {editingId ? (
                 <p className="text-[11px] text-slate-400 -mt-1">Daftar email khusus diatur lewat tombol ✉️ di baris kode.</p>
               ) : (
