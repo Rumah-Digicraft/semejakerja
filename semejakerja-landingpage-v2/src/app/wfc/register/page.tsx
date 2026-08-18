@@ -79,6 +79,48 @@ interface SubmitResult {
 
 const isAnswerable = (t: FormQuestionType) => t !== "section";
 
+// ── Kompresi gambar client-side sebelum upload ──────────────────
+// Bukti follow IG = screenshot teks; downscale ke 1600px + re-encode JPEG
+// biasanya cuma 150-300KB dan tetap kebaca. Target 500KB — kualitas
+// diturunkan bertahap sampai muat. Kalau decode gagal (format eksotis),
+// pemanggil fallback ke file asli (bucket tetap menegakkan 5MB + image/*).
+const UPLOAD_TARGET_BYTES = 500 * 1024;
+const UPLOAD_MAX_DIMENSION = 1600;
+const UPLOAD_SOURCE_LIMIT = 20 * 1024 * 1024;
+
+async function compressImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(
+    1,
+    UPLOAD_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height)
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas tidak tersedia");
+  // Latar putih supaya PNG transparan nggak jadi hitam pas ke JPEG.
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  const encode = (quality: number) =>
+    new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", quality)
+    );
+
+  let smallest: Blob | null = null;
+  for (const quality of [0.85, 0.75, 0.65, 0.55, 0.45, 0.35]) {
+    const blob = await encode(quality);
+    if (!blob) break;
+    smallest = blob;
+    if (blob.size <= UPLOAD_TARGET_BYTES) break;
+  }
+  if (!smallest) throw new Error("Gagal memproses gambar");
+  return smallest;
+}
+
 // Satu kalimat ringkas, bukan 2 baris info terpisah — "ditolak" udah
 // nyiratin event-nya approval-gated, jadi nggak perlu diulang lagi.
 function noticeText(
@@ -149,17 +191,30 @@ function FormRunner({
       setErrorMsg("File harus berupa gambar (JPG/PNG) ya.");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg("Ukuran gambar maksimal 5MB ya.");
+    if (file.size > UPLOAD_SOURCE_LIMIT) {
+      setErrorMsg("Ukuran file maksimal 20MB ya.");
       return;
     }
     setUploading((u) => ({ ...u, [qid]: true }));
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      // Kompres dulu (target ±500KB). Kalau decode gagal, fallback ke file
+      // asli selama masih di bawah limit bucket (5MB).
+      let blob: Blob = file;
+      let ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      let contentType = file.type;
+      try {
+        blob = await compressImage(file);
+        ext = "jpg";
+        contentType = "image/jpeg";
+      } catch {
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error("gambar terlalu besar dan gagal dikompres");
+        }
+      }
       const path = `${form.id}/${crypto.randomUUID()}.${ext}`;
       const { error } = await supabase.storage
         .from("form-uploads")
-        .upload(path, file, { contentType: file.type });
+        .upload(path, blob, { contentType });
       if (error) throw new Error(error.message);
       const { data } = supabase.storage.from("form-uploads").getPublicUrl(path);
       setAnswer(qid, data.publicUrl);
@@ -399,7 +454,9 @@ function FormRunner({
                       </>
                     )}
                   </label>
-                  <p className={styles.uploadHint}>JPG/PNG, maksimal 5MB.</p>
+                  <p className={styles.uploadHint}>
+                    JPG/PNG maks 20MB — otomatis dikompres.
+                  </p>
                 </div>
               )}
             </div>
@@ -710,19 +767,22 @@ function RegisterContent() {
 
   if (!form) {
     return (
-      <div className={styles.statusCard}>
-        <div className={styles.statusEmoji}>🔍</div>
-        <h2 className={styles.statusTitle}>Form tidak ditemukan</h2>
-        <p className={styles.statusText}>
-          Link tidak valid atau pendaftaran sudah ditutup. Cek lagi link yang
-          dibagikan panitia ya!
-        </p>
+      <div className={styles.layout}>
+        <div className={styles.statusCard}>
+          <div className={styles.statusEmoji}>🔍</div>
+          <h2 className={styles.statusTitle}>Form tidak ditemukan</h2>
+          <p className={styles.statusText}>
+            Link tidak valid atau pendaftaran sudah ditutup. Cek lagi link yang
+            dibagikan panitia ya!
+          </p>
+        </div>
       </div>
     );
   }
 
   // Wajib login Google dulu sebelum bisa buka/isi form. Semua state di
-  // bawah tetap menampilkan list peserta terdaftar di bagian bawah.
+  // bawah tetap menampilkan list peserta terdaftar: sticky di kolom kiri
+  // pada desktop, di bawah form pada mobile.
   const main =
     authState === "out" ? (
       <LoginGate form={form} token={token ?? ""} />
@@ -755,14 +815,20 @@ function RegisterContent() {
       />
     );
 
+  const showSidebar = participants.length > 0;
+
   return (
-    <>
-      {main}
-      <ParticipantList
-        names={participants}
-        quota={form.show_quota !== false ? form.quota : null}
-      />
-    </>
+    <div className={`${styles.layout} ${showSidebar ? styles.layoutSplit : ""}`}>
+      <div className={styles.main}>{main}</div>
+      {showSidebar && (
+        <aside className={styles.sidebar}>
+          <ParticipantList
+            names={participants}
+            quota={form.show_quota !== false ? form.quota : null}
+          />
+        </aside>
+      )}
+    </div>
   );
 }
 

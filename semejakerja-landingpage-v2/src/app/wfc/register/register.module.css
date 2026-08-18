@@ -4,9 +4,49 @@
   background-color: var(--color-background);
 }
 
+/* Lebar dikendalikan .layout (560px single-col / 900px split) — .inner
+   cuma jadi batas terluar. */
 .inner {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+/* ── Layout: form + list peserta ──
+   Mobile (default): satu kolom, list peserta di bawah form — form itu
+   aksi utamanya, jangan kedorong list nama. Desktop ≥1024px (kalau ada
+   peserta): list pindah ke kolom kiri dan sticky ngikutin scroll. */
+.layout {
   max-width: 560px;
   margin: 0 auto;
+}
+
+.main {
+  min-width: 0;
+}
+
+.sidebar {
+  margin-top: var(--space-6);
+}
+
+@media (min-width: 1024px) {
+  .layoutSplit {
+    max-width: 900px;
+    display: grid;
+    grid-template-columns: 280px minmax(0, 560px);
+    gap: var(--space-6);
+    align-items: start;
+    justify-content: center;
+  }
+
+  .layoutSplit .sidebar {
+    order: -1; /* kolom kiri */
+    margin-top: 0;
+    position: sticky;
+    top: calc(var(--navbar-height) + var(--space-6));
+    /* List panjang scroll di dalam kartunya sendiri, bukan lepas dari viewport. */
+    max-height: calc(100vh - var(--navbar-height) - var(--space-10));
+    overflow-y: auto;
+  }
 }
 
 .header {
@@ -363,12 +403,12 @@
 }
 
 /* ── List peserta terdaftar (nama aja, social proof) ── */
+/* Jarak dari form diatur .sidebar (mobile) / grid gap (desktop). */
 .participantsCard {
   background: white;
   border: 1px solid var(--color-gray-100);
   border-radius: var(--radius-xl);
   padding: var(--space-5);
-  margin-top: var(--space-6);
   box-shadow: var(--shadow-sm);
 }
 
