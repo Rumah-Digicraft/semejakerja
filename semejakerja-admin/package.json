@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@maplibre/maplibre-gl-leaflet": "^0.1.4",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.109.0",
     "@tanstack/react-query": "^5.101.2",
@@ -19,6 +20,7 @@
     "jspdf-autotable": "^5.0.8",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.22.0",
+    "maplibre-gl": "^6.4.1",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",

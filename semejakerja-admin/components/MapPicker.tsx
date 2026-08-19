@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import { MapContainer, Marker, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import { MapTilerVectorLayer } from '@/lib/mapTilerVectorLayer'
 
 // Fix Leaflet marker icon issue in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -61,11 +62,8 @@ export default function MapPicker({ center, zoom = 14, onLocationChange }: MapPi
 
   return (
     <div className="h-[250px] w-full rounded-xl overflow-hidden border border-slate-200 z-0 relative">
-      <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} style={{ height: '100%', width: '100%', zIndex: 0 }}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-        />
+      <MapContainer center={center} zoom={zoom} maxZoom={19} scrollWheelZoom={true} style={{ height: '100%', width: '100%', zIndex: 0 }}>
+        <MapTilerVectorLayer />
         <LocationMarker position={position} onChange={handleChange} />
       </MapContainer>
     </div>

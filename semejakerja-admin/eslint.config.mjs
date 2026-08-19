@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // macOS AppleDouble metadata files (repo on external drive) — not source.
     "**/._*",
+    // Vendored maplibre-gl worker build output (minified, not source we own).
+    "public/maplibre/**",
   ]),
 ]);
 

@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import { MapContainer, Marker, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import { ZoomIn, ZoomOut, Compass, MapPin, Navigation } from 'lucide-react';
 import L from 'leaflet';
 import type { Cafe, FilterState } from '../types/cafe';
 import { createHighlightIcon, createMarkerIcon, getMarkerTier, getZIndexOffset } from './MapMarker';
 import MapSearch from './MapSearch';
+import { MapTilerVectorLayer } from '../lib/mapTilerVectorLayer';
 
 // Cluster bubble matches the app's pin palette (verified purple / partner
 // green, see TIER_CFG in MapMarker.tsx) instead of leaflet.markercluster's
@@ -215,6 +216,11 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeC
       <MapContainer
         center={position}
         zoom={14}
+        // maplibre-gl-leaflet reads the Leaflet map's maxZoom to configure its
+        // internal MapLibre GL instance — without an explicit cap here (Leaflet
+        // defaults to Infinity), MapLibre throws "Map has no maxZoom specified"
+        // and the whole map fails to mount.
+        maxZoom={19}
         // Leaflet defaults to whole-number zoom levels (zoomSnap: 1), so every
         // scroll/pinch/button zoom jumps a full level in one step — the
         // "patah-patah" feel vs. Google Maps' continuous zoom. Fractional
@@ -225,9 +231,7 @@ const MapView: React.FC<MapViewProps> = ({ cafes, filters, selectedCafe, onCafeC
         attributionControl={false}
         className="w-full h-full"
       >
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        />
+        <MapTilerVectorLayer />
 
         {/* Clusters nearby pins into a single bubble instead of animating
             every marker's DOM node on every zoom frame — with ~half the
