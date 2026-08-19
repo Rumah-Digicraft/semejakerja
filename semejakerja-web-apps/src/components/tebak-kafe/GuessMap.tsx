@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import L from 'leaflet';
+import { MapTilerVectorLayer } from '../../lib/mapTilerVectorLayer';
 
 export interface LatLng {
   lat: number;
@@ -107,6 +108,7 @@ const GuessMap: React.FC<GuessMapProps> = ({ guess, actual, locked, onGuess }) =
         center={CENTER}
         zoom={13}
         minZoom={11}
+        maxZoom={19}
         maxBounds={BOUNDS.pad(0.5)}
         maxBoundsViscosity={0.4}
         zoomControl={false}
@@ -114,7 +116,7 @@ const GuessMap: React.FC<GuessMapProps> = ({ guess, actual, locked, onGuess }) =
         className="w-full h-full"
         style={{ cursor: locked ? 'default' : 'crosshair' }}
       >
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+        <MapTilerVectorLayer />
 
         <ClickCatcher locked={locked} onGuess={onGuess} />
         <RevealFrame guess={guess} actual={actual} locked={locked} />

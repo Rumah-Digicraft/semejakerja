@@ -3,8 +3,9 @@
 // nentuin lokasi). CSS Leaflet sudah di-import global di src/index.css,
 // jadi tidak perlu import ulang di sini.
 import { useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import { MapTilerVectorLayer } from '../../lib/mapTilerVectorLayer';
 
 // react-leaflet's default Marker pakai path icon yang rusak di bundle
 // Vite/Webpack (sama seperti kasusnya di admin) — MapView.tsx utama
@@ -60,13 +61,10 @@ export default function LocationPicker({ center, zoom = 14, onLocationChange }: 
 
   return (
     <div className="h-[220px] rounded-xl overflow-hidden border border-gray-200">
-      <MapContainer center={position} zoom={zoom} style={{ height: '100%', width: '100%' }}>
-        {/* Samain dengan MapPicker.tsx admin (CartoDB Voyager) biar dua
-            picker lokasi ini konsisten tampilannya. */}
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
+      <MapContainer center={position} zoom={zoom} maxZoom={19} style={{ height: '100%', width: '100%' }}>
+        {/* Samain dengan MapView.tsx (MapTiler vector) biar semua map di
+            app ini konsisten tampilannya. */}
+        <MapTilerVectorLayer />
         <LocationMarker position={position} onChange={handleChange} />
       </MapContainer>
     </div>
