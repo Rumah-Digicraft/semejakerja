@@ -78,14 +78,24 @@ export default function DashboardPage() {
           nextStats.serviceFeeTotal = (data as number | null) ?? 0
         })())
         tasks.push((async () => {
-          const { data } = await supabase.from('memberships').select('id, user_profiles(full_name), created_at').eq('status', 'pending_payment').limit(3)
-          membershipItems = (data ?? []).map(m => ({
+          // Nama diambil terpisah: memberships.user_id dan user_profiles.id
+          // sama-sama nunjuk auth.users, tidak ada FK di antara keduanya —
+          // embed `user_profiles(...)` ditolak PostgREST (PGRST200). Pola
+          // map-by-user_id ini sama dengan community/members.
+          const { data } = await supabase.from('memberships').select('id, user_id, created_at').eq('status', 'pending_payment').limit(3)
+          const rows = data ?? []
+          const nameMap: Record<string, string | null> = {}
+          if (rows.length > 0) {
+            const { data: profs } = await supabase
+              .from('user_profiles')
+              .select('id, full_name')
+              .in('id', rows.map(m => m.user_id))
+            profs?.forEach(p => { nameMap[p.id] = p.full_name })
+          }
+          membershipItems = rows.map(m => ({
             id: m.id, type: 'payment' as const,
             label: 'Pembayaran membership pending',
-            sublabel:
-              (Array.isArray(m.user_profiles)
-                ? m.user_profiles[0]?.full_name
-                : (m.user_profiles as { full_name?: string | null } | null)?.full_name) ?? 'Member',
+            sublabel: nameMap[m.user_id] ?? 'Member',
             time: formatDate(m.created_at),
           }))
         })())
@@ -113,11 +123,12 @@ export default function DashboardPage() {
           nextStats.movesSessionsThisMonth = count ?? 0
         })())
         tasks.push((async () => {
-          const { data } = await supabase.from('participants').select('id, participant_name, created_at').eq('payment_status', 'pending').limit(3)
+          // Kolomnya `name` — `participant_name` itu punya addon_dropin.
+          const { data } = await supabase.from('participants').select('id, name, created_at').eq('payment_status', 'pending').limit(3)
           participantItems = (data ?? []).map(p => ({
             id: p.id, type: 'payment' as const,
             label: 'Pembayaran sesi Moves pending',
-            sublabel: p.participant_name ?? 'Peserta',
+            sublabel: p.name ?? 'Peserta',
             time: formatDate(p.created_at),
           }))
         })())
