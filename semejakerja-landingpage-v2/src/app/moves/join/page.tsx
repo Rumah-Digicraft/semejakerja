@@ -67,7 +67,11 @@ const noteStyle: React.CSSProperties = {
 function useUniqueCode() {
   const [code, setCode] = useState<number | null>(null);
   useEffect(() => {
-    setCode(300 + Math.floor(Math.random() * 401));
+    // Nggak bisa dihitung pas render: halaman ini di-prerender statis, jadi
+    // angka acak di server bakal beda dengan di client (hydration mismatch).
+    // Ditunda satu microtask supaya bukan setState sinkron di badan effect
+    // (react-hooks/set-state-in-effect).
+    queueMicrotask(() => setCode(300 + Math.floor(Math.random() * 401)));
   }, []);
   return code;
 }
