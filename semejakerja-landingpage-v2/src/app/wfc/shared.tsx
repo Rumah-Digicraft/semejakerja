@@ -38,6 +38,17 @@ export function useWfcEvents() {
   useEffect(() => {
     async function load() {
       const supabase = createClient();
+      try {
+        await loadInner(supabase);
+      } catch {
+        /* biarkan list kosong — jangan tinggalin pemanggilnya di loading */
+      }
+      setLoading(false);
+    }
+
+    // Kalau salah satu request nggak pernah selesai/gagal, setLoading(false)
+    // di atas tetap kepanggil — dulu error di sini bikin skeleton nyangkut.
+    async function loadInner(supabase: ReturnType<typeof createClient>) {
       const [{ data: rows }, { data: { session } }] = await Promise.all([
         supabase
           .from("public_wfc_events")
@@ -65,7 +76,6 @@ export function useWfcEvents() {
       setEvents(
         eventRows.map((e) => ({ ...e, myStatus: myStatusByForm[e.id] ?? null }))
       );
-      setLoading(false);
     }
     load();
   }, []);
