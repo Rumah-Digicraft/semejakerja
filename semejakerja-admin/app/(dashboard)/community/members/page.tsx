@@ -6,7 +6,19 @@ import { usePagination } from '@/lib/usePagination'
 import { Pagination } from '@/components/ui/pagination'
 import type { Membership, UserProfile } from '@/types'
 import { formatDate, formatCurrency } from '@/lib/utils/format'
-import { Search, CheckCircle, XCircle, Loader2, GraduationCap, ChevronDown, CreditCard, Users, Clock, Eye, X, Phone, Mail, Briefcase, MapPin, CalendarClock, Tag, History } from 'lucide-react'
+import { Search, CheckCircle, XCircle, Loader2, GraduationCap, CreditCard, Users, Clock, Eye, X, Phone, Mail, Briefcase, MapPin, CalendarClock, Tag, History, Gift } from 'lucide-react'
+
+// Tanggal lokal (WIB) dalam format yyyy-mm-dd untuk <input type="date"> —
+// toISOString() memakai UTC dan bisa mundur sehari di malam hari.
+const localDateStr = (d: Date) => {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+const addMonthsStr = (n: number) => {
+  const d = new Date()
+  d.setMonth(d.getMonth() + n)
+  return localDateStr(d)
+}
 
 const TIER_LABELS: Record<string, { label: string; color: string }> = {
   nyantai: { label: 'Nyantai', color: 'bg-slate-100 text-slate-600' },
@@ -47,6 +59,13 @@ export default function MembersPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [toast, setToast] = useState('')
 
+  // Modal "Beri Membership": admin kasih tier ke user by email + tanggal berakhir
+  const [grantOpen, setGrantOpen] = useState(false)
+  const [grantEmail, setGrantEmail] = useState('')
+  const [grantTier, setGrantTier] = useState('nongkrong')
+  const [grantExpiry, setGrantExpiry] = useState('')
+  const [grantSaving, setGrantSaving] = useState(false)
+
   const showToast = (msg: string) => {
     setToast(msg); setTimeout(() => setToast(''), 3000)
   }
@@ -66,12 +85,16 @@ export default function MembersPage() {
     })
 
     // Per user, prefer the row that actually drives their access: an active
-    // membership first, else the newest row (pending/expired/cancelled).
+    // row that hasn't passed expires_at first (so a lapsed grant falls back to
+    // the base nyantai row), then a stale active, else the newest row.
+    const now = Date.now()
+    const isLive = (m: Membership) => m.status === 'active' && (!m.expires_at || Date.parse(m.expires_at) > now)
+    const rank = (m: Membership) => (isLive(m) ? 2 : m.status === 'active' ? 1 : 0)
     const memberMap: Record<string, Membership> = {}
     const historyMap: Record<string, Membership[]> = {}
     memberships?.forEach(m => {
       const existing = memberMap[m.user_id]
-      if (!existing || (m.status === 'active' && existing.status !== 'active')) {
+      if (!existing || rank(m) > rank(existing)) {
         memberMap[m.user_id] = m
       }
       ;(historyMap[m.user_id] ??= []).push(m)
@@ -100,13 +123,42 @@ export default function MembersPage() {
     showToast('Berhasil: KTM diverifikasi!'); load()
   }
 
-  const handleChangeTier = async (userId: string, membershipId: string, tier: string) => {
-    const { data, error } = await supabase.from('memberships').update({ tier }).eq('id', membershipId).select('id')
+  const openGrant = (email?: string) => {
+    setGrantEmail(email ?? '')
+    setGrantTier('nongkrong')
+    setGrantExpiry(addMonthsStr(1))
+    setGrantOpen(true)
+  }
+
+  // Insert baris membership BARU (status active, gratis) — sama seperti alur
+  // checkout yang juga insert baris per pembelian. Baris nyantai bawaan user
+  // tetap ada sebagai fallback saat pemberian ini lewat expires_at; landing
+  // page memilih tier tertinggi yang masih hidup. price_paid 0 juga otomatis
+  // menyembunyikannya dari halaman Transaksi (khusus transaksi berbayar).
+  const handleGrant = async () => {
+    const email = grantEmail.trim().toLowerCase()
+    if (!email) { showToast('Isi email member dulu'); return }
+    const target = members.find(m => (m.profile.email ?? '').toLowerCase() === email)
+    if (!target) { showToast('Email tidak ditemukan di daftar member'); return }
+    const isNyantai = grantTier === 'nyantai'
+    if (!isNyantai && !grantExpiry) { showToast('Tanggal berakhir wajib diisi'); return }
+    setGrantSaving(true)
+    const { data, error } = await supabase.from('memberships').insert({
+      user_id: target.profile.id,
+      tier: grantTier,
+      status: 'active',
+      // Berlaku sampai akhir hari tanggal yang dipilih (nyantai tanpa batas)
+      expires_at: isNyantai ? null : new Date(`${grantExpiry}T23:59:59`).toISOString(),
+      price_paid: 0,
+    }).select('id')
+    setGrantSaving(false)
     if (error || !data?.length) {
-      showToast(`Gagal ubah tier: ${error?.message ?? 'tidak ada baris ter-update (cek role admin / RLS)'}`)
+      showToast(`Gagal memberi membership: ${error?.message ?? 'tidak ada baris ter-insert (cek role admin / RLS)'}`)
       return
     }
-    showToast('Berhasil: Tier berhasil diubah!'); load()
+    showToast(`Berhasil: ${TIER_LABELS[grantTier]?.label} diberikan ke ${target.profile.full_name ?? email}!`)
+    setGrantOpen(false)
+    load()
   }
 
   const handlePayment = async (membershipId: string, action: 'approve' | 'reject') => {
@@ -150,6 +202,12 @@ export default function MembersPage() {
           <h1 className="text-2xl font-bold text-slate-900">Manajemen Member</h1>
           <p className="text-slate-500 mt-1">Kelola profil & membership komunitas Semejakerja</p>
         </div>
+        <button
+          onClick={() => openGrant()}
+          className="px-4 py-2.5 bg-purple-600 text-white hover:bg-purple-700 rounded-xl text-sm font-medium flex items-center gap-2 transition"
+        >
+          <Gift size={16} /> Beri Membership
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -240,27 +298,21 @@ export default function MembersPage() {
                   </td>
                   <td className="px-5 py-4">
                     {membership ? (
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${TIER_LABELS[membership.tier]?.color}`}>
-                          {TIER_LABELS[membership.tier]?.label}
-                        </span>
-                        <select
-                          value={membership.tier}
-                          onChange={e => handleChangeTier(profile.id, membership.id, e.target.value)}
-                          className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none"
-                        >
-                          <option value="nyantai">Nyantai</option>
-                          <option value="nongkrong">Nongkrong</option>
-                          <option value="mode_serius">Mode Serius</option>
-                        </select>
-                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${TIER_LABELS[membership.tier]?.color}`}>
+                        {TIER_LABELS[membership.tier]?.label}
+                      </span>
                     ) : <span className="text-slate-400 text-xs">Belum ada membership</span>}
                   </td>
                   <td className="px-5 py-4">
                     {membership ? (
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[membership.status]}`}>
-                        {membership.status}
-                      </span>
+                      <>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[membership.status]}`}>
+                          {STATUS_LABELS[membership.status] ?? membership.status}
+                        </span>
+                        {membership.expires_at && (
+                          <p className="text-xs text-slate-400 mt-1.5">s/d {formatDate(membership.expires_at)}</p>
+                        )}
+                      </>
                     ) : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-5 py-4 text-xs text-slate-500">{formatDate(profile.created_at)}</td>
@@ -284,6 +336,14 @@ export default function MembersPage() {
                       >
                         <Eye size={12} /> Detail
                       </button>
+                      {profile.email && (
+                        <button
+                          onClick={() => openGrant(profile.email)}
+                          className="px-3 py-1.5 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg text-xs font-medium flex items-center gap-1 transition w-max"
+                        >
+                          <Gift size={12} /> Beri Membership
+                        </button>
+                      )}
                       {profile.is_student && !profile.student_verified_at && (
                         <button
                           onClick={() => handleVerifyKTM(profile.id)}
@@ -367,19 +427,17 @@ export default function MembersPage() {
                 )}
               </div>
 
-              {membership && (
-                <label className="flex items-center gap-2 text-xs text-slate-400">
-                  Ubah tier:
-                  <select
-                    value={membership.tier}
-                    onChange={e => handleChangeTier(profile.id, membership.id, e.target.value)}
-                    className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none text-slate-700"
-                  >
-                    <option value="nyantai">Nyantai</option>
-                    <option value="nongkrong">Nongkrong</option>
-                    <option value="mode_serius">Mode Serius</option>
-                  </select>
-                </label>
+              {membership?.expires_at && (
+                <p className="text-xs text-slate-400">Berlaku s/d {formatDate(membership.expires_at)}</p>
+              )}
+
+              {profile.email && (
+                <button
+                  onClick={() => openGrant(profile.email)}
+                  className="px-3 py-1.5 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg text-xs font-medium flex items-center gap-1 transition w-max"
+                >
+                  <Gift size={12} /> Beri Membership
+                </button>
               )}
 
               <p className="text-xs text-slate-400">Bergabung {formatDate(profile.created_at)}</p>
@@ -574,6 +632,121 @@ export default function MembersPage() {
                 </ul>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {grantOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          onClick={() => !grantSaving && setGrantOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 p-6 border-b border-slate-100">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Gift size={18} className="text-purple-600" /> Beri Membership</h2>
+                <p className="text-sm text-slate-500 mt-1">Kasih tier ke member by email, gratis & langsung aktif.</p>
+              </div>
+              <button onClick={() => setGrantOpen(false)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition" aria-label="Tutup">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Email member</label>
+                <input
+                  value={grantEmail}
+                  onChange={e => setGrantEmail(e.target.value)}
+                  list="member-emails"
+                  type="email"
+                  placeholder="nama@email.com"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+                <datalist id="member-emails">
+                  {members.filter(m => m.profile.email).map(m => (
+                    <option key={m.profile.id} value={m.profile.email!}>{m.profile.full_name ?? ''}</option>
+                  ))}
+                </datalist>
+                {(() => {
+                  const match = members.find(m => (m.profile.email ?? '').toLowerCase() === grantEmail.trim().toLowerCase())
+                  if (!grantEmail.trim()) return null
+                  if (!match) return <p className="text-xs text-amber-600 mt-1.5">Email belum cocok dengan member manapun.</p>
+                  return (
+                    <p className="text-xs text-slate-500 mt-1.5">
+                      {match.profile.full_name ?? 'Tanpa nama'}
+                      {match.membership && (
+                        <> · saat ini <span className="font-medium">{TIER_LABELS[match.membership.tier]?.label}</span>
+                          {match.membership.expires_at ? ` s/d ${formatDate(match.membership.expires_at)}` : ''}</>
+                      )}
+                    </p>
+                  )
+                })()}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Tier</label>
+                <select
+                  value={grantTier}
+                  onChange={e => setGrantTier(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+                >
+                  <option value="nongkrong">Nongkrong</option>
+                  <option value="mode_serius">Mode Serius</option>
+                  <option value="nyantai">Nyantai (tier gratis, tanpa masa berakhir)</option>
+                </select>
+              </div>
+
+              {grantTier !== 'nyantai' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Durasi</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[1, 2, 3, 6, 12].map(n => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setGrantExpiry(addMonthsStr(n))}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${grantExpiry === addMonthsStr(n) ? 'bg-purple-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                      >
+                        {n} bulan
+                      </button>
+                    ))}
+                  </div>
+                  <label className="block text-xs text-slate-400 mt-3 mb-1">Atau pilih tanggal berakhir sendiri:</label>
+                  <input
+                    type="date"
+                    value={grantExpiry}
+                    min={localDateStr(new Date())}
+                    onChange={e => setGrantExpiry(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  {grantExpiry && (
+                    <p className="text-xs text-slate-400 mt-2">Membership aktif sampai akhir hari {formatDate(grantExpiry)}.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 p-6 pt-0">
+              <button
+                onClick={() => setGrantOpen(false)}
+                disabled={grantSaving}
+                className="px-4 py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-medium transition disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleGrant}
+                disabled={grantSaving}
+                className="px-4 py-2 bg-purple-600 text-white hover:bg-purple-700 rounded-xl text-sm font-medium flex items-center gap-2 transition disabled:opacity-50"
+              >
+                {grantSaving ? <Loader2 size={14} className="animate-spin" /> : <Gift size={14} />}
+                Beri Membership
+              </button>
+            </div>
           </div>
         </div>
       )}

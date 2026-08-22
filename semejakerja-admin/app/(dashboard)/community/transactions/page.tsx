@@ -40,8 +40,14 @@ export default function TransactionsPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    // Hanya transaksi checkout riil: price_paid > 0, ATAU pakai kode promo —
+    // promo bisa 100% (price_paid 0) tapi tetap lewat DOKU (bayar service fee).
+    // Yang tersaring keluar: baris nyantai bawaan user baru (migrasi 016) dan
+    // pemberian membership dari admin, dua-duanya gratis tanpa promo.
     const [{ data: memberships }, { data: profiles }] = await Promise.all([
-      supabase.from('memberships').select('*').order('created_at', { ascending: false }),
+      supabase.from('memberships').select('*')
+        .or('price_paid.gt.0,promo_code_used.not.is.null')
+        .order('created_at', { ascending: false }),
       supabase.from('user_profiles').select('*'),
     ])
 
@@ -105,7 +111,7 @@ export default function TransactionsPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Transaksi Membership</h1>
-          <p className="text-slate-500 mt-1">Riwayat pembelian & verifikasi pembayaran membership</p>
+          <p className="text-slate-500 mt-1">Riwayat pembelian & verifikasi pembayaran membership — hanya transaksi berbayar</p>
         </div>
       </div>
 
@@ -141,7 +147,6 @@ export default function TransactionsPage() {
           </div>
           <select value={filterTier} onChange={e => setFilterTier(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none">
             <option value="all">Semua Tier</option>
-            <option value="nyantai">Nyantai</option>
             <option value="nongkrong">Nongkrong</option>
             <option value="mode_serius">Mode Serius</option>
           </select>
