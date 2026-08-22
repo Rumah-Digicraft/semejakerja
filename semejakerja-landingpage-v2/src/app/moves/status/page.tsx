@@ -30,14 +30,13 @@ type State = "checking" | "success" | "pending" | "failed";
 function StatusContent() {
   const supabase = createClient();
   const invoice = useSearchParams().get("invoice");
-  const [state, setState] = useState<State>("checking");
+  // Tanpa ?invoice= nggak ada yang bisa dicek — tentukan pas render, bukan
+  // lewat setState di dalam effect (react-hooks/set-state-in-effect).
+  const [state, setState] = useState<State>(invoice ? "checking" : "pending");
   const [amount, setAmount] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!invoice) {
-      setState("pending");
-      return;
-    }
+    if (!invoice) return;
 
     let tries = 0;
     let timer: ReturnType<typeof setTimeout>;

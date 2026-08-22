@@ -897,6 +897,8 @@ function RegisterContent() {
   // Kode promo tervalidasi (event berbayar) — di-lift ke sini supaya
   // tetap kepasang saat pindah layar form → layar pembayaran.
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+  // Layar loading kelamaan → tawarin muat ulang, jangan spinner selamanya.
+  const [gateTimedOut, setGateTimedOut] = useState(false);
 
   // Nama peserta terdaftar (best-effort; kalau RPC gagal list cuma nggak
   // tampil, form tetap jalan). Di-refresh setelah submit/cancel supaya
@@ -913,12 +915,12 @@ function RegisterContent() {
 
   useEffect(() => {
     if (!form) return;
-    // Defer a frame (react-hooks/set-state-in-effect) — same pattern as
-    // the my-response loader below.
-    const raf = requestAnimationFrame(() => {
-      loadParticipants();
-    });
-    return () => cancelAnimationFrame(raf);
+    // Ditunda satu microtask, BUKAN satu frame: requestAnimationFrame
+    // berhenti total selama dokumen hidden (link kebuka di tab background,
+    // layar HP kekunci), jadi datanya nggak pernah kemuat sampai tabnya
+    // difokusin. queueMicrotask tetap jalan dan sama-sama bikin
+    // react-hooks/set-state-in-effect adem.
+    queueMicrotask(() => loadParticipants());
   }, [form, loadParticipants]);
 
   useEffect(() => {
@@ -944,18 +946,26 @@ function RegisterContent() {
         setUserId(session.user.id);
         setUserEmail(session.user.email ?? null);
       }
-      const { data: prof } = await supabase
-        .from("user_profiles")
-        .select("full_name, nickname, occupation, city, phone")
-        .eq("id", session.user.id)
-        .maybeSingle();
-      if (active) {
-        setProfile((prof as ProfileData | null) ?? null);
-        setProfileReady(true);
+      // Profil cuma buat autofill — kegagalannya tidak boleh menahan render.
+      try {
+        const { data: prof } = await supabase
+          .from("user_profiles")
+          .select("full_name, nickname, occupation, city, phone")
+          .eq("id", session.user.id)
+          .maybeSingle();
+        if (active) setProfile((prof as ProfileData | null) ?? null);
+      } catch {
+        /* biarkan kosong, user isi manual */
       }
+      if (active) setProfileReady(true);
     }
 
-    supabase.auth.getSession().then(({ data }) => resolveAuth(data.session));
+    // getSession() bisa reject (storage/cookie rusak, refresh token ditolak).
+    // Tanpa catch, profileReady nggak pernah true dan halaman spinner selamanya.
+    supabase.auth
+      .getSession()
+      .then(({ data }) => resolveAuth(data.session))
+      .catch(() => resolveAuth(null));
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => resolveAuth(session));
@@ -966,16 +976,18 @@ function RegisterContent() {
         if (active) setLoading(false);
         return;
       }
-      const { data } = await supabase
-        .from("forms")
-        .select("*")
-        .eq("token", token)
-        .eq("status", "open")
-        .maybeSingle();
-      if (active) {
-        if (data) setForm(data as FormRow);
-        setLoading(false);
+      try {
+        const { data } = await supabase
+          .from("forms")
+          .select("*")
+          .eq("token", token)
+          .eq("status", "open")
+          .maybeSingle();
+        if (active && data) setForm(data as FormRow);
+      } catch {
+        /* form tetap null → layar "Form tidak ditemukan" */
       }
+      if (active) setLoading(false);
     }
     loadForm();
 
@@ -990,28 +1002,27 @@ function RegisterContent() {
   // response" membatasi query ini ke baris user_id = auth.uid() sendiri.
   useEffect(() => {
     if (!form?.id || !userId) return;
+    const formId = form.id;
     let active = true;
-    // Defer a frame so setMyResponseReady(false) isn't a sync setState in
-    // the effect body (react-hooks/set-state-in-effect) — same pattern as
-    // admin's forms/[id]/page.tsx load().
-    const raf = requestAnimationFrame(() => {
-      setMyResponseReady(false);
-      createClient()
-        .from("form_responses")
-        .select("id, status")
-        .eq("form_id", form.id)
-        .eq("user_id", userId)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (active) {
-            setMyResponse((data as MyResponse | null) ?? null);
-            setMyResponseReady(true);
-          }
-        });
-    });
+    // Tanpa requestAnimationFrame (alasannya di efek list peserta di atas).
+    // myResponseReady WAJIB kebuka walau query-nya gagal — flag ini nahan
+    // seluruh halaman, jadi kegagalannya nggak boleh berujung spinner abadi.
+    (async () => {
+      try {
+        const { data } = await createClient()
+          .from("form_responses")
+          .select("id, status")
+          .eq("form_id", formId)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (active) setMyResponse((data as MyResponse | null) ?? null);
+      } catch {
+        /* anggap belum punya baris respons */
+      }
+      if (active) setMyResponseReady(true);
+    })();
     return () => {
       active = false;
-      cancelAnimationFrame(raf);
     };
   }, [form?.id, userId]);
 
@@ -1039,6 +1050,20 @@ function RegisterContent() {
     return () => clearInterval(interval);
   }, [form?.id, userId, myResponse?.status, loadParticipants]);
 
+  // Semua flag async yang menahan render pertama. Sesi, profil, dan baris
+  // respons di-fetch tanpa batas waktu — di jaringan mobile yang putus-
+  // nyambung salah satunya bisa nggak pernah selesai, dan dulu itu berarti
+  // spinner selamanya tanpa jalan keluar. Sekarang: 12 detik lalu tawarin
+  // muat ulang.
+  const gateReady =
+    !loading && profileReady && !(authState === "in" && form && !myResponseReady);
+
+  useEffect(() => {
+    if (gateReady) return;
+    const t = setTimeout(() => setGateTimedOut(true), 12000);
+    return () => clearTimeout(t);
+  }, [gateReady]);
+
   const handleCancel = async () => {
     if (!token) return;
     if (!confirm("Batalkan pendaftaran kamu di event ini?")) return;
@@ -1056,8 +1081,26 @@ function RegisterContent() {
     loadParticipants();
   };
 
-  if (loading || !profileReady || (authState === "in" && form && !myResponseReady)) {
-    return (
+  if (!gateReady) {
+    return gateTimedOut ? (
+      <div className={styles.layout}>
+        <div className={styles.statusCard}>
+          <div className={styles.statusEmoji}>📡</div>
+          <h2 className={styles.statusTitle}>Gagal memuat halaman</h2>
+          <p className={styles.statusText}>
+            Koneksi kamu kelihatannya lagi nggak stabil. Coba muat ulang
+            halamannya ya — pendaftaran kamu (kalau sudah terkirim) aman kok.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className={`btn btn--primary ${styles.waButton}`}
+          >
+            Muat ulang
+          </button>
+        </div>
+      </div>
+    ) : (
       <div className={styles.loadingWrap}>
         <Loader2 size={32} className={styles.spinner} />
       </div>
