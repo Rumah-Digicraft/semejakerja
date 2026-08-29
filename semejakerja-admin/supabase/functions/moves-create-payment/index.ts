@@ -9,6 +9,8 @@
 // total is unique (and it softly covers DOKU's fee). Mirrors the
 // membership doku-create-payment, but writes moves_payment_transactions
 // and links to sessions/participants instead of memberships.
+// Kode unik is toggleable per sport via UNIQUE_CODE_ENABLED below —
+// currently OFF for funminton (badminton), still ON for padel.
 //
 //   funminton → body has participant_ids[] (existing roster rows). On
 //               payment success the webhook flips them to 'approved'.
@@ -25,6 +27,13 @@ import {
   dokuBaseUrl,
   makeInvoiceNumber,
 } from "../_shared/doku.ts";
+
+// Kode unik per olahraga. false → total = harga pas (unique_code tersimpan 0).
+// Balikkan ke true untuk mengaktifkan lagi, lalu deploy ulang function ini.
+const UNIQUE_CODE_ENABLED: Record<string, boolean> = {
+  funminton: false, // dinonaktifkan sementara (Agu 2026)
+  padel: true,
+};
 
 function jsonRes(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -116,10 +125,14 @@ Deno.serve(async (req) => {
     // The client may propose the kode unik so it can show the exact total
     // before redirect. We only accept a valid integer in [300,700]; otherwise
     // we generate our own. The base price stays server-authoritative.
+    // When the sport's toggle is off, the code is forced to 0 regardless of
+    // what the client proposes.
     const baseAmount = count * price;
+    const codeEnabled = UNIQUE_CODE_ENABLED[session.sport_type as string] ?? true;
     const proposedCode = Number(unique_code);
-    const uniqueCode =
-      Number.isInteger(proposedCode) && proposedCode >= 300 && proposedCode <= 700
+    const uniqueCode = !codeEnabled
+      ? 0
+      : Number.isInteger(proposedCode) && proposedCode >= 300 && proposedCode <= 700
         ? proposedCode
         : 300 + Math.floor(Math.random() * 401);
     const amount = baseAmount + uniqueCode;

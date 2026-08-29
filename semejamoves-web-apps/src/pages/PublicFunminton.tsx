@@ -162,12 +162,11 @@ export default function PublicFunminton() {
             </div>
           </div>
 
-          <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-1">
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
             <div className="flex justify-between items-center">
               <span className="text-gray-600 font-medium">Total Tagihan</span>
               <span className="text-xl font-bold text-primary-green">{formatCurrency(expectedTotal)}</span>
             </div>
-            <p className="text-xs text-gray-400">+ kode unik (Rp300–700) ditambahkan otomatis di halaman pembayaran.</p>
           </div>
 
           {session.announcement_config?.enabled && (

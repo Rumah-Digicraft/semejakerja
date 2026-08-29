@@ -64,6 +64,9 @@ const noteStyle: React.CSSProperties = {
 // Kode unik (Rp300–700) — dibuat di client agar total pastinya bisa
 // ditampilkan sebelum redirect ke DOKU (biar user nggak kaget). Server tetap
 // otoritatif: memvalidasi 300–700 & menghitung harga dasar sendiri.
+// Catatan: untuk funminton kode unik sedang DINONAKTIFKAN (server memaksa 0,
+// lihat UNIQUE_CODE_ENABLED di edge function moves-create-payment) — hook ini
+// sekarang hanya dipakai padel.
 function useUniqueCode() {
   const [code, setCode] = useState<number | null>(null);
   useEffect(() => {
@@ -113,7 +116,6 @@ function FunmintonJoin({ session }: { session: Session }) {
   const [pollingAnswer, setPollingAnswer] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const uniqueCode = useUniqueCode();
 
   useEffect(() => {
     supabase
@@ -132,8 +134,7 @@ function FunmintonJoin({ session }: { session: Session }) {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
 
-  const base = selectedIds.length * session.price_per_person;
-  const total = base > 0 ? base + (uniqueCode ?? 0) : 0;
+  const total = selectedIds.length * session.price_per_person;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,7 +151,6 @@ function FunmintonJoin({ session }: { session: Session }) {
         participant_ids: selectedIds,
         kritik_saran: kritikSaran || null,
         polling_hari: pollingAnswer,
-        unique_code: uniqueCode,
         return_url: `${window.location.origin}/moves/status`,
       });
     } catch (err) {
@@ -211,13 +211,6 @@ function FunmintonJoin({ session }: { session: Session }) {
             <span className={styles.totalLabel}>Total Tagihan</span>
             <span className={styles.totalValue}>{formatCurrency(total)}</span>
           </div>
-          {base > 0 && (
-            <p style={noteStyle}>
-              Iuran {formatCurrency(base)} + kode unik{" "}
-              {uniqueCode != null ? formatCurrency(uniqueCode) : "…"} — biar
-              gampang dicek admin.
-            </p>
-          )}
         </div>
 
         {session.announcement_config?.enabled &&
@@ -297,7 +290,7 @@ function FunmintonJoin({ session }: { session: Session }) {
 
         <button
           type="submit"
-          disabled={submitting || selectedIds.length === 0 || uniqueCode == null}
+          disabled={submitting || selectedIds.length === 0}
           className={`btn btn--primary ${styles.submitBtn}`}
         >
           {submitting ? "Memproses…" : "Bayar Sekarang (QRIS)"}
