@@ -1,14 +1,20 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Coffee, Loader2, Trophy } from 'lucide-react';
+import { ArrowLeft, Coffee, History, Loader2, Trophy } from 'lucide-react';
 import Seo from '../components/Seo';
 import PointsLeaderboardList from '../components/contribution/PointsLeaderboardList';
+import MonthlyWinnersList from '../components/contribution/MonthlyWinnersList';
 import { useAuth } from '../hooks/useAuth';
-import { useContributionLeaderboard, useMyContributionRank } from '../hooks/useContributionPoints';
+import {
+  useContributionLeaderboard,
+  useContributionMonthlyWinners,
+  useMyContributionRank,
+} from '../hooks/useContributionPoints';
 
 export default function PapanKontributor() {
   const { user } = useAuth();
   const { data: entries, isLoading, error } = useContributionLeaderboard();
   const { data: myRank } = useMyContributionRank(user?.id);
+  const { data: winners, isLoading: winnersLoading, error: winnersError } = useContributionMonthlyWinners();
 
   const isInTop10 = !!entries?.some(e => e.userId === user?.id);
   const myRankIfOutside = user && myRank && !isInTop10 ? myRank : null;
@@ -60,6 +66,22 @@ export default function PapanKontributor() {
               currentUserId={user?.id}
               myRankIfOutside={myRankIfOutside}
             />
+          )}
+        </div>
+
+        <div className="glass-panel rounded-3xl shadow-xl p-6 sm:p-8 flex flex-col gap-5 mt-4 sm:mt-6">
+          <div className="flex items-center gap-2 text-purple-600 font-bold text-xs uppercase tracking-wide">
+            <History size={14} /> Riwayat Pemenang
+          </div>
+
+          {winnersLoading ? (
+            <div className="flex items-center justify-center py-8 text-gray-400">
+              <Loader2 size={18} className="animate-spin" />
+            </div>
+          ) : winnersError ? (
+            <p className="text-sm text-red-500 text-center py-4">Gagal memuat riwayat pemenang.</p>
+          ) : (
+            <MonthlyWinnersList winners={winners ?? []} />
           )}
         </div>
       </div>

@@ -44,6 +44,38 @@ export function useContributionLeaderboard() {
   });
 }
 
+export interface MonthlyWinner {
+  month: string; // 'YYYY-MM-DD' (selalu tanggal 1), lihat view contribution_monthly_winners
+  userId: string;
+  fullName: string | null;
+  avatarUrl: string | null;
+  totalPoints: number;
+}
+
+// Riwayat pemenang bulan-bulan lampau — publik, terbaca tanpa login
+// (lihat view contribution_monthly_winners di migration 057). Bulan
+// berjalan sengaja tidak ikut, itu tugas useContributionLeaderboard.
+export function useContributionMonthlyWinners() {
+  return useQuery({
+    queryKey: ['contribution-monthly-winners'],
+    queryFn: async (): Promise<MonthlyWinner[]> => {
+      const { data, error } = await supabase
+        .from('contribution_monthly_winners')
+        .select('month, user_id, full_name, avatar_url, total_points')
+        .order('month', { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map(row => ({
+        month: row.month,
+        userId: row.user_id,
+        fullName: row.full_name,
+        avatarUrl: row.avatar_url,
+        totalPoints: row.total_points,
+      }));
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export interface MyRank {
   totalPoints: number;
   rank: number;
