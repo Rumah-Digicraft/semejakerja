@@ -53,8 +53,8 @@ export default function PapanKontributor() {
             <Trophy size={14} /> Reset tiap awal bulan
           </div>
           <p className="text-sm text-gray-500 leading-relaxed -mt-2">
-            Setiap kontribusi yang disetujui admin dapat poin: usulan kafe baru <span className="font-semibold text-gray-700">+50</span>,
-            koreksi info <span className="font-semibold text-gray-700">+10</span>, upload foto <span className="font-semibold text-gray-700">+2</span>.
+            Setiap kontribusi yang disetujui admin dapat poin: menambahkan kafe baru <span className="font-semibold text-gray-700">+50</span>,
+            koreksi info <span className="font-semibold text-gray-700">+10</span>, dan upload foto <span className="font-semibold text-gray-700">+2</span>.
             Kontributor teratas setiap bulan akan kami traktir kopi saat WFC 😋.
           </p>
 
