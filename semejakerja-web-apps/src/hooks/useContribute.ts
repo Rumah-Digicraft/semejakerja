@@ -62,11 +62,25 @@ export function useSubmitNewCafe() {
 // semejakerja-admin/supabase/functions/resolve-maps-link). Gagal (link
 // expired/format berubah/dll) BUKAN error fatal — NewCafeForm fallback ke
 // pin manual, bukan blocking submit.
+//
+// Link share dari app HP tidak punya @lat,lng di URL-nya sama sekali, cuma
+// place reference (CID) — edge function fallback geocode by nama+alamat
+// (Google Places API) untuk kasus itu, jadi lat/lng tetap terisi seperti
+// biasa dari sisi client ini; placeRef cuma tambahan identitas kanonik
+// tempat (belum disimpan ke DB, tidak ada kolom untuk itu saat ini).
+//
+// `address` CUMA ada untuk kasus link mobile di atas — URL-nya memang
+// membawa "Nama, Alamat lengkap" sekaligus. Link web (yang sudah punya
+// @lat,lng) URL-nya cuma membawa nama tempat, jadi `address` sengaja tidak
+// dikirim edge function untuk kasus itu (undefined, bukan string kosong) —
+// jangan diasumsikan selalu ada.
 export interface ResolvedMapsLocation {
   lat: number;
   lng: number;
   name: string | null;
+  address?: string | null;
   resolvedUrl: string;
+  placeRef?: string | null;
 }
 
 async function resolveMapsLink(url: string): Promise<ResolvedMapsLocation> {

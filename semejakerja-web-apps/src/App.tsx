@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Routes, Route, useMatch, useNavigate } from 'react-router-dom';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -6,6 +6,7 @@ import MapView from './components/MapView';
 import CafeModal from './components/CafeModal';
 import { LoginModal } from './components/LoginModal';
 import { ContributeModal } from './components/contribute/ContributeModal';
+import ContributionPromoModal from './components/ContributionPromoModal';
 import BottomNav from './components/BottomNav';
 import AuthCallback from './components/AuthCallback';
 import { CafesLoadingOverlay, CafesErrorOverlay } from './components/CafesLoadingOverlay';
@@ -39,9 +40,16 @@ const defaultFilters: FilterState = {
 
 interface MapAppProps {
   onRequestLogin: () => void;
+  onAddCafeClick: () => void;
 }
 
-function MapApp({ onRequestLogin }: MapAppProps) {
+// Sekali per sesi tab (bukan sekali seumur hidup — sessionStorage, bukan
+// localStorage) supaya promo ini kelihatan lagi di kunjungan berikutnya,
+// tapi tidak muncul berkali-kali kalau user cuma pindah-pindah halaman
+// dalam satu sesi buka browser yang sama.
+const CONTRIBUTION_PROMO_KEY = 'sk_contribution_promo_shown';
+
+function MapApp({ onRequestLogin, onAddCafeClick }: MapAppProps) {
   const { cafes, loading, error, refetch } = useCafes();
   const { user, profile, landingUrl } = useAuth();
   const navigate = useNavigate();
@@ -66,6 +74,21 @@ function MapApp({ onRequestLogin }: MapAppProps) {
 
   // Feature gating per membership tier (see mapsAccess in useAuth).
   const access = mapsAccess(user, profile?.tier ?? null);
+
+  // Promo ajakan kontribusi — muncul sekali per sesi, sedikit setelah peta
+  // pertama kali kebuka (bukan langsung, biar gak numpuk sama loading
+  // overlay/transisi awal). Dicek & ditandai di sini (bukan di App()) karena
+  // "pertama kali buka peta" secara harfiah berarti MapApp, bukan tiap
+  // halaman lain di app ini.
+  const [showContributionPromo, setShowContributionPromo] = useState(false);
+  useEffect(() => {
+    if (sessionStorage.getItem(CONTRIBUTION_PROMO_KEY)) return;
+    const timer = setTimeout(() => {
+      setShowContributionPromo(true);
+      sessionStorage.setItem(CONTRIBUTION_PROMO_KEY, '1');
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const filteredCount = cafes.filter(cafe => {
     if (filters.facilities.length > 0) {
@@ -182,6 +205,18 @@ function MapApp({ onRequestLogin }: MapAppProps) {
           landingUrl={landingUrl}
         />
       )}
+      {/* Guest juga lihat ini — klik "Kontribusi Sekarang" tetap lewat
+          onAddCafeClick, yang sudah menangani guest->login sendiri (lihat
+          handleAddCafeClick di App()). */}
+      {showContributionPromo && (
+        <ContributionPromoModal
+          onClose={() => setShowContributionPromo(false)}
+          onContributeClick={() => {
+            setShowContributionPromo(false);
+            onAddCafeClick();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -194,6 +229,10 @@ function App() {
   const access = mapsAccess(user, profile?.tier ?? null);
   const [showLogin, setShowLogin] = useState(false);
   const [showNewCafeModal, setShowNewCafeModal] = useState(false);
+  // Lifted from TebakKafe.tsx (via its onPlayingChange prop) so BottomNav
+  // can hide only during actual gameplay, not on the page's intro screen —
+  // see the comment in BottomNav.tsx for why gameplay specifically hides it.
+  const [tebakKafePlaying, setTebakKafePlaying] = useState(false);
 
   // Contribution (usulkan cafe baru) is open to any logged-in member, guest
   // just gets routed to login first — same rule as Sidebar's "Tambahkan
@@ -212,12 +251,12 @@ function App() {
       <Routes>
         <Route
           path="/"
-          element={<MapApp onRequestLogin={handleRequestLogin} />}
+          element={<MapApp onRequestLogin={handleRequestLogin} onAddCafeClick={handleAddCafeClick} />}
         >
           <Route index element={null} />
           <Route path="cafe/:slug" element={null} />
         </Route>
-        <Route path="/tebak-kafe" element={<TebakKafe />} />
+        <Route path="/tebak-kafe" element={<TebakKafe onPlayingChange={setTebakKafePlaying} />} />
         <Route path="/papan-kontributor" element={<PapanKontributor />} />
         <Route path="/kontribusiku" element={<Kontribusiku />} />
         <Route path="/tersimpan" element={<Tersimpan />} />
@@ -225,7 +264,7 @@ function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
 
-      <BottomNav onAddCafeClick={handleAddCafeClick} />
+      <BottomNav onAddCafeClick={handleAddCafeClick} tebakKafePlaying={tebakKafePlaying} />
 
       {showLogin && (
         <LoginModal

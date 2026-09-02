@@ -15,7 +15,15 @@ import {
 } from '../lib/tebakKafe';
 import type { Cafe } from '../types/cafe';
 
-export default function TebakKafe() {
+interface TebakKafeProps {
+  /** Reports whether a round is actually in progress, so App.tsx can pass
+   * it to BottomNav — the bar should stay visible on this page's intro
+   * screen and only hide once gameplay (with its own fixed clue/guess
+   * panel) starts. See BottomNav.tsx for the full reasoning. */
+  onPlayingChange?: (playing: boolean) => void;
+}
+
+export default function TebakKafe({ onPlayingChange }: TebakKafeProps) {
   const { cafes, loading, error, refetch } = useCafes();
   const { user, signInWithGoogle } = useAuth();
   const submitScore = useSubmitTebakKafeScore();
@@ -52,6 +60,16 @@ export default function TebakKafe() {
   const finished = started && round >= ROUND_COUNT;
   const currentCafe = started && !finished ? roundCafes![round] : null;
   const totalScore = results.reduce((sum, r) => sum + r.points, 0);
+
+  // Report to App.tsx (see TebakKafeProps) so BottomNav can hide only while
+  // the fixed clue/guess panel below is actually on screen (started &&
+  // !finished) — not on the intro screen, and not on the results screen
+  // either, since neither of those renders that panel. Cleanup resets it
+  // if the player navigates away mid-game.
+  useEffect(() => {
+    onPlayingChange?.(started && !finished);
+    return () => onPlayingChange?.(false);
+  }, [started, finished, onPlayingChange]);
 
   // Submit once per finished game, only when logged in — leaderboard
   // requires an account (see migration 039). Guards against re-submitting
@@ -151,8 +169,14 @@ export default function TebakKafe() {
 
       {/* Intro */}
       {!started && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center px-6">
-          <div className="glass-panel rounded-3xl shadow-2xl p-8 max-w-md w-full flex flex-col gap-5">
+        // pointer-events-none on the full-screen wrapper, -auto back on the
+        // card: BottomNav now renders on this screen (see BottomNav.tsx) and
+        // sits underneath this z-40 overlay — without this, the wrapper's
+        // transparent margin around the centered card would silently
+        // swallow taps meant for the nav below it, even though nothing is
+        // visibly there.
+        <div className="absolute inset-0 z-40 flex items-center justify-center px-6 pointer-events-none">
+          <div className="glass-panel rounded-3xl shadow-2xl p-8 max-w-md w-full flex flex-col gap-5 pointer-events-auto">
             <div className="flex items-center gap-2 text-purple-600 font-bold text-xs uppercase tracking-wide">
               <MapPin size={14} /> Mini-game baru
             </div>
@@ -287,8 +311,12 @@ export default function TebakKafe() {
 
       {/* Results */}
       {finished && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center px-6">
-          <div className="glass-panel rounded-3xl shadow-2xl p-8 max-w-sm w-full flex flex-col gap-5">
+        // Same pointer-events fix as the Intro overlay above — BottomNav is
+        // visible again here too (gameplay's clue/guess panel is gone once
+        // finished), so the transparent wrapper margin can't be left
+        // swallowing taps meant for it.
+        <div className="absolute inset-0 z-40 flex items-center justify-center px-6 pointer-events-none">
+          <div className="glass-panel rounded-3xl shadow-2xl p-8 max-w-sm w-full flex flex-col gap-5 pointer-events-auto">
             <div className="text-center">
               <p className="text-xs font-bold uppercase tracking-wide text-purple-600">Hasil Main</p>
               <p className="text-3xl font-extrabold text-gray-900 mt-1 tabular-nums">{totalScore}</p>

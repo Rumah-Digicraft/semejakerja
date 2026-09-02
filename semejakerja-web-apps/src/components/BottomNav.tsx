@@ -4,6 +4,11 @@ import { Compass, PlusCircle, Bookmark, Gamepad2, Trophy } from 'lucide-react';
 
 interface BottomNavProps {
   onAddCafeClick: () => void;
+  /** True while an actual Tebak Kafe round is in progress (App.tsx lifts
+   * this from TebakKafe.tsx's local `started` state via onPlayingChange) —
+   * lets this bar know to hide only during gameplay, not on the page's
+   * intro screen. */
+  tebakKafePlaying: boolean;
 }
 
 // Mobile-only tab bar — desktop keeps Header + Sidebar as its nav (see
@@ -17,26 +22,28 @@ interface BottomNavProps {
 // leaderboard) to the outer edges — same reasoning restaurants put specials
 // in the middle of a menu and everyday items at the ends.
 //
-// /tebak-kafe itself is deliberately NOT in VISIBLE_PATHS: the game's active
-// play screen has its own fixed-bottom-0 clue/guess panel (see TebakKafe.tsx)
-// with a "Kunci Tebakan" action button — stacking this bar under/behind it
-// works z-index-wise (same as Sidebar/CafeModal covering this bar elsewhere)
-// but wastes the tab's screen real estate for no benefit, since you can't
-// tap back to Explore mid-guess anyway without losing your pin. The tab is
-// still reachable from every other screen; it just doesn't render on the
-// game screen itself.
+// /tebak-kafe IS in VISIBLE_PATHS (its intro screen has plenty of room for
+// this bar), but hidden specifically while `tebakKafePlaying` is true — the
+// game's active play screen has its own fixed-bottom-0 clue/guess panel
+// (see TebakKafe.tsx) with a "Kunci Tebakan" action button, and stacking
+// this bar under/behind it (same z-index trick as Sidebar/CafeModal
+// covering this bar elsewhere) would waste the tab's screen real estate for
+// no benefit, since you can't tap back to Explore mid-guess anyway without
+// losing your pin.
 //
 // z-30, deliberately below Sidebar's z-40 and CafeModal's z-50: when either
 // of those mobile bottom sheets is open, it should visually cover this bar
 // rather than float above it — same as a normal app hiding its tab bar
 // under a full takeover sheet.
-const VISIBLE_PATHS = [/^\/$/, /^\/cafe\//, /^\/tersimpan$/, /^\/papan-kontributor$/];
+const VISIBLE_PATHS = [/^\/$/, /^\/cafe\//, /^\/tebak-kafe$/, /^\/tersimpan$/, /^\/papan-kontributor$/];
 
-const BottomNav: React.FC<BottomNavProps> = ({ onAddCafeClick }) => {
+const BottomNav: React.FC<BottomNavProps> = ({ onAddCafeClick, tebakKafePlaying }) => {
   const location = useLocation();
   if (!VISIBLE_PATHS.some(re => re.test(location.pathname))) return null;
+  if (location.pathname === '/tebak-kafe' && tebakKafePlaying) return null;
 
   const isExplore = location.pathname === '/' || location.pathname.startsWith('/cafe/');
+  const isTebakKafe = location.pathname === '/tebak-kafe';
   const isSaved = location.pathname === '/tersimpan';
   const isKontributor = location.pathname === '/papan-kontributor';
 
@@ -47,9 +54,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ onAddCafeClick }) => {
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 glass-panel rounded-t-3xl shadow-2xl flex items-center justify-around px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-      {/* Never the active tab — /tebak-kafe isn't in VISIBLE_PATHS, so this
-          bar never renders while actually on that page. */}
-      <Link to="/tebak-kafe" className={tabClass(false)}>
+      <Link to="/tebak-kafe" className={tabClass(isTebakKafe)}>
         <Gamepad2 size={20} />
         <span className="text-[10px] font-bold">Tebak Kafe</span>
       </Link>

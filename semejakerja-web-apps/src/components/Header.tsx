@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Coffee, SlidersHorizontal, X, LogIn, LogOut, Crown, Gamepad2, Trophy, Award } from 'lucide-react';
+import { SlidersHorizontal, X, LogIn, LogOut, Crown, Gamepad2, Trophy, Award, Bookmark } from 'lucide-react';
 import { useAuth, type MembershipTier } from '../hooks/useAuth';
 import { LoginModal } from './LoginModal';
 
@@ -49,15 +49,18 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
           }
         </button>
 
-        {/* Logo */}
-        <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-purple-600 flex items-center justify-center shadow-md shadow-purple-500/20 flex-shrink-0">
-          <Coffee size={18} color="white" className="sm:hidden" />
-          <Coffee size={24} color="white" className="hidden sm:block" />
-        </div>
+        {/* Logo mark Semeja Kerja (public/semejakerja-only-logo.png) — sudah
+            punya background bulat sendiri, jadi ditampilkan polos tanpa
+            dibungkus kotak ungu lagi. */}
+        <img
+          src="/semejakerja-only-logo.png"
+          alt="Semeja Kerja"
+          className="w-9 h-9 sm:w-12 sm:h-12 flex-shrink-0"
+        />
         <div className="flex flex-col gap-0.5 sm:gap-1.5">
           <h1 className="text-gray-900 font-extrabold text-base sm:text-xl leading-tight tracking-tight whitespace-nowrap">
             <span className="hidden sm:inline">Peta Cafe Purwokerto</span>
-            <span className="sm:hidden">Purwokerto</span>
+            <span className="sm:hidden">Peta Cafe</span>
           </h1>
           <p className="text-purple-600 text-xs font-bold">By Semeja Kerja</p>
         </div>
@@ -71,9 +74,10 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
 
       {/* Right actions */}
       <div className="flex items-center gap-1.5 sm:gap-5">
-        {/* Tebak Kafe / Kontributor: desktop-only here now — moved to the
-            mobile BottomNav (BottomNav.tsx) where a label always fits,
-            instead of the icon-only squares this used to render below md:. */}
+        {/* Tebak Kafe / Tersimpan / Kontributor: desktop-only here — mobile
+            reaches these lewat BottomNav.tsx, yang tidak render di md:
+            ke atas. Tersimpan sempat cuma ada di BottomNav (mobile-only)
+            sampai ketahuan gak ada jalan masuk sama sekali di desktop. */}
         <Link
           to="/tebak-kafe"
           title="Main Tebak Kafe"
@@ -81,6 +85,15 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
         >
           <Gamepad2 size={18} />
           <span>Tebak Kafe</span>
+        </Link>
+
+        <Link
+          to="/tersimpan"
+          title="Cafe Tersimpan"
+          className="hidden md:flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/60 hover:bg-white border border-white/80 transition-all shadow-sm text-purple-700 font-bold text-base flex-shrink-0"
+        >
+          <Bookmark size={18} />
+          <span>Tersimpan</span>
         </Link>
 
         {/* Papan Kontributor — publik, siapa pun bisa lihat tanpa login. */}
