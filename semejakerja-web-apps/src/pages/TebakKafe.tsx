@@ -94,6 +94,17 @@ export default function TebakKafe({ onPlayingChange }: TebakKafeProps) {
     submittedForRef.current = null;
   }, [cafes]);
 
+  // Main butuh akun — skor selalu masuk leaderboard (lihat migration 039),
+  // jadi gak ada lagi jalur "main tanpa login". Guest yang klik "Mulai
+  // Main" diarahkan login dulu, bukan langsung mulai ronde.
+  const handleStartClick = useCallback(() => {
+    if (!user) {
+      setShowLogin(true);
+      return;
+    }
+    startGame();
+  }, [user, startGame]);
+
   const handleGuess = useCallback((latlng: LatLng) => {
     if (locked) return;
     setGuess(latlng);
@@ -148,7 +159,7 @@ export default function TebakKafe({ onPlayingChange }: TebakKafeProps) {
             <Gamepad2 size={20} className="text-purple-600" />
             <div className="flex flex-col leading-tight">
               <span className="font-extrabold text-gray-900 text-sm sm:text-base">Tebak Kafe</span>
-              <span className="text-[11px] text-gray-500 hidden sm:block">Mini-game &middot; peta asli Purwokerto</span>
+              <span className="text-[11px] text-gray-500 hidden sm:block">Mini-game &middot; Peta Cafe Purwokerto</span>
             </div>
           </div>
         </div>
@@ -178,20 +189,19 @@ export default function TebakKafe({ onPlayingChange }: TebakKafeProps) {
         <div className="absolute inset-0 z-40 flex items-center justify-center px-6 pointer-events-none">
           <div className="glass-panel rounded-3xl shadow-2xl p-8 max-w-md w-full flex flex-col gap-5 pointer-events-auto">
             <div className="flex items-center gap-2 text-purple-600 font-bold text-xs uppercase tracking-wide">
-              <MapPin size={14} /> Mini-game baru
+              <MapPin size={14} /> Mini-game
             </div>
             <h1 className="text-2xl font-extrabold text-gray-900 leading-tight">
-              Tebak lokasi kafenya, bukan cuma nongkrongnya.
+              Tebak kafenya dan buktikan kalo kamu si paling WFC.
             </h1>
             <p className="text-sm text-gray-500 leading-relaxed">
-              Lihat ciri-ciri kafe (fasilitas, rating, suasana), lalu tancapkan pin di peta Purwokerto asli.
-              Nama &amp; alamatnya baru kebuka setelah kamu kunci tebakan.
+              Lihat ciri-ciri kafe (rating, harga, suasana, fasilitas), lalu tancapkan pin di peta yang tersedia.
             </p>
             <ol className="flex flex-col gap-2 text-sm text-gray-700">
               {[
-                'Lihat petunjuk fasilitas & suasana kafenya',
-                'Tebak lokasinya langsung di peta',
-                'Kunci tebakan, lihat jaraknya & kumpulkan poin',
+                'Lihat petunjuknya',
+                'Tebak lokasinya di peta',
+                'Kunci tebakan & kumpulkan poin',
               ].map((step, i) => (
                 <li key={i} className="flex items-center gap-3">
                   <span className="w-6 h-6 rounded-full border border-gray-300 text-gray-500 text-xs font-bold flex items-center justify-center flex-none">
@@ -212,12 +222,23 @@ export default function TebakKafe({ onPlayingChange }: TebakKafeProps) {
             ) : (
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={startGame}
-                  disabled={!canStart}
+                  onClick={handleStartClick}
+                  disabled={user ? !canStart : loading}
                   className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
                 >
-                  {loading ? <><Loader2 size={16} className="animate-spin" /> Memuat data kafe...</> : <>Mulai Main <ArrowLeft size={16} className="rotate-180" /></>}
+                  {loading ? (
+                    <><Loader2 size={16} className="animate-spin" /> Memuat data kafe...</>
+                  ) : !user ? (
+                    <><LogIn size={16} /> Masuk buat Main</>
+                  ) : (
+                    <>Mulai Main <ArrowLeft size={16} className="rotate-180" /></>
+                  )}
                 </button>
+                {!user && !loading && (
+                  <p className="text-xs text-gray-400 text-center -mt-1">
+                    Skor otomatis masuk leaderboard, jadi harus login dulu.
+                  </p>
+                )}
                 <button
                   onClick={() => setShowIntroLeaderboard(true)}
                   className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-purple-50 text-purple-700 font-bold text-sm hover:bg-purple-100 transition-colors"
