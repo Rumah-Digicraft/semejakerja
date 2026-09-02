@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Coffee, LogIn, Loader2, MapPin, Trophy, X } from 'lucide-react';
+import { ArrowLeft, Gamepad2, LogIn, Loader2, MapPin, Trophy, X } from 'lucide-react';
 import Seo from '../components/Seo';
 import ClueCard from '../components/tebak-kafe/ClueCard';
 import GuessMap, { type LatLng } from '../components/tebak-kafe/GuessMap';
@@ -145,7 +145,7 @@ export default function TebakKafe({ onPlayingChange }: TebakKafeProps) {
             <ArrowLeft size={17} className="text-purple-600" />
           </Link>
           <div className="flex items-center gap-2">
-            <Coffee size={20} className="text-purple-600" />
+            <Gamepad2 size={20} className="text-purple-600" />
             <div className="flex flex-col leading-tight">
               <span className="font-extrabold text-gray-900 text-sm sm:text-base">Tebak Kafe</span>
               <span className="text-[11px] text-gray-500 hidden sm:block">Mini-game &middot; peta asli Purwokerto</span>

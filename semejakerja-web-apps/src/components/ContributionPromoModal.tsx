@@ -47,12 +47,12 @@ const ContributionPromoModal: React.FC<ContributionPromoModalProps> = ({ onClose
           Bantu lengkapi peta, kumpulkan poin!
         </h2>
         <p className="text-sm text-gray-500 leading-relaxed mb-3">
-          Tambahkan cafe baru <span className="font-semibold text-gray-700">+20</span>, koreksi info yang keliru{' '}
-          <span className="font-semibold text-gray-700">+15</span>, atau upload foto{' '}
-          <span className="font-semibold text-gray-700">+10</span> poin.
+          Tambahkan cafe baru <span className="font-semibold text-gray-700">+50</span>, koreksi info yang keliru{' '}
+          <span className="font-semibold text-gray-700">+10</span>, atau upload foto{' '}
+          <span className="font-semibold text-gray-700">+2</span> poin.
         </p>
         <p className="text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 mb-5">
-          🏆 Jadi #1 bulan ini, kita traktir kopi di WFC bareng strangers.
+          🏆 Jadi #1 bulan ini, kami traktir kopi saat WFC 😋.
         </p>
 
         <div className="flex flex-col gap-2">
