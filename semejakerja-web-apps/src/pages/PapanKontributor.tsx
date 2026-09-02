@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Coffee, History, Loader2, Trophy } from 'lucide-react';
+import { ArrowLeft, History, Loader2, Trophy } from 'lucide-react';
 import Seo from '../components/Seo';
 import PointsLeaderboardList from '../components/contribution/PointsLeaderboardList';
 import MonthlyWinnersList from '../components/contribution/MonthlyWinnersList';
@@ -36,7 +36,7 @@ export default function PapanKontributor() {
           <ArrowLeft size={17} className="text-purple-600" />
         </Link>
         <div className="flex items-center gap-2">
-          <Coffee size={20} className="text-purple-600" />
+          <Trophy size={20} className="text-purple-600" />
           <div className="flex flex-col leading-tight">
             <span className="font-extrabold text-gray-900 text-sm sm:text-base">Papan Kontributor</span>
             <span className="text-[11px] text-gray-500 hidden sm:block">Member paling aktif bulan ini</span>
@@ -53,9 +53,9 @@ export default function PapanKontributor() {
             <Trophy size={14} /> Reset tiap awal bulan
           </div>
           <p className="text-sm text-gray-500 leading-relaxed -mt-2">
-            Setiap kontribusi yang disetujui tim dapat poin: usulan kafe baru <span className="font-semibold text-gray-700">+20</span>,
-            koreksi info <span className="font-semibold text-gray-700">+15</span>, upload foto <span className="font-semibold text-gray-700">+10</span>.
-            Kontributor teratas bulan ini dapat hadiah dari Semeja Kerja.
+            Setiap kontribusi yang disetujui admin dapat poin: usulan kafe baru <span className="font-semibold text-gray-700">+50</span>,
+            koreksi info <span className="font-semibold text-gray-700">+10</span>, upload foto <span className="font-semibold text-gray-700">+2</span>.
+            Kontributor teratas setiap bulan akan kami traktir kopi saat WFC 😋.
           </p>
 
           {isLoading ? (

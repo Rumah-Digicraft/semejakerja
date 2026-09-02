@@ -424,7 +424,7 @@ function NewCafeForm({
         </div>
         <div className="space-y-1.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
           {week.map((day, i) => (
-            <div key={DAY_LABELS[i]} className="flex items-center gap-2">
+            <div key={DAY_LABELS[i]} className="flex items-center flex-wrap gap-2">
               <label className="flex items-center gap-2 w-24 cursor-pointer shrink-0">
                 <input
                   type="checkbox" checked={day.open}
@@ -792,7 +792,7 @@ function EditForm({
         </div>
         <div className="space-y-1.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
           {week.map((day, i) => (
-            <div key={DAY_LABELS[i]} className="flex items-center gap-2">
+            <div key={DAY_LABELS[i]} className="flex items-center flex-wrap gap-2">
               <label className="flex items-center gap-2 w-24 cursor-pointer shrink-0">
                 <input
                   type="checkbox" checked={day.open}
@@ -1165,7 +1165,7 @@ export function ContributeModal({ type, cafeId, cafeName, currentValues, onClose
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-5">
           {step === 'form' && type === 'new-cafe' && (
             <NewCafeForm onSubmit={handleNewCafe} isLoading={isLoading} />
           )}

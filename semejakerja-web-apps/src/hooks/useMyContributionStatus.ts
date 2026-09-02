@@ -3,13 +3,16 @@ import { supabase } from '../lib/supabaseClient';
 import type { ContributionSourceTable } from './useContributionPoints';
 
 // Poin per tipe kontribusi — sama persis dengan angka yang di-hardcode di
-// trigger award_points_* (migration 047). Dipakai cuma buat tampilan
-// "+20" pada entri yang sudah disetujui, bukan sumber kebenaran poin
-// (itu tetap contribution_points/RPC my_contribution_rank).
+// trigger award_points_* (migration 059: cafe > edit > foto, tiap tingkat
+// 5x tingkat di bawahnya). Kalau sampai poinnya seri, leaderboard tie-break
+// pakai gaya Olimpiade (jumlah cafe dulu, baru edit, baru foto — lihat
+// migration 059). Dipakai cuma buat tampilan "+50" pada entri yang sudah
+// disetujui, bukan sumber kebenaran poin (itu tetap contribution_points/
+// RPC my_contribution_rank).
 export const POINTS_BY_SOURCE: Record<ContributionSourceTable, number> = {
-  cafe_submissions: 20,
-  cafe_edits: 15,
-  cafe_photos: 10,
+  cafe_submissions: 50,
+  cafe_edits: 10,
+  cafe_photos: 2,
 };
 
 export interface MyContributionStatusEntry {
