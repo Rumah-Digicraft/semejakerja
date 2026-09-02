@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   X, Star, Wifi, Zap, Wind, BookOpen, Bike, Car,
-  CheckCircle2, Gauge,
+  CheckCircle2, Gauge, Bookmark,
   MapPin, Share2, Check, ExternalLink,
   Pencil, MessageSquare, Camera, Users, FileText,
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Lock, Crown, LogIn,
@@ -13,6 +13,7 @@ import type { MapsAccess } from '../hooks/useAuth';
 import { ContributeModal, type ContributeType } from './contribute/ContributeModal';
 import { useCafeReviews, useMyCafeReview } from '../hooks/useCafeReviews';
 import { useCafePhotos } from '../hooks/useCafePhotos';
+import { useIsCafeSaved, useToggleSavedCafe } from '../hooks/useSavedCafes';
 import PhotoLightbox from './PhotoLightbox';
 import { cafeSlug } from '../lib/slug';
 import SpeedTestButton from './SpeedTestButton';
@@ -244,6 +245,14 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
   const { data: photos = [] } = useCafePhotos(cafe.id);
   const coverPhoto = photos[activePhoto] ?? photos[0] ?? null;
 
+  const { data: savedEntry } = useIsCafeSaved(cafe.id, userId);
+  const isSaved = !!savedEntry;
+  const toggleSaved = useToggleSavedCafe(cafe.id, userId);
+  const handleToggleSaved = () => {
+    if (!userId) { onRequestLogin(); return; }
+    toggleSaved.mutate(!isSaved);
+  };
+
   const showPhoto = (i: number) => setActivePhoto((i + photos.length) % photos.length);
 
   const touchStartX = React.useRef<number | null>(null);
@@ -427,6 +436,16 @@ const CafeModal: React.FC<CafeModalProps> = ({ cafe, onClose, access, userId, on
               {cafe.category === 'sponsored' ? 'Sponsored' : 'Verified Partner'}
             </div>
           )}
+
+          <button
+            onClick={handleToggleSaved}
+            disabled={toggleSaved.isPending}
+            title={isSaved ? 'Hapus dari Tersimpan' : 'Simpan Cafe'}
+            className="absolute top-3.5 right-14 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:bg-white/80 hover:scale-105 shadow-sm bg-white/50 backdrop-blur-md"
+            style={{ border: '1px solid rgba(255,255,255,0.8)' }}
+          >
+            <Bookmark size={16} className={isSaved ? 'text-purple-600 fill-current' : 'text-gray-700'} />
+          </button>
 
           <button
             onClick={onClose}

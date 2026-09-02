@@ -19,33 +19,40 @@ interface TierConfig {
   zOffset: number;
 }
 
-const TIER_CFG: Record<MarkerTier, TierConfig> = {
+// Exported so the map legend can render swatches from the same colors/badges
+// as the actual pins instead of a hand-maintained duplicate palette.
+export const TIER_CFG: Record<MarkerTier, TierConfig> = {
   basic: {
     fill: '#B4B2A9', stroke: '#888780',
-    pinW: 28, pinH: 36,
+    pinW: 30, pinH: 30,
     badgeText: null, badgeFontSize: 0,
     hasCheckmark: false, hasStar: false, hasPulse: false, hasLabel: false,
     zOffset: 0,
   },
   verified: {
     fill: '#7F77DD', stroke: '#534AB7',
-    pinW: 34, pinH: 44,
-    badgeText: 'SK', badgeFontSize: 10,
+    pinW: 34, pinH: 34,
+    // Badge text and always-on name label dropped — the legend (Info button
+    // on the map) now explains what each pin color means, and the cafe name
+    // shows on tap via the highlight pin instead of cluttering every marker.
+    badgeText: null, badgeFontSize: 0,
     hasCheckmark: true, hasStar: false, hasPulse: false, hasLabel: false,
     zOffset: 100,
   },
   partner: {
     fill: '#1D9E75', stroke: '#0F6E56',
-    pinW: 34, pinH: 44,
-    badgeText: 'MITRA', badgeFontSize: 9,
-    hasCheckmark: true, hasStar: false, hasPulse: true, hasLabel: true,
+    pinW: 34, pinH: 34,
+    badgeText: null, badgeFontSize: 0,
+    // Pulse animation stays — that's what keeps mitra pins visually louder
+    // than a plain colored dot even without the text badge/label.
+    hasCheckmark: true, hasStar: false, hasPulse: true, hasLabel: false,
     zOffset: 200,
   },
   sponsor: {
     fill: '#EF9F27', stroke: '#BA7517',
-    pinW: 42, pinH: 54,
-    badgeText: 'SPONSOR', badgeFontSize: 9,
-    hasCheckmark: false, hasStar: true, hasPulse: false, hasLabel: true,
+    pinW: 40, pinH: 40,
+    badgeText: null, badgeFontSize: 0,
+    hasCheckmark: false, hasStar: true, hasPulse: false, hasLabel: false,
     zOffset: 300,
   },
 };
@@ -98,6 +105,59 @@ function buildPinSvg(cfg: TierConfig): string {
   );
 }
 
+// Simple coffee-cup glyph (body + handle + steam), drawn from scratch rather
+// than tracing an icon library's bezier data — it only needs to read as "cafe"
+// at marker scale, not match any particular icon set stroke-for-stroke.
+function buildCoffeeGlyph(cx: number, cy: number, r: number, color: string): string {
+  const bw = r * 0.85;
+  const bh = r * 0.72;
+  const bx = cx - bw / 2 - r * 0.08;
+  const by = cy - bh / 2 + r * 0.12;
+  const rx = r * 0.16;
+  const sw = Math.max(1.3, r * 0.11);
+  const handleW = r * 0.32;
+  const handleH = bh * 0.55;
+  const hx = bx + bw;
+  const hy = by + (bh - handleH) / 2;
+  const steamX1 = bx + bw * 0.3;
+  const steamX2 = bx + bw * 0.68;
+  const steamTopY = by - r * 0.1;
+  const steamHeight = r * 0.32;
+
+  return (
+    `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="${rx.toFixed(1)}"` +
+    ` fill="none" stroke="${color}" stroke-width="${sw.toFixed(1)}"/>` +
+    `<path d="M${hx.toFixed(1)} ${hy.toFixed(1)} q${handleW.toFixed(1)} 0 ${handleW.toFixed(1)} ${(handleH / 2).toFixed(1)}` +
+    ` q0 ${(handleH / 2).toFixed(1)} -${handleW.toFixed(1)} ${(handleH / 2).toFixed(1)}"` +
+    ` fill="none" stroke="${color}" stroke-width="${sw.toFixed(1)}" stroke-linecap="round"/>` +
+    `<path d="M${steamX1.toFixed(1)} ${steamTopY.toFixed(1)} q${(r * 0.1).toFixed(1)} -${(steamHeight * 0.5).toFixed(1)} 0 -${steamHeight.toFixed(1)}"` +
+    ` fill="none" stroke="${color}" stroke-width="${(sw * 0.8).toFixed(1)}" stroke-linecap="round"/>` +
+    `<path d="M${steamX2.toFixed(1)} ${steamTopY.toFixed(1)} q${(r * 0.1).toFixed(1)} -${(steamHeight * 0.5).toFixed(1)} 0 -${steamHeight.toFixed(1)}"` +
+    ` fill="none" stroke="${color}" stroke-width="${(sw * 0.8).toFixed(1)}" stroke-linecap="round"/>`
+  );
+}
+
+// Cafe pins: a plain circle (no teardrop tail — anchored at its center, not a
+// tip) with a coffee-cup glyph, colored by tier. Basic tier is a white disc
+// with a muted icon so it recedes; verified/partner/sponsor fill solid with a
+// white icon so they pop against the basic pins around them.
+function buildCoffeePinSvg(cfg: TierConfig, tier: MarkerTier): string {
+  const { pinW: w, fill, stroke } = cfg;
+  const cx = w / 2;
+  const cy = cx;
+  const r = cx - 1.5;
+  const isBasic = tier === 'basic';
+  const circleFill = isBasic ? '#FFFFFF' : fill;
+  const iconColor = isBasic ? stroke : '#FFFFFF';
+
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${w}" viewBox="0 0 ${w} ${w}">` +
+    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${circleFill}" stroke="${stroke}" stroke-width="2"/>` +
+    buildCoffeeGlyph(cx, cy, r, iconColor) +
+    `</svg>`
+  );
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export function getMarkerTier(cafe: Cafe): MarkerTier {
@@ -123,7 +183,7 @@ export function createMarkerIcon(cafe: Cafe, tier: MarkerTier = 'basic'): L.Icon
   const cacheKey = cfg.hasLabel ? `${tier}:${cafe.name}` : tier;
   const cached = iconCache.get(cacheKey);
   if (cached) return cached;
-  const icon = buildIcon(cafe, cfg);
+  const icon = buildIcon(cafe, cfg, tier);
   iconCache.set(cacheKey, icon);
   return icon;
 }
@@ -167,24 +227,25 @@ export function createHighlightIcon(cafe: Cafe): L.DivIcon {
   return icon;
 }
 
-function buildIcon(cafe: Cafe, cfg: TierConfig): L.Icon | L.DivIcon {
-  const { pinW, pinH, badgeText, badgeFontSize, hasPulse, hasLabel, fill, stroke } = cfg;
+function buildIcon(cafe: Cafe, cfg: TierConfig, tier: MarkerTier): L.Icon | L.DivIcon {
+  const { pinW, badgeText, badgeFontSize, hasPulse, hasLabel, fill, stroke } = cfg;
 
   // Plain pins (basic tier — the vast majority) become a single <img> via an
   // SVG data URI instead of a DivIcon's nested divs: ~1 DOM node per marker
   // instead of ~4, which is what keeps pan/zoom smooth on phones.
   if (!badgeText && !hasPulse && !hasLabel) {
     return L.icon({
-      iconUrl: 'data:image/svg+xml,' + encodeURIComponent(buildPinSvg(cfg)),
-      iconSize: [pinW, pinH],
-      iconAnchor: [pinW / 2, pinH],
-      popupAnchor: [0, -pinH],
+      iconUrl: 'data:image/svg+xml,' + encodeURIComponent(buildCoffeePinSvg(cfg, tier)),
+      iconSize: [pinW, pinW],
+      // Circle marker, no tail — anchor at its center, not a bottom tip.
+      iconAnchor: [pinW / 2, pinW / 2],
+      popupAnchor: [0, -(pinW / 2 + 4)],
     });
   }
 
   const hasBadge = Boolean(badgeText);
   const badgeOffset = hasBadge ? BADGE_H : 0;
-  const containerH = badgeOffset + pinH;
+  const containerH = badgeOffset + pinW;
 
   const badge = hasBadge
     ? `<div style="position:absolute;top:0;left:50%;transform:translateX(-50%);` +
@@ -208,7 +269,7 @@ function buildIcon(cafe: Cafe, cfg: TierConfig): L.Icon | L.DivIcon {
       `box-shadow:0 2px 6px rgba(0,0,0,0.18);pointer-events:none;">${cafe.name}</div>`
     : '';
 
-  const pinSvg = buildPinSvg(cfg);
+  const pinSvg = buildCoffeePinSvg(cfg, tier);
 
   const html =
     `<div style="position:relative;width:${pinW}px;height:${containerH}px;overflow:visible;">` +
@@ -222,7 +283,10 @@ function buildIcon(cafe: Cafe, cfg: TierConfig): L.Icon | L.DivIcon {
     html,
     className: 'custom-leaflet-icon',
     iconSize: [pinW, containerH],
-    iconAnchor: [pinW / 2, containerH],
-    popupAnchor: [0, -pinH],
+    // Anchor at the circle's own center (it sits badgeOffset px down from the
+    // container top), not the container's bottom edge — there's no tail tip
+    // to anchor on anymore.
+    iconAnchor: [pinW / 2, badgeOffset + pinW / 2],
+    popupAnchor: [0, -(badgeOffset + pinW / 2 + 4)],
   });
 }
