@@ -45,7 +45,7 @@ const PointsLeaderboardList: React.FC<PointsLeaderboardListProps> = ({ entries, 
   if (entries.length === 0) {
     return (
       <p className="text-sm text-gray-400 text-center py-6">
-        Belum ada kontribusi yang disetujui bulan ini. Jadilah yang pertama!
+        Belum ada poin yang masuk bulan ini. Jadilah kontributor pertama!
       </p>
     );
   }

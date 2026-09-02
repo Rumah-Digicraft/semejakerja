@@ -53,7 +53,8 @@ export default function PapanKontributor() {
             <Trophy size={14} /> Reset tiap awal bulan
           </div>
           <p className="text-sm text-gray-500 leading-relaxed -mt-2">
-            Poin didapat dari kontribusi yang disetujui tim: usulan kafe baru, koreksi info, dan upload foto.
+            Setiap kontribusi yang disetujui tim dapat poin: usulan kafe baru <span className="font-semibold text-gray-700">+20</span>,
+            koreksi info <span className="font-semibold text-gray-700">+15</span>, upload foto <span className="font-semibold text-gray-700">+10</span>.
             Kontributor teratas bulan ini dapat hadiah dari Semeja Kerja.
           </p>
 

@@ -99,6 +99,10 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
   // default ke mode ringkasan.
   const [weekSectionOpen, setWeekSectionOpen] = useState(false)
   const lastWeekRef = useRef<WeekHours>(initial.week ?? DEFAULT_WEEK())
+  // Field jam terpisah khusus buat tombol "Samakan semua hari" — bukan
+  // diam-diam nyalin dari salah satu hari (dulu Senin), field ini gak
+  // terikat ke hari mana pun jadi jelas ini "jam yang mau disamakan".
+  const [templateHours, setTemplateHours] = useState({ from: '09:00', to: '21:00' })
 
   const set = (patch: Partial<CafeFormValues>) => setValues(v => ({ ...v, ...patch }))
 
@@ -124,8 +128,11 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
 
   // Sama persis flow "Cari Lokasi" di form publik (semejakerja-web-apps
   // ContributeModal.tsx) — resolve link share Google Maps lewat edge
-  // function resolve-maps-link (follow redirect short link -> koordinat),
-  // dipakai supaya admin gak perlu copy-paste lat/lng manual dari Maps.
+  // function resolve-maps-link (follow redirect short link -> koordinat,
+  // fallback Google Places API kalau link share dari app HP cuma bawa place
+  // reference tanpa @lat,lng), dipakai supaya admin gak perlu copy-paste
+  // lat/lng manual dari Maps. `address` cuma ada di respons untuk kasus link
+  // mobile itu (link web tidak membawa teks alamat sama sekali di URL-nya).
   const handleResolveLink = async () => {
     if (!mapsUrl.trim()) return
     setResolvingLocation(true)
@@ -139,6 +146,7 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
     }
     set({ lat: data.lat, lng: data.lng })
     if (data.name && !values.name.trim()) set({ name: data.name })
+    if (data.address && !values.address.trim()) set({ address: data.address })
   }
 
   const err = (key: string) =>
@@ -378,11 +386,22 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
 
             {weekSectionOpen && values.week && (
               <>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <input
+                    type="time" value={templateHours.from}
+                    onChange={e => setTemplateHours(h => ({ ...h, from: e.target.value }))}
+                    className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  <span className="text-slate-400 text-sm">–</span>
+                  <input
+                    type="time" value={templateHours.to}
+                    onChange={e => setTemplateHours(h => ({ ...h, to: e.target.value }))}
+                    className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
                   <button
                     type="button"
-                    onClick={() => values.week && setWeek(values.week.map(() => ({ ...values.week![0] })))}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 transition"
+                    onClick={() => setWeek(DAY_LABELS.map(() => ({ open: true, ...templateHours })))}
+                    className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold transition"
                   >
                     Samakan semua hari
                   </button>
@@ -435,13 +454,17 @@ export default function CafeForm({ initial, saving, submitLabel, onSubmit }: Caf
                     onChange={e => { setOpenHoursTouched(true); set({ open_hours: e.target.value }) }}
                     className={inputCls} placeholder='mis. "09:00 - 22:00" atau "24 Jam"'
                   />
-                  <button
-                    type="button"
-                    onClick={() => { setOpenHoursTouched(false); set({ open_hours: suggestOpenHours(values.week) }) }}
-                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs text-slate-600 whitespace-nowrap transition"
-                  >
-                    Pakai saran
-                  </button>
+                  {/* Cuma muncul kalau sudah diedit manual — normalnya field
+                      ini otomatis ngikutin jadwal per-hari di atas. */}
+                  {openHoursTouched && (
+                    <button
+                      type="button"
+                      onClick={() => { setOpenHoursTouched(false); set({ open_hours: suggestOpenHours(values.week) }) }}
+                      className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs text-slate-600 whitespace-nowrap transition"
+                    >
+                      Isi otomatis dari jadwal di atas
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">

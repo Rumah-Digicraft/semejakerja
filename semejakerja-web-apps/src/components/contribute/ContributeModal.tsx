@@ -1,6 +1,6 @@
 import { useState, useRef, type ReactNode } from 'react';
 import {
-  X, CheckCircle2, Star, Upload, Loader2, MapPin, Search, ExternalLink,
+  X, CheckCircle2, Star, Upload, Loader2, Search, ExternalLink,
   Wifi, Wind, BookOpen, Presentation, Trees, UtensilsCrossed, Maximize, Bike, Car, Zap,
 } from 'lucide-react';
 import {
@@ -11,7 +11,6 @@ import {
   useResolveMapsLink,
 } from '../../hooks/useContribute';
 import type { CafeEditSuggestedData, CafeFacility, CafeScale } from '../../types/cafe';
-import { searchAddress, type GeocodeResult } from '../../lib/geocode';
 import PhotoCropModal from './PhotoCropModal';
 import LocationPicker from './LocationPicker';
 import {
@@ -145,18 +144,15 @@ function NewCafeForm({
   const [facilities, setFacilities] = useState<CafeFacility>(DEFAULT_FACILITIES);
   const [scales, setScales] = useState<CafeScale>(DEFAULT_SCALES);
   const [week, setWeek] = useState<WeekHours>(defaultWeekHours());
+  // Field jam terpisah khusus buat tombol "Samakan semua hari" — bukan
+  // diam-diam nyalin dari salah satu hari (dulu Senin), field ini emang
+  // gak terikat ke hari mana pun, jadi jelas ini "jam yang mau disamakan",
+  // bukan "jam hari X".
+  const [templateHours, setTemplateHours] = useState({ from: '09:00', to: '21:00' });
   const [openHours, setOpenHours] = useState(suggestOpenHours(defaultWeekHours()));
   const [openHoursTouched, setOpenHoursTouched] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [addressResults, setAddressResults] = useState<GeocodeResult[]>([]);
-  const [addressSearching, setAddressSearching] = useState(false);
-  const [addressSearchError, setAddressSearchError] = useState<string | null>(null);
-  // Opsi Google Maps + paste-link disembunyikan sampai memang dibutuhkan
-  // (pencarian otomatis gagal, atau user memang sudah punya link) — biar
-  // nggak numpuk 4 kontrol sekaligus di layar buat kasus umum yang biasanya
-  // langsung ketemu dari pencarian otomatis.
-  const [showLinkFallback, setShowLinkFallback] = useState(false);
 
   const { mutate: resolveLink, isPending: resolving } = useResolveMapsLink();
 
@@ -168,6 +164,12 @@ function NewCafeForm({
     applyWeek(week.map((d, i) => (i === index ? { ...d, ...patch } : d)));
   };
 
+  // Link Google Maps adalah cara utama mengisi form ini (lihat JSX di bawah)
+  // — begitu resolve sukses, nama & alamat langsung diisi dari hasilnya
+  // (bukan cuma kalau kosong), karena inilah titik masuk pertama yang dilihat
+  // user. `address` cuma ada untuk link share dari app HP (lihat komen di
+  // ResolvedMapsLocation, useContribute.ts) — link web tidak membawa teks
+  // alamat sama sekali, jadi kolom Alamat tetap harus diisi manual utk itu.
   const handleResolveLink = () => {
     if (!form.mapsUrl.trim()) return;
     setLocationError(null);
@@ -175,7 +177,8 @@ function NewCafeForm({
       onSuccess: (loc) => {
         setLat(loc.lat);
         setLng(loc.lng);
-        if (loc.name && !form.name.trim()) set('name', loc.name);
+        if (loc.name) set('name', loc.name);
+        if (loc.address) set('address', loc.address);
       },
       onError: (err) => {
         setLocationError(err instanceof Error ? err.message : 'Gagal membaca link, geser pin manual di bawah ya');
@@ -183,43 +186,14 @@ function NewCafeForm({
     });
   };
 
-  // Alternatif gratis buat "Link Google Maps" — geocoding pakai OpenStreetMap
-  // Nominatim (tanpa API key) dari Nama Cafe + Alamat yang sudah diisi.
-  // Ada karena link share Google Maps dari app HP sering nggak bisa dibaca
-  // koordinatnya (lihat komen di resolve-maps-link edge function), jadi user
-  // nggak harus bolak-balik ke Google Maps buat dapetin link yang "benar".
-  const handleSearchAddress = async () => {
-    if (!form.name.trim() && !form.address.trim()) return;
-    setAddressSearchError(null);
-    setAddressSearching(true);
-    try {
-      const results = await searchAddress(form.name, form.address);
-      setAddressResults(results);
-      if (results.length === 0) {
-        setAddressSearchError('Lokasi tidak ketemu otomatis.');
-        setShowLinkFallback(true);
-      }
-    } catch {
-      setAddressSearchError('Gagal mencari lokasi, coba lagi.');
-    } finally {
-      setAddressSearching(false);
-    }
-  };
-
-  const handlePickAddressResult = (r: GeocodeResult) => {
-    setLat(r.lat);
-    setLng(r.lng);
-    setAddressResults([]);
-  };
-
-  // Nominatim (di atas) sering nggak nemu bisnis kecil/jalan yang belum ditag
-  // di OSM. Google punya data yang jauh lebih lengkap — buka tab baru ke URL
-  // pencarian resmi Google Maps (bukan scraping, ini skema URL yang memang
-  // didokumentasikan Google buat deep-link), user tinggal cek pin-nya lalu
-  // copy link dari address bar & tempel di kolom "Link Google Maps" di bawah.
+  // Bantuan buat user yang belum punya link sama sekali — buka tab baru ke
+  // URL pencarian resmi Google Maps (bukan scraping, ini skema URL yang
+  // memang didokumentasikan Google buat deep-link), user tinggal cek pin-nya
+  // lalu copy link dari address bar & tempel di kolom "Link Google Maps" di
+  // atas. Dipakai dari posisi paling atas form (sebelum Nama/Alamat terisi),
+  // jadi fallback ke pencarian generik kalau belum ada teks apa pun diketik.
   const handleOpenGoogleMapsSearch = () => {
-    const query = [form.name, form.address].filter((s) => s.trim()).join(', ').trim();
-    if (!query) return;
+    const query = [form.name, form.address].filter((s) => s.trim()).join(', ').trim() || 'cafe di Purwokerto';
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -250,6 +224,39 @@ function NewCafeForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* ── Link Google Maps: cara utama, isi ini duluan ── */}
+      <div className="p-3.5 rounded-xl bg-purple-50/60 border border-purple-100">
+        <Label text="Link Google Maps" />
+        <div className="flex gap-2">
+          <input
+            className={inputCls}
+            placeholder="https://maps.app.goo.gl/..."
+            value={form.mapsUrl}
+            onChange={(e) => set('mapsUrl', e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={handleResolveLink}
+            disabled={resolving || !form.mapsUrl.trim()}
+            className="shrink-0 px-4 py-2.5 text-sm font-semibold text-purple-700 bg-white hover:bg-purple-100 border border-purple-200 rounded-xl transition-all disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Cari
+          </button>
+        </div>
+        <div className="flex items-center justify-between gap-2 mt-1.5">
+          <p className="text-xs text-gray-500">Isi otomatis nama, alamat & lokasi</p>
+          <button
+            type="button"
+            onClick={handleOpenGoogleMapsSearch}
+            className="shrink-0 text-xs font-semibold text-purple-600 hover:underline inline-flex items-center gap-0.5"
+          >
+            Buka Google Maps <ExternalLink className="w-3 h-3" />
+          </button>
+        </div>
+        {locationError && <p className="text-xs text-amber-600 mt-1.5">{locationError}</p>}
+      </div>
+
       <div>
         <Label text="Nama Cafe" />
         <input required className={inputCls} placeholder="Contoh: Kopi Kenangan Purwokerto" value={form.name} onChange={(e) => set('name', e.target.value)} />
@@ -262,82 +269,8 @@ function NewCafeForm({
       {/* ── Lokasi ── */}
       <div>
         <Label text="Titik Lokasi di Peta" />
-
-        <button
-          type="button"
-          onClick={handleSearchAddress}
-          disabled={addressSearching || (!form.name.trim() && !form.address.trim())}
-          className="w-full px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
-        >
-          {addressSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-          Cari Lokasi Otomatis
-        </button>
-        {addressSearchError && <p className="text-xs text-amber-600 mt-1.5">{addressSearchError}</p>}
-        {addressResults.length > 0 && (
-          <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
-            {addressResults.map((r, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => handlePickAddressResult(r)}
-                className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-start gap-2"
-              >
-                <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-purple-500" />
-                <span className="line-clamp-2">{r.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Fallback (link Google Maps) — disembunyikan sampai pencarian
-            otomatis gagal, atau user klik toggle-nya sendiri kalau memang
-            sudah pegang link. Menghindari numpuk 4 kontrol lokasi sekaligus
-            buat kasus umum yang biasanya langsung ketemu di atas. */}
-        {!showLinkFallback ? (
-          <button
-            type="button"
-            onClick={() => setShowLinkFallback(true)}
-            className="text-xs font-semibold text-purple-600 hover:underline mt-2"
-          >
-            Nggak ketemu? Pakai link Google Maps →
-          </button>
-        ) : (
-          <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
-            <p className="text-xs text-gray-500">
-              Klik{' '}
-              <button
-                type="button"
-                onClick={handleOpenGoogleMapsSearch}
-                disabled={!form.name.trim() && !form.address.trim()}
-                className="font-semibold text-purple-600 hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-0.5"
-              >
-                buka Google Maps <ExternalLink className="w-3 h-3" />
-              </button>
-              , cari & pastikan pin-nya di tempat yang benar, lalu copy link dari address bar dan tempel di sini:
-            </p>
-            <div className="flex gap-2">
-              <input
-                className={inputCls}
-                placeholder="https://maps.app.goo.gl/..."
-                value={form.mapsUrl}
-                onChange={(e) => set('mapsUrl', e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={handleResolveLink}
-                disabled={resolving || !form.mapsUrl.trim()}
-                className="shrink-0 px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-                Pakai Link Ini
-              </button>
-            </div>
-            {locationError && <p className="text-xs text-amber-600">{locationError}</p>}
-          </div>
-        )}
-
-        <p className="text-xs text-gray-400 mt-2">
-          {lat != null && lng != null ? 'Geser pin di peta kalau kurang pas.' : 'Atau langsung klik/geser pin di peta di bawah ini.'}
+        <p className="text-xs text-gray-400">
+          {lat != null && lng != null ? 'Geser pin di peta kalau kurang pas.' : 'Klik/geser pin di peta buat nentuin lokasi, atau pakai Link Google Maps di atas.'}
         </p>
         <div className="mt-2">
           <LocationPicker
@@ -369,19 +302,26 @@ function NewCafeForm({
 
       {/* ── Review Google Maps ── */}
       <div>
-        <Label text="Review Google Maps" optional hint="salin dari halaman Google Maps cafe ini" />
+        <Label text="Rating & Ulasan Google Maps" optional />
         <div className="grid grid-cols-2 gap-3">
-          <input
-            type="number" min={0} max={5} step="0.1"
-            className={inputCls} placeholder="Rating, mis. 4.8"
-            value={form.rating} onChange={(e) => set('rating', e.target.value)}
-          />
-          <input
-            type="number" min={0} step={1}
-            className={inputCls} placeholder="Jumlah review, mis. 834"
-            value={form.totalReviews} onChange={(e) => set('totalReviews', e.target.value)}
-          />
+          <div className="relative">
+            <Star className="w-4 h-4 text-amber-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="number" min={0} max={5} step="0.1"
+              className={`${inputCls} pl-9`} placeholder="4.8"
+              value={form.rating} onChange={(e) => set('rating', e.target.value)}
+            />
+          </div>
+          <div className="relative">
+            <input
+              type="number" min={0} step={1}
+              className={`${inputCls} pr-16`} placeholder="834"
+              value={form.totalReviews} onChange={(e) => set('totalReviews', e.target.value)}
+            />
+            <span className="text-xs text-gray-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">ulasan</span>
+          </div>
         </div>
+        <p className="text-xs text-gray-400 mt-1.5">Opsional — salin dari halaman Google Maps cafe ini</p>
       </div>
 
       {/* ── Fasilitas & Suasana ── */}
@@ -455,11 +395,22 @@ function NewCafeForm({
       {/* ── Jam Operasional ── */}
       <div>
         <Label text="Jam Operasional" optional />
-        <div className="flex gap-2 mb-2">
+        <div className="flex flex-wrap items-center gap-1.5 mb-2">
+          <input
+            type="time" value={templateHours.from}
+            onChange={(e) => setTemplateHours((h) => ({ ...h, from: e.target.value }))}
+            className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+          />
+          <span className="text-gray-400 text-sm">–</span>
+          <input
+            type="time" value={templateHours.to}
+            onChange={(e) => setTemplateHours((h) => ({ ...h, to: e.target.value }))}
+            className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+          />
           <button
             type="button"
-            onClick={() => applyWeek(week.map(() => ({ ...week[0] })))}
-            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs text-gray-600 transition"
+            onClick={() => applyWeek(DAY_LABELS.map(() => ({ open: true, ...templateHours })))}
+            className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold transition"
           >
             Samakan semua hari
           </button>
@@ -500,19 +451,28 @@ function NewCafeForm({
             </div>
           ))}
         </div>
-        <div className="flex gap-2 mt-2">
-          <input
-            value={openHours}
-            onChange={(e) => { setOpenHoursTouched(true); setOpenHours(e.target.value); }}
-            className={inputCls} placeholder='Ringkasan jam, mis. "09:00 - 22:00"'
-          />
-          <button
-            type="button"
-            onClick={() => { setOpenHoursTouched(false); setOpenHours(suggestOpenHours(week)); }}
-            className="shrink-0 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs text-gray-600 transition"
-          >
-            Pakai saran
-          </button>
+        <div className="mt-2">
+          <p className="text-xs text-gray-500 mb-1">Ringkasan jam buka (dipakai buat status buka/tutup di peta)</p>
+          <div className="flex gap-2">
+            <input
+              value={openHours}
+              onChange={(e) => { setOpenHoursTouched(true); setOpenHours(e.target.value); }}
+              className={inputCls} placeholder='mis. "09:00 - 22:00"'
+            />
+            {/* Cuma muncul kalau user sudah nulis manual di atas — normalnya
+                field ini otomatis ngikutin jadwal per-hari di atas, jadi
+                tombolnya cuma relevan buat "batalkan editan manual, balik ke
+                otomatis lagi". */}
+            {openHoursTouched && (
+              <button
+                type="button"
+                onClick={() => { setOpenHoursTouched(false); setOpenHours(suggestOpenHours(week)); }}
+                className="shrink-0 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs text-gray-600 transition"
+              >
+                Isi otomatis dari jadwal di atas
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -578,15 +538,12 @@ function EditForm({
   const [lng, setLng] = useState<number | null>(currentValues?.lng ?? null);
   const [mapsUrl, setMapsUrl] = useState('');
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [addressResults, setAddressResults] = useState<GeocodeResult[]>([]);
-  const [addressSearching, setAddressSearching] = useState(false);
-  const [addressSearchError, setAddressSearchError] = useState<string | null>(null);
-  const [showLinkFallback, setShowLinkFallback] = useState(false);
   const { mutate: resolveLink, isPending: resolving } = useResolveMapsLink();
 
   // ── Jam operasional (opt-in) — mulai dari jadwal cafe saat ini ──
   const [hoursOptIn, setHoursOptIn] = useState(false);
   const [week, setWeek] = useState<WeekHours>(() => parseWeekdayText(currentValues?.weekday_text));
+  const [templateHours, setTemplateHours] = useState({ from: '09:00', to: '21:00' });
   const [openHours, setOpenHours] = useState(() => suggestOpenHours(parseWeekdayText(currentValues?.weekday_text)));
   const [openHoursTouched, setOpenHoursTouched] = useState(false);
   const applyWeek = (nextWeek: WeekHours) => {
@@ -606,36 +563,13 @@ function EditForm({
   const [facilities, setFacilities] = useState<CafeFacility>(currentValues?.facilities ?? DEFAULT_FACILITIES);
   const [scales, setScales] = useState<CafeScale>(currentValues?.scales ?? DEFAULT_SCALES);
 
-  // Nama/alamat buat query lokasi: pakai koreksi user kalau diisi, kalau
-  // belum ya pakai nama/alamat cafe yang sekarang (biasanya belum berubah).
+  // Nama/alamat buat query "buka Google Maps": pakai koreksi user kalau
+  // diisi, kalau belum ya pakai nama/alamat cafe yang sekarang.
   const queryName = form.name || currentValues?.name || '';
   const queryAddress = form.address || currentValues?.address || '';
 
-  const handleSearchAddress = async () => {
-    if (!queryName.trim() && !queryAddress.trim()) return;
-    setAddressSearchError(null);
-    setAddressSearching(true);
-    try {
-      const results = await searchAddress(queryName, queryAddress);
-      setAddressResults(results);
-      if (results.length === 0) {
-        setAddressSearchError('Lokasi tidak ketemu otomatis.');
-        setShowLinkFallback(true);
-      }
-    } catch {
-      setAddressSearchError('Gagal mencari lokasi, coba lagi.');
-    } finally {
-      setAddressSearching(false);
-    }
-  };
-  const handlePickAddressResult = (r: GeocodeResult) => {
-    setLat(r.lat);
-    setLng(r.lng);
-    setAddressResults([]);
-  };
   const handleOpenGoogleMapsSearch = () => {
-    const query = [queryName, queryAddress].filter((s) => s.trim()).join(', ').trim();
-    if (!query) return;
+    const query = [queryName, queryAddress].filter((s) => s.trim()).join(', ').trim() || 'cafe di Purwokerto';
     window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer');
   };
   const handleResolveLink = () => {
@@ -717,70 +651,34 @@ function EditForm({
 
       {/* ── Lokasi ── */}
       <OptInSection label="Koreksi Titik Lokasi di Peta" checked={locationOptIn} onToggle={setLocationOptIn}>
-        <button
-          type="button"
-          onClick={handleSearchAddress}
-          disabled={addressSearching || (!queryName.trim() && !queryAddress.trim())}
-          className="w-full px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
-        >
-          {addressSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-          Cari Lokasi Otomatis
-        </button>
-        {addressSearchError && <p className="text-xs text-amber-600">{addressSearchError}</p>}
-        {addressResults.length > 0 && (
-          <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
-            {addressResults.map((r, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => handlePickAddressResult(r)}
-                className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-start gap-2"
-              >
-                <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-purple-500" />
-                <span className="line-clamp-2">{r.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {!showLinkFallback ? (
-          <button type="button" onClick={() => setShowLinkFallback(true)} className="text-xs font-semibold text-purple-600 hover:underline">
-            Nggak ketemu? Pakai link Google Maps →
+        <div className="flex gap-2">
+          <input
+            className={inputCls}
+            placeholder="https://maps.app.goo.gl/..."
+            value={mapsUrl}
+            onChange={(e) => setMapsUrl(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={handleResolveLink}
+            disabled={resolving || !mapsUrl.trim()}
+            className="shrink-0 px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Cari
           </button>
-        ) : (
-          <div className="pt-1 border-t border-gray-100 space-y-1.5">
-            <p className="text-xs text-gray-500">
-              Klik{' '}
-              <button
-                type="button"
-                onClick={handleOpenGoogleMapsSearch}
-                disabled={!queryName.trim() && !queryAddress.trim()}
-                className="font-semibold text-purple-600 hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-0.5"
-              >
-                buka Google Maps <ExternalLink className="w-3 h-3" />
-              </button>
-              , cari & pastikan pin-nya di tempat yang benar, lalu copy link dari address bar dan tempel di sini:
-            </p>
-            <div className="flex gap-2">
-              <input
-                className={inputCls}
-                placeholder="https://maps.app.goo.gl/..."
-                value={mapsUrl}
-                onChange={(e) => setMapsUrl(e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={handleResolveLink}
-                disabled={resolving || !mapsUrl.trim()}
-                className="shrink-0 px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-                Pakai Link Ini
-              </button>
-            </div>
-            {locationError && <p className="text-xs text-amber-600">{locationError}</p>}
-          </div>
-        )}
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-gray-500">Tempel link Google Maps buat update pin</p>
+          <button
+            type="button"
+            onClick={handleOpenGoogleMapsSearch}
+            className="shrink-0 text-xs font-semibold text-purple-600 hover:underline inline-flex items-center gap-0.5"
+          >
+            Buka Google Maps <ExternalLink className="w-3 h-3" />
+          </button>
+        </div>
+        {locationError && <p className="text-xs text-amber-600">{locationError}</p>}
 
         <p className="text-xs text-gray-400">Geser pin di peta kalau kurang pas.</p>
         <LocationPicker
@@ -865,11 +763,22 @@ function EditForm({
 
       {/* ── Jam Operasional ── */}
       <OptInSection label="Koreksi Jam Operasional" checked={hoursOptIn} onToggle={setHoursOptIn}>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <input
+            type="time" value={templateHours.from}
+            onChange={(e) => setTemplateHours((h) => ({ ...h, from: e.target.value }))}
+            className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+          />
+          <span className="text-gray-400 text-sm">–</span>
+          <input
+            type="time" value={templateHours.to}
+            onChange={(e) => setTemplateHours((h) => ({ ...h, to: e.target.value }))}
+            className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+          />
           <button
             type="button"
-            onClick={() => applyWeek(week.map(() => ({ ...week[0] })))}
-            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs text-gray-600 transition"
+            onClick={() => applyWeek(DAY_LABELS.map(() => ({ open: true, ...templateHours })))}
+            className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold transition"
           >
             Samakan semua hari
           </button>
@@ -910,19 +819,24 @@ function EditForm({
             </div>
           ))}
         </div>
-        <div className="flex gap-2">
-          <input
-            value={openHours}
-            onChange={(e) => { setOpenHoursTouched(true); setOpenHours(e.target.value); }}
-            className={inputCls} placeholder='Ringkasan jam, mis. "09:00 - 22:00"'
-          />
-          <button
-            type="button"
-            onClick={() => { setOpenHoursTouched(false); setOpenHours(suggestOpenHours(week)); }}
-            className="shrink-0 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs text-gray-600 transition"
-          >
-            Pakai saran
-          </button>
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Ringkasan jam buka (dipakai buat status buka/tutup di peta)</p>
+          <div className="flex gap-2">
+            <input
+              value={openHours}
+              onChange={(e) => { setOpenHoursTouched(true); setOpenHours(e.target.value); }}
+              className={inputCls} placeholder='mis. "09:00 - 22:00"'
+            />
+            {openHoursTouched && (
+              <button
+                type="button"
+                onClick={() => { setOpenHoursTouched(false); setOpenHours(suggestOpenHours(week)); }}
+                className="shrink-0 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs text-gray-600 transition"
+              >
+                Isi otomatis dari jadwal di atas
+              </button>
+            )}
+          </div>
         </div>
       </OptInSection>
 
