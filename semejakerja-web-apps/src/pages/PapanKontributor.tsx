@@ -44,7 +44,10 @@ export default function PapanKontributor() {
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      {/* pb-24: clears the mobile bottom nav (BottomNav.tsx), which now
+          includes a Kontributor tab linking here and floats fixed at the
+          bottom of this page too. */}
+      <div className="max-w-lg mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8">
         <div className="glass-panel rounded-3xl shadow-xl p-6 sm:p-8 flex flex-col gap-5">
           <div className="flex items-center gap-2 text-purple-600 font-bold text-xs uppercase tracking-wide">
             <Trophy size={14} /> Reset tiap awal bulan

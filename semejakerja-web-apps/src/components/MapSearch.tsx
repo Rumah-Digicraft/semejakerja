@@ -49,9 +49,13 @@ const MapSearch: React.FC<MapSearchProps> = ({ cafes, onCafeClick }) => {
   };
 
   return (
-    <div ref={wrapperRef} className="absolute top-28 sm:top-36 left-1/2 transform -translate-x-1/2 z-[400] w-[90%] sm:w-[400px]">
+    <div ref={wrapperRef} className="absolute top-28 sm:top-32 left-1/2 transform -translate-x-1/2 z-[400] w-[90%] sm:w-[400px]">
       <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+        {/* z-10: without an explicit stacking level, this sits behind the
+            input's own compositing layer once `sm:backdrop-blur-md` kicks in
+            (≥640px) — the icon is still in the DOM/visible per computed
+            styles, just visually buried under the blurred input. */}
+        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
           <Search size={18} className="text-gray-400" />
         </div>
         <input
@@ -68,9 +72,9 @@ const MapSearch: React.FC<MapSearchProps> = ({ cafes, onCafeClick }) => {
           onClick={() => setIsOpen(true)}
         />
         {query && (
-          <button 
+          <button
             onClick={() => { setQuery(''); setIsOpen(true); }}
-            className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
+            className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 z-10"
           >
             <X size={16} />
           </button>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Coffee, MapPin, SlidersHorizontal, X, LogIn, LogOut, Crown, Gamepad2, Trophy, Award } from 'lucide-react';
+import { Coffee, SlidersHorizontal, X, LogIn, LogOut, Crown, Gamepad2, Trophy, Award } from 'lucide-react';
 import { useAuth, type MembershipTier } from '../hooks/useAuth';
 import { LoginModal } from './LoginModal';
 
@@ -64,33 +64,33 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, onToggleSidebar }) => {
       </div>
 
       {/* Center badge — hidden on small screens */}
-      <div className="hidden lg:flex items-center gap-3 px-6 py-3 rounded-2xl bg-white/60 border border-white/80 shadow-sm text-gray-700 text-base font-bold">
+      {/* <div className="hidden lg:flex items-center gap-3 px-6 py-3 rounded-2xl bg-white/60 border border-white/80 shadow-sm text-gray-700 text-base font-bold">
         <MapPin size={18} className="text-purple-600" />
         Purwokerto, Jawa Tengah
-      </div>
+      </div> */}
 
       {/* Right actions */}
       <div className="flex items-center gap-1.5 sm:gap-5">
-        {/* Tebak Kafe mini-game entry point — fixed square icon button on
-            mobile (matches the filter toggle's w-10 h-10) since the label
-            is hidden there anyway; pill shape with label kicks in at sm:. */}
+        {/* Tebak Kafe / Kontributor: desktop-only here now — moved to the
+            mobile BottomNav (BottomNav.tsx) where a label always fits,
+            instead of the icon-only squares this used to render below md:. */}
         <Link
           to="/tebak-kafe"
           title="Main Tebak Kafe"
-          className="w-10 h-10 sm:w-auto flex items-center justify-center gap-2 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-white/60 hover:bg-white border border-white/80 transition-all shadow-sm text-purple-700 font-bold text-sm sm:text-base flex-shrink-0"
+          className="hidden md:flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/60 hover:bg-white border border-white/80 transition-all shadow-sm text-purple-700 font-bold text-base flex-shrink-0"
         >
           <Gamepad2 size={18} />
-          <span className="hidden sm:inline">Tebak Kafe</span>
+          <span>Tebak Kafe</span>
         </Link>
 
         {/* Papan Kontributor — publik, siapa pun bisa lihat tanpa login. */}
         <Link
           to="/papan-kontributor"
           title="Papan Kontributor"
-          className="w-10 h-10 sm:w-auto flex items-center justify-center gap-2 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-white/60 hover:bg-white border border-white/80 transition-all shadow-sm text-purple-700 font-bold text-sm sm:text-base flex-shrink-0"
+          className="hidden md:flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/60 hover:bg-white border border-white/80 transition-all shadow-sm text-purple-700 font-bold text-base flex-shrink-0"
         >
           <Trophy size={18} />
-          <span className="hidden sm:inline">Kontributor</span>
+          <span>Kontributor</span>
         </Link>
 
         {/* Account: Google login (users) — admin has its own app */}

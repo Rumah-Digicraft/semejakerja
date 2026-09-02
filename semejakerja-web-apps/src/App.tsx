@@ -5,6 +5,8 @@ import Sidebar from './components/Sidebar';
 import MapView from './components/MapView';
 import CafeModal from './components/CafeModal';
 import { LoginModal } from './components/LoginModal';
+import { ContributeModal } from './components/contribute/ContributeModal';
+import BottomNav from './components/BottomNav';
 import AuthCallback from './components/AuthCallback';
 import { CafesLoadingOverlay, CafesErrorOverlay } from './components/CafesLoadingOverlay';
 import Seo from './components/Seo';
@@ -12,6 +14,7 @@ import NotFound from './pages/NotFound';
 import TebakKafe from './pages/TebakKafe';
 import PapanKontributor from './pages/PapanKontributor';
 import Kontribusiku from './pages/Kontribusiku';
+import Tersimpan from './pages/Tersimpan';
 import { useCafes } from './hooks/useCafes';
 import { useAuth, mapsAccess } from './hooks/useAuth';
 import { supabase } from './lib/supabaseClient';
@@ -34,12 +37,15 @@ const defaultFilters: FilterState = {
   mitraSemejaKerja: false,
 };
 
-function MapApp() {
+interface MapAppProps {
+  onRequestLogin: () => void;
+}
+
+function MapApp({ onRequestLogin }: MapAppProps) {
   const { cafes, loading, error, refetch } = useCafes();
-  const { user, profile, signInWithGoogle, landingUrl } = useAuth();
+  const { user, profile, landingUrl } = useAuth();
   const navigate = useNavigate();
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
-  const [showLogin, setShowLogin] = useState(false);
 
   // The URL is the source of truth for which cafe is open (/cafe/:slug).
   // Fallback on the 8-char id suffix so renamed cafes keep resolving.
@@ -128,6 +134,7 @@ function MapApp() {
         filters={filters}
         selectedCafe={selectedCafe}
         onCafeClick={handleCafeClick}
+        sidebarOpen={sidebarOpen}
       />
 
       {loading && <CafesLoadingOverlay />}
@@ -162,7 +169,7 @@ function MapApp() {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         access={access}
-        onRequestLogin={() => setShowLogin(true)}
+        onRequestLogin={onRequestLogin}
         landingUrl={landingUrl}
       />
       {selectedCafe && (
@@ -171,14 +178,8 @@ function MapApp() {
           onClose={() => navigate('/')}
           access={access}
           userId={user?.id}
-          onRequestLogin={() => setShowLogin(true)}
+          onRequestLogin={onRequestLogin}
           landingUrl={landingUrl}
-        />
-      )}
-      {showLogin && (
-        <LoginModal
-          onClose={() => setShowLogin(false)}
-          onSignInWithGoogle={signInWithGoogle}
         />
       )}
     </div>
@@ -186,21 +187,59 @@ function MapApp() {
 }
 
 function App() {
+  // Login/add-cafe modal state lives here, not inside MapApp, because the
+  // mobile BottomNav's "+" button (and eventually its Saved tab's own gating)
+  // needs to trigger them from any route, not just the map screen.
+  const { user, profile, signInWithGoogle } = useAuth();
+  const access = mapsAccess(user, profile?.tier ?? null);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showNewCafeModal, setShowNewCafeModal] = useState(false);
+
+  // Contribution (usulkan cafe baru) is open to any logged-in member, guest
+  // just gets routed to login first — same rule as Sidebar's "Tambahkan
+  // Tempat Baru" button, just reachable from the map FAB / bottom-nav "+" too.
+  const handleAddCafeClick = useCallback(() => {
+    if (access === 'guest') setShowLogin(true);
+    else setShowNewCafeModal(true);
+  }, [access]);
+  const handleRequestLogin = useCallback(() => setShowLogin(true), []);
+
   // Admin panel lives in the separate semejakerja-admin app now.
   // "/" and "/cafe/:slug" share one MapApp mount (layout route) so the
   // Leaflet map survives modal open/close; MapApp reads the slug itself.
   return (
-    <Routes>
-      <Route path="/" element={<MapApp />}>
-        <Route index element={null} />
-        <Route path="cafe/:slug" element={null} />
-      </Route>
-      <Route path="/tebak-kafe" element={<TebakKafe />} />
-      <Route path="/papan-kontributor" element={<PapanKontributor />} />
-      <Route path="/kontribusiku" element={<Kontribusiku />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route
+          path="/"
+          element={<MapApp onRequestLogin={handleRequestLogin} />}
+        >
+          <Route index element={null} />
+          <Route path="cafe/:slug" element={null} />
+        </Route>
+        <Route path="/tebak-kafe" element={<TebakKafe />} />
+        <Route path="/papan-kontributor" element={<PapanKontributor />} />
+        <Route path="/kontribusiku" element={<Kontribusiku />} />
+        <Route path="/tersimpan" element={<Tersimpan />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+
+      <BottomNav onAddCafeClick={handleAddCafeClick} />
+
+      {showLogin && (
+        <LoginModal
+          onClose={() => setShowLogin(false)}
+          onSignInWithGoogle={signInWithGoogle}
+        />
+      )}
+      {showNewCafeModal && (
+        <ContributeModal
+          type="new-cafe"
+          onClose={() => setShowNewCafeModal(false)}
+        />
+      )}
+    </>
   );
 }
 
