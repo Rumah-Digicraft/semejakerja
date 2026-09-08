@@ -2,8 +2,8 @@
 // semejakerja-admin/components/MapPicker.tsx (klik atau geser pin buat
 // nentuin lokasi). CSS Leaflet sudah di-import global di src/index.css,
 // jadi tidak perlu import ulang di sini.
-import { useRef, useState } from 'react';
-import { MapContainer, Marker, useMapEvents } from 'react-leaflet';
+import { useEffect, useRef, useState } from 'react';
+import { MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { MapTilerVectorLayer } from '../../lib/mapTilerVectorLayer';
 
@@ -43,6 +43,19 @@ function LocationMarker({ position, onChange }: { position: L.LatLngExpression; 
   return <Marker draggable eventHandlers={eventHandlers} position={position} ref={markerRef} />;
 }
 
+// MapContainer's `center` prop cuma dipakai sekali pas mount awal (react-leaflet
+// tidak reaktif ke perubahan prop itu) — komponen ini yang gerakin viewport-nya
+// tiap kali `position` berubah, mis. setelah "Cari Lokasi" resolve URL Maps.
+function RecenterMap({ position, zoom }: { position: L.LatLngExpression; zoom: number }) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.flyTo(position, zoom);
+  }, [map, position, zoom]);
+
+  return null;
+}
+
 export default function LocationPicker({ center, zoom = 14, onLocationChange }: LocationPickerProps) {
   const [position, setPosition] = useState<L.LatLngExpression>(center);
   // Sinkron posisi pin dari `center` (mis. setelah "Cari Lokasi" resolve
@@ -66,6 +79,7 @@ export default function LocationPicker({ center, zoom = 14, onLocationChange }: 
             app ini konsisten tampilannya. */}
         <MapTilerVectorLayer />
         <LocationMarker position={position} onChange={handleChange} />
+        <RecenterMap position={position} zoom={zoom} />
       </MapContainer>
     </div>
   );
