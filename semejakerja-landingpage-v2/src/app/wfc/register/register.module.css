@@ -342,6 +342,16 @@
   align-items: center;
 }
 
+/* Judul layar transisi ke DOKU — spinner-nya nggak setinggi emoji status,
+   jadi jaraknya diatur di sini biar kartunya tetap seimbang. */
+.redirectTitle {
+  margin-top: var(--space-4);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-gray-900);
+  margin-bottom: var(--space-2);
+}
+
 .statusEmoji {
   font-size: 3rem;
   margin-bottom: var(--space-4);

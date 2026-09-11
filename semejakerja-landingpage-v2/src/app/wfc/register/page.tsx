@@ -97,11 +97,13 @@ interface AppliedPromo {
 // Minta invoice DOKU (QRIS) ke edge function form-create-payment lalu
 // redirect ke halaman bayarnya. Harga & diskon SELALU dihitung
 // server-side. `free: true` = diskon 100% — udah langsung terdaftar
-// tanpa lewat DOKU; `error` = gagal (tanpa redirect).
+// tanpa lewat DOKU; `redirecting: true` = browser lagi pindah ke DOKU
+// (pemanggil WAJIB nahan layarnya, jangan render ulang apa pun);
+// `error` = gagal (tanpa redirect).
 async function startPayment(
   token: string,
   promoCode?: string | null
-): Promise<{ error?: string; free?: boolean }> {
+): Promise<{ error?: string; free?: boolean; redirecting?: boolean }> {
   const supabase = createClient();
   const { data, error } = await supabase.functions.invoke("form-create-payment", {
     body: {
@@ -122,7 +124,7 @@ async function startPayment(
   if (data?.free) return { free: true };
   if (data?.payment_url) {
     window.location.href = data.payment_url; // ke halaman bayar DOKU
-    return {};
+    return { redirecting: true };
   }
   return { error: "Tidak dapat memulai pembayaran. Coba lagi ya." };
 }
@@ -292,7 +294,10 @@ function FormRunner({
   previousStatus: "cancelled" | "rejected" | null;
   appliedPromo: AppliedPromo | null;
   onPromoApplied: (promo: AppliedPromo | null) => void;
-  onSubmitted: (result: SubmitResult) => void;
+  // paymentError kekirim cuma kalau event berbayar tapi invoice DOKU-nya
+  // gagal dibuat — biar layar "Selesaikan pembayaran" bisa nampilin
+  // alasannya, bukan diam-diam.
+  onSubmitted: (result: SubmitResult, paymentError?: string) => void;
 }) {
   const supabase = createClient();
   // Autofill: email dari Google + field yang ditandai profile_field dari
@@ -309,6 +314,11 @@ function FormRunner({
     return init;
   });
   const [submitting, setSubmitting] = useState(false);
+  // Event berbayar: true sejak invoice DOKU diminta sampai browser beneran
+  // pindah. Selama true layarnya dikunci ke overlay "mengarahkan ke
+  // pembayaran" — assignment ke window.location.href itu nggak instan, dan
+  // dulu React sempat nge-render layar "Selesaikan pembayaran" di sela itu.
+  const [redirecting, setRedirecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   // Pertanyaan 'image' yang lagi upload — submit diblokir selama masih ada.
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
@@ -404,7 +414,10 @@ function FormRunner({
 
       // Write-back ke profil: simpan jawaban ber-profile_field ke user_profiles
       // biar user nggak perlu isi ulang di Dashboard kalau ikut WFC lagi.
-      // Best-effort — kegagalan di sini tidak membatalkan pendaftaran.
+      // Best-effort — kegagalan di sini tidak membatalkan pendaftaran, dan di
+      // event berbayar sengaja TIDAK di-await supaya nggak nambah satu round
+      // trip di depan redirect ke DOKU (requestnya tetap jalan barengan).
+      let profileSave: PromiseLike<unknown> | null = null;
       if (userId) {
         const patch: Partial<Record<ProfileField, string>> = {};
         for (const q of form.questions) {
@@ -413,25 +426,36 @@ function FormRunner({
           if (typeof v === "string" && v.trim()) patch[q.profile_field] = v.trim();
         }
         if (Object.keys(patch).length > 0) {
-          await supabase
+          profileSave = supabase
             .from("user_profiles")
-            .upsert({ id: userId, ...patch }, { onConflict: "id" });
+            .upsert({ id: userId, ...patch }, { onConflict: "id" })
+            .then(
+              () => {},
+              () => {}
+            );
         }
       }
 
       const result = data as SubmitResult;
 
-      // Event berbayar: langsung lempar ke halaman bayar DOKU (QRIS).
-      // Diskon 100% → udah terdaftar tanpa lewat DOKU. Kalau invoice
-      // gagal dibuat, user tetap pindah ke layar "Selesaikan pembayaran"
-      // yang punya tombol coba lagi.
+      // Event berbayar: langsung lempar ke halaman bayar DOKU (QRIS) tanpa
+      // mampir ke layar "Selesaikan pembayaran" dulu. Diskon 100% → udah
+      // terdaftar tanpa lewat DOKU. Kalau invoice gagal dibuat, BARU user
+      // pindah ke layar itu — lengkap dengan alasan + tombol coba lagi.
       if (result.status === "pending_payment") {
+        setRedirecting(true);
         const pay = await startPayment(form.token, appliedPromo?.code ?? null);
+        if (pay.redirecting) return; // biarkan overlay nahan layar
+        setRedirecting(false);
         if (pay.free) {
           onSubmitted({ ...result, status: "registered" });
           return;
         }
+        onSubmitted(result, pay.error);
+        return;
       }
+
+      await profileSave;
       onSubmitted(result);
     } catch (err) {
       setErrorMsg(
@@ -441,6 +465,20 @@ function FormRunner({
       setSubmitting(false);
     }
   };
+
+  // Browser lagi pindah ke DOKU — jangan render form/layar lain di belakangnya.
+  if (redirecting) {
+    return (
+      <div className={styles.statusCard}>
+        <Loader2 size={32} className={styles.spinner} />
+        <h2 className={styles.redirectTitle}>Mengarahkan ke pembayaran…</h2>
+        <p className={styles.statusText}>
+          Pendaftaran kamu udah kesimpen. Tunggu sebentar, kamu lagi dibawa ke
+          halaman pembayaran QRIS — jangan tutup halaman ini ya.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -778,13 +816,16 @@ function PaymentPending({
   form,
   appliedPromo,
   onPromoApplied,
+  initialError,
 }: {
   form: FormRow;
   appliedPromo: AppliedPromo | null;
   onPromoApplied: (promo: AppliedPromo | null) => void;
+  // Alasan kenapa redirect otomatis abis submit nggak jadi (kalau ada).
+  initialError?: string;
 }) {
   const [paying, setPaying] = useState(false);
-  const [payError, setPayError] = useState("");
+  const [payError, setPayError] = useState(initialError ?? "");
 
   const payAmount = appliedPromo?.final_price ?? form.price ?? 0;
 
@@ -897,6 +938,9 @@ function RegisterContent() {
   // Kode promo tervalidasi (event berbayar) — di-lift ke sini supaya
   // tetap kepasang saat pindah layar form → layar pembayaran.
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+  // Kenapa redirect otomatis ke DOKU gagal (kalau gagal) — diteruskan ke
+  // layar "Selesaikan pembayaran" supaya user tahu alasannya.
+  const [autoPayError, setAutoPayError] = useState<string | undefined>();
   // Layar loading kelamaan → tawarin muat ulang, jangan spinner selamanya.
   const [gateTimedOut, setGateTimedOut] = useState(false);
 
@@ -1134,6 +1178,7 @@ function RegisterContent() {
         form={form}
         appliedPromo={appliedPromo}
         onPromoApplied={setAppliedPromo}
+        initialError={autoPayError}
       />
     ) : myResponse &&
       (myResponse.status === "registered" || myResponse.status === "pending") ? (
@@ -1160,7 +1205,8 @@ function RegisterContent() {
         }
         appliedPromo={appliedPromo}
         onPromoApplied={setAppliedPromo}
-        onSubmitted={(result) => {
+        onSubmitted={(result, paymentError) => {
+          setAutoPayError(paymentError);
           setMyResponse({ id: result.response_id, status: result.status });
           loadParticipants();
         }}
