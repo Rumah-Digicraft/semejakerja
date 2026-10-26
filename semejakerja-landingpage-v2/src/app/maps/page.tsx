@@ -18,12 +18,13 @@ export const metadata: Metadata = {
   openGraph: { url: "/maps" },
 };
 
-const basecamps = [
+const basecamps: { name: string; logo: string; url?: string }[] = [
   { name: "Duanja", logo: "/images/kafe/duanja.png" },
   { name: "The Soeds", logo: "/images/kafe/the-soeds.png" },
   { name: "Meatboss", logo: "/images/kafe/meatboss.png" },
   { name: "Ruang Temu", logo: "/images/kafe/ruang-temu.png" },
   { name: "At Nine", logo: "/images/kafe/atnine.png" },
+  { name: "Grey", logo: "/images/kafe/grey.png", url: "https://www.instagram.com/grey_cte/" },
 ];
 
 const moods = [
@@ -181,8 +182,8 @@ export default function MapsPage() {
             Cafe-cafe ini sudah jadi markas Semeja Kerja — tempat kita ngumpul dan WFC bareng.
           </p>
           <div className={styles.cafeGrid}>
-            {basecamps.map((cafe) => (
-              <div key={cafe.name} className={styles.cafeCard}>
+            {basecamps.map((cafe) => {
+              const logo = (
                 <Image
                   src={cafe.logo}
                   alt={`Logo ${cafe.name}`}
@@ -190,8 +191,24 @@ export default function MapsPage() {
                   height={80}
                   className={styles.cafeLogo}
                 />
-              </div>
-            ))}
+              );
+              return cafe.url ? (
+                <a
+                  key={cafe.name}
+                  href={cafe.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={cafe.name}
+                  className={styles.cafeCard}
+                >
+                  {logo}
+                </a>
+              ) : (
+                <div key={cafe.name} className={styles.cafeCard}>
+                  {logo}
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
