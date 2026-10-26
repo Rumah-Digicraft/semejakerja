@@ -92,52 +92,66 @@ export const TERMS_SECTIONS: TermsSection[] = [
   },
   {
     no: 5,
-    title: "Ketentuan Promosi dan Penawaran Produk",
+    title: "Ketentuan Pembayaran Kegiatan",
     blocks: [
       {
         kind: "numbered",
         items: [
-          { no: "5.1", text: "Anggota diperbolehkan membagikan informasi mengenai produk atau jasa yang ditawarkan sepanjang tidak bertentangan dengan hukum, norma yang berlaku, dan ketentuan komunitas." },
-          { no: "5.2", text: "Anggota dilarang mempromosikan atau menawarkan produk maupun layanan ilegal, perjudian, pinjaman online ilegal, investasi bodong, penipuan, atau penawaran lain yang berpotensi merugikan anggota." },
-          { no: "5.3", text: "Aktivitas promosi wajib dilakukan secara wajar dan tidak berlebihan. Anggota dilarang melakukan spam, mengirimkan promosi berulang kali, atau memenuhi percakapan grup dengan materi komersial yang mengganggu." },
-          { no: "5.4", text: "Pengelola berhak menghapus materi promosi yang dinilai melanggar ketentuan ini atau mengganggu kenyamanan komunitas." },
+          { no: "5.1", text: "Biaya pendaftaran kegiatan berbayar yang telah dibayarkan tidak dapat dikembalikan (non-refundable), termasuk apabila peserta tidak hadir atau membatalkan keikutsertaannya." },
+          { no: "5.2", text: "Ketentuan pada poin 5.1 dikecualikan untuk kegiatan yang menerapkan Commitment Fee. Commitment Fee merupakan biaya jaminan kehadiran yang akan dikembalikan kepada peserta yang hadir sesuai ketentuan kegiatan terkait. Peserta yang tidak hadir tidak berhak atas pengembalian Commitment Fee." },
+          { no: "5.3", text: "Penerapan Commitment Fee beserta mekanisme pengembaliannya akan diinformasikan secara jelas pada informasi atau halaman pendaftaran kegiatan terkait." },
         ],
       },
     ],
   },
   {
     no: 6,
-    title: "Ketentuan Berbagi Informasi Lowongan Kerja",
+    title: "Ketentuan Promosi dan Penawaran Produk",
     blocks: [
       {
         kind: "numbered",
         items: [
-          { no: "6.1", text: "Anggota diperbolehkan membagikan informasi lowongan kerja dengan ketentuan bahwa informasi tersebut disampaikan dalam bentuk teks tanpa menyertakan tautan (link)." },
-          { no: "6.2", text: "Informasi lowongan kerja disarankan memuat posisi yang ditawarkan, lokasi kerja, dan kualifikasi yang dibutuhkan. Anggota yang berminat dapat menghubungi pengirim secara pribadi untuk memperoleh informasi lebih lanjut." },
-          { no: "6.3", text: "Anggota diimbau untuk memeriksa kebenaran informasi lowongan kerja secara mandiri. Anggota harus waspada terhadap lowongan yang meminta pembayaran biaya administrasi, biaya rekrutmen, atau pembayaran lain yang mencurigakan." },
-          { no: "6.4", text: "Semeja Kerja tidak menjamin keaslian, ketersediaan, maupun kebenaran setiap informasi lowongan kerja yang dibagikan oleh anggota, kecuali dinyatakan secara tegas oleh pengelola." },
+          { no: "6.1", text: "Anggota diperbolehkan membagikan informasi mengenai produk atau jasa yang ditawarkan sepanjang tidak bertentangan dengan hukum, norma yang berlaku, dan ketentuan komunitas." },
+          { no: "6.2", text: "Anggota dilarang mempromosikan atau menawarkan produk maupun layanan ilegal, perjudian, pinjaman online ilegal, investasi bodong, penipuan, atau penawaran lain yang berpotensi merugikan anggota." },
+          { no: "6.3", text: "Aktivitas promosi wajib dilakukan secara wajar dan tidak berlebihan. Anggota dilarang melakukan spam, mengirimkan promosi berulang kali, atau memenuhi percakapan grup dengan materi komersial yang mengganggu." },
+          { no: "6.4", text: "Pengelola berhak menghapus materi promosi yang dinilai melanggar ketentuan ini atau mengganggu kenyamanan komunitas." },
         ],
       },
     ],
   },
   {
     no: 7,
-    title: "Privasi dan Keamanan Data",
+    title: "Ketentuan Berbagi Informasi Lowongan Kerja",
     blocks: [
       {
         kind: "numbered",
         items: [
-          { no: "7.1", text: "Setiap anggota wajib menghormati privasi anggota lainnya." },
-          { no: "7.2", text: "Anggota wajib memperoleh persetujuan dari orang yang bersangkutan sebelum mengambil, memublikasikan, atau menyebarkan foto, video, maupun rekaman yang menampilkan orang tersebut, khususnya untuk penggunaan di luar kebutuhan pribadi." },
-          { no: "7.3", text: "Anggota dilarang menyebarkan nomor telepon, alamat, identitas, informasi kontak, atau data pribadi anggota lain tanpa persetujuan yang sah, kecuali diwajibkan berdasarkan ketentuan hukum yang berlaku." },
-          { no: "7.4", text: "Komunikasi pribadi antaranggota wajib dilakukan secara wajar, sopan, dan tidak mengandung unsur pelecehan, intimidasi, penipuan, atau tindakan yang tidak diinginkan." },
-          { no: "7.5", text: "Anggota dapat melaporkan dugaan pelanggaran privasi atau tindakan yang menimbulkan ketidaknyamanan kepada admin untuk ditindaklanjuti sesuai kebijakan komunitas." },
+          { no: "7.1", text: "Anggota diperbolehkan membagikan informasi lowongan kerja dengan ketentuan bahwa informasi tersebut disampaikan dalam bentuk teks tanpa menyertakan tautan (link)." },
+          { no: "7.2", text: "Informasi lowongan kerja disarankan memuat posisi yang ditawarkan, lokasi kerja, dan kualifikasi yang dibutuhkan. Anggota yang berminat dapat menghubungi pengirim secara pribadi untuk memperoleh informasi lebih lanjut." },
+          { no: "7.3", text: "Anggota diimbau untuk memeriksa kebenaran informasi lowongan kerja secara mandiri. Anggota harus waspada terhadap lowongan yang meminta pembayaran biaya administrasi, biaya rekrutmen, atau pembayaran lain yang mencurigakan." },
+          { no: "7.4", text: "Semeja Kerja tidak menjamin keaslian, ketersediaan, maupun kebenaran setiap informasi lowongan kerja yang dibagikan oleh anggota, kecuali dinyatakan secara tegas oleh pengelola." },
         ],
       },
     ],
   },
   {
     no: 8,
+    title: "Privasi dan Keamanan Data",
+    blocks: [
+      {
+        kind: "numbered",
+        items: [
+          { no: "8.1", text: "Setiap anggota wajib menghormati privasi anggota lainnya." },
+          { no: "8.2", text: "Anggota wajib memperoleh persetujuan dari orang yang bersangkutan sebelum mengambil, memublikasikan, atau menyebarkan foto, video, maupun rekaman yang menampilkan orang tersebut, khususnya untuk penggunaan di luar kebutuhan pribadi." },
+          { no: "8.3", text: "Anggota dilarang menyebarkan nomor telepon, alamat, identitas, informasi kontak, atau data pribadi anggota lain tanpa persetujuan yang sah, kecuali diwajibkan berdasarkan ketentuan hukum yang berlaku." },
+          { no: "8.4", text: "Komunikasi pribadi antaranggota wajib dilakukan secara wajar, sopan, dan tidak mengandung unsur pelecehan, intimidasi, penipuan, atau tindakan yang tidak diinginkan." },
+          { no: "8.5", text: "Anggota dapat melaporkan dugaan pelanggaran privasi atau tindakan yang menimbulkan ketidaknyamanan kepada admin untuk ditindaklanjuti sesuai kebijakan komunitas." },
+        ],
+      },
+    ],
+  },
+  {
+    no: 9,
     title: "Hak dan Kewenangan Pengelola",
     blocks: [
       { kind: "p", text: "Pengelola Semeja Kerja berhak untuk:" },
@@ -158,22 +172,22 @@ export const TERMS_SECTIONS: TermsSection[] = [
     ],
   },
   {
-    no: 9,
+    no: 10,
     title: "Pembatasan Tanggung Jawab",
     blocks: [
       {
         kind: "numbered",
         items: [
-          { no: "9.1", text: "Setiap anggota bertanggung jawab atas tindakan, pernyataan, konten, penawaran, dan komunikasi yang dilakukannya di dalam maupun di luar komunitas." },
-          { no: "9.2", text: "Semeja Kerja tidak bertanggung jawab atas kerugian yang timbul akibat transaksi pribadi antaranggota, informasi lowongan kerja yang dibagikan anggota, atau tindakan pihak ketiga, sepanjang tanggung jawab tersebut tidak diwajibkan berdasarkan hukum yang berlaku." },
-          { no: "9.3", text: "Keikutsertaan dalam kegiatan dilakukan dengan kewajiban untuk mematuhi instruksi penyelenggara serta peraturan di lokasi kegiatan." },
-          { no: "9.4", text: "Ketentuan pembatasan tanggung jawab ini tidak menghapus hak atau kewajiban yang tidak dapat dikesampingkan berdasarkan peraturan perundang-undangan." },
+          { no: "10.1", text: "Setiap anggota bertanggung jawab atas tindakan, pernyataan, konten, penawaran, dan komunikasi yang dilakukannya di dalam maupun di luar komunitas." },
+          { no: "10.2", text: "Semeja Kerja tidak bertanggung jawab atas kerugian yang timbul akibat transaksi pribadi antaranggota, informasi lowongan kerja yang dibagikan anggota, atau tindakan pihak ketiga, sepanjang tanggung jawab tersebut tidak diwajibkan berdasarkan hukum yang berlaku." },
+          { no: "10.3", text: "Keikutsertaan dalam kegiatan dilakukan dengan kewajiban untuk mematuhi instruksi penyelenggara serta peraturan di lokasi kegiatan." },
+          { no: "10.4", text: "Ketentuan pembatasan tanggung jawab ini tidak menghapus hak atau kewajiban yang tidak dapat dikesampingkan berdasarkan peraturan perundang-undangan." },
         ],
       },
     ],
   },
   {
-    no: 10,
+    no: 11,
     title: "Pelanggaran dan Sanksi",
     blocks: [
       {
@@ -196,7 +210,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
     ],
   },
   {
-    no: 11,
+    no: 12,
     title: "Perubahan Syarat dan Ketentuan",
     blocks: [
       {
@@ -210,7 +224,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
     ],
   },
   {
-    no: 12,
+    no: 13,
     title: "Hukum yang Berlaku",
     blocks: [
       {
@@ -220,7 +234,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
     ],
   },
   {
-    no: 13,
+    no: 14,
     title: "Persetujuan Pengguna",
     blocks: [
       {
