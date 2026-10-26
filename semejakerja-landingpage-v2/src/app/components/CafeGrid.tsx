@@ -6,13 +6,26 @@ import { MapPin, MessageSquare } from "lucide-react";
 import ScrollReveal from "./ScrollReveal";
 import styles from "./CafeGrid.module.css";
 
-const cafes = [
+const cafes: { name: string; logo: string; url?: string }[] = [
   { name: "Duanja", logo: "/images/kafe/duanja.png" },
   { name: "The Soeds", logo: "/images/kafe/the-soeds.png" },
   { name: "Meatboss", logo: "/images/kafe/meatboss.png" },
   { name: "Ruang Temu", logo: "/images/kafe/ruang-temu.png" },
   { name: "At Nine", logo: "/images/kafe/atnine.png" },
+  { name: "Grey", logo: "/images/kafe/grey.png", url: "https://www.instagram.com/grey_cte/" },
 ];
+
+function CafeLogo({ cafe }: { cafe: { name: string; logo: string } }) {
+  return (
+    <Image
+      src={cafe.logo}
+      alt={`Logo ${cafe.name}`}
+      width={150}
+      height={80}
+      className={styles.cafeLogo}
+    />
+  );
+}
 
 export default function CafeGrid() {
   return (
@@ -35,15 +48,21 @@ export default function CafeGrid() {
         <div className={styles.grid}>
           {cafes.map((cafe, i) => (
             <ScrollReveal key={cafe.name} delay={i * 80}>
-              <div className={styles.cafeCard}>
-                <Image
-                  src={cafe.logo}
-                  alt={`Logo ${cafe.name}`}
-                  width={150}
-                  height={80}
-                  className={styles.cafeLogo}
-                />
-              </div>
+              {cafe.url ? (
+                <a
+                  href={cafe.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={cafe.name}
+                  className={styles.cafeCard}
+                >
+                  <CafeLogo cafe={cafe} />
+                </a>
+              ) : (
+                <div className={styles.cafeCard}>
+                  <CafeLogo cafe={cafe} />
+                </div>
+              )}
             </ScrollReveal>
           ))}
         </div>
