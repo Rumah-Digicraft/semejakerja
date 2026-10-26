@@ -275,6 +275,14 @@ img {
   font-size: var(--text-sm);
 }
 
+/* Disabled (mis. tombol bayar sebelum S&K dicentang) */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 /* --- Card Styles --- */
 .card {
   background: white;

@@ -2,6 +2,7 @@
 
 import { ArrowUpRight } from "lucide-react";
 import ScrollReveal from "./ScrollReveal";
+import { JoinGroupButton } from "./TermsAgreement";
 import styles from "./CTASection.module.css";
 
 function InstagramIcon({ size = 16 }: { size?: number }) {
@@ -55,15 +56,14 @@ export default function CTASection() {
               Gratis. Tanpa syarat. Cukup datang, buka laptop, dan kenalan dengan stranger di sebelahmu.
             </p>
             <div className={styles.actions}>
-              <a
+              <JoinGroupButton
                 href="https://linktr.ee/semejakerja"
-                target="_blank"
-                rel="noopener noreferrer"
                 className={`btn btn--primary btn--large ${styles.cta}`}
+                confirmLabel="Gabung Komunitas Sekarang"
               >
                 Gabung Komunitas Sekarang
                 <ArrowUpRight size={20} />
-              </a>
+              </JoinGroupButton>
             </div>
 
             <div className={styles.socialLinks}>

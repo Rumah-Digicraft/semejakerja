@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Session, Participant } from "@/lib/movesTypes";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Activity, Trophy, Loader2 } from "lucide-react";
+import { TermsCheckbox } from "../../components/TermsAgreement";
 import styles from "./join.module.css";
 
 // ── shared helpers ──────────────────────────────────────────────
@@ -116,6 +117,7 @@ function FunmintonJoin({ session }: { session: Session }) {
   const [pollingAnswer, setPollingAnswer] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [agreedTerms, setAgreedTerms] = useState(false);
 
   useEffect(() => {
     supabase
@@ -140,6 +142,10 @@ function FunmintonJoin({ session }: { session: Session }) {
     e.preventDefault();
     if (selectedIds.length === 0) {
       setErrorMsg("Pilih dulu nama yang mau dibayar.");
+      return;
+    }
+    if (!agreedTerms) {
+      setErrorMsg("Centang persetujuan Syarat & Ketentuan dulu ya.");
       return;
     }
 
@@ -288,9 +294,11 @@ function FunmintonJoin({ session }: { session: Session }) {
           />
         </div>
 
+        <TermsCheckbox checked={agreedTerms} onChange={setAgreedTerms} />
+
         <button
           type="submit"
-          disabled={submitting || selectedIds.length === 0}
+          disabled={submitting || selectedIds.length === 0 || !agreedTerms}
           className={`btn btn--primary ${styles.submitBtn}`}
         >
           {submitting ? "Memproses…" : "Bayar Sekarang (QRIS)"}
@@ -306,12 +314,17 @@ function PadelJoin({ session }: { session: Session }) {
   const [formData, setFormData] = useState({ name: "", phone: "" });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [agreedTerms, setAgreedTerms] = useState(false);
   const uniqueCode = useUniqueCode();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) {
       setErrorMsg("Isi nama dulu ya.");
+      return;
+    }
+    if (!agreedTerms) {
+      setErrorMsg("Centang persetujuan Syarat & Ketentuan dulu ya.");
       return;
     }
 
@@ -400,9 +413,11 @@ function PadelJoin({ session }: { session: Session }) {
           Pendaftaran kamu otomatis tercatat setelah pembayaran berhasil.
         </p>
 
+        <TermsCheckbox checked={agreedTerms} onChange={setAgreedTerms} />
+
         <button
           type="submit"
-          disabled={submitting || !formData.name || uniqueCode == null}
+          disabled={submitting || !formData.name || uniqueCode == null || !agreedTerms}
           className={`btn btn--primary ${styles.submitBtn}`}
         >
           {submitting ? "Memproses…" : "Daftar & Bayar (QRIS)"}

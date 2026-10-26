@@ -27,6 +27,7 @@ const quickLinks = [
   { href: "/maps", label: "Maps Kafe" },
   { href: "/moves", label: "Semeja Moves" },
   { href: "/membership", label: "Membership" },
+  { href: "/syarat-ketentuan", label: "Syarat & Ketentuan" },
   // { href: "/dokumentasi", label: "Dokumentasi WFC" }, // di-hide sementara — jangan dihapus
 ];
 

@@ -19,6 +19,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ImagePlus, Loader2, Users } from "lucide-react";
 import OAuthButtons from "../../auth/OAuthButtons";
+import { JoinGroupButton, TermsCheckbox } from "../../components/TermsAgreement";
 import styles from "./register.module.css";
 
 // Local mirror of the admin `Form` shape (types aren't shared across apps).
@@ -320,6 +321,8 @@ function FormRunner({
   // dulu React sempat nge-render layar "Selesaikan pembayaran" di sela itu.
   const [redirecting, setRedirecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  // Event berbayar wajib centang S&K sebelum kirim & bayar.
+  const [agreedTerms, setAgreedTerms] = useState(false);
   // Pertanyaan 'image' yang lagi upload — submit diblokir selama masih ada.
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
 
@@ -389,6 +392,11 @@ function FormRunner({
 
     if (Object.values(uploading).some(Boolean)) {
       setErrorMsg("Tunggu upload gambarnya selesai dulu ya.");
+      return;
+    }
+
+    if (isPaid(form) && !agreedTerms) {
+      setErrorMsg("Centang persetujuan Syarat & Ketentuan dulu ya.");
       return;
     }
 
@@ -678,6 +686,7 @@ function FormRunner({
                 </>
               )}
             </div>
+            <TermsCheckbox checked={agreedTerms} onChange={setAgreedTerms} />
           </>
         )}
 
@@ -685,7 +694,7 @@ function FormRunner({
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || (isPaid(form) && !agreedTerms)}
           className={`btn btn--primary ${styles.submitBtn}`}
         >
           {submitting
@@ -766,14 +775,12 @@ function RegistrationStatus({
               "Makasih udah daftar! Undangan akan dikirim via WhatsApp ke peserta terpilih."}
         </p>
         {form.whatsapp_group_url && (
-          <a
+          <JoinGroupButton
             href={form.whatsapp_group_url}
-            target="_blank"
-            rel="noopener noreferrer"
             className={`btn btn--primary ${styles.waButton}`}
           >
             {form.whatsapp_group_label ?? "Klik Sini"}
-          </a>
+          </JoinGroupButton>
         )}
 
         <div className={styles.accountBox}>
@@ -826,10 +833,12 @@ function PaymentPending({
 }) {
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState(initialError ?? "");
+  const [agreedTerms, setAgreedTerms] = useState(false);
 
   const payAmount = appliedPromo?.final_price ?? form.price ?? 0;
 
   const handlePay = async () => {
+    if (!agreedTerms) return;
     setPaying(true);
     setPayError("");
     const res = await startPayment(form.token, appliedPromo?.code ?? null);
@@ -874,10 +883,13 @@ function PaymentPending({
             {payError}
           </div>
         )}
+        <div className={styles.termsRow}>
+          <TermsCheckbox checked={agreedTerms} onChange={setAgreedTerms} />
+        </div>
         <button
           type="button"
           onClick={handlePay}
-          disabled={paying}
+          disabled={paying || !agreedTerms}
           className={`btn btn--primary ${styles.waButton}`}
         >
           {paying
