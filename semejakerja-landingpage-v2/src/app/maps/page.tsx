@@ -9,6 +9,7 @@ import ScrollReveal from "../components/ScrollReveal";
 import JsonLd from "../components/JsonLd";
 import { breadcrumbSchema, webPageSchema } from "@/lib/schema";
 import { MAPS_URL } from "@/lib/seo";
+import { basecamps } from "@/lib/basecamps";
 
 export const metadata: Metadata = {
   title: "Maps Kafe",
@@ -17,15 +18,6 @@ export const metadata: Metadata = {
   alternates: { canonical: "/maps" },
   openGraph: { url: "/maps" },
 };
-
-const basecamps: { name: string; logo: string; url?: string }[] = [
-  { name: "Duanja", logo: "/images/kafe/duanja.png" },
-  { name: "The Soeds", logo: "/images/kafe/the-soeds.png" },
-  { name: "Meatboss", logo: "/images/kafe/meatboss.png" },
-  { name: "Ruang Temu", logo: "/images/kafe/ruang-temu.png" },
-  { name: "At Nine", logo: "/images/kafe/atnine.png" },
-  { name: "Grey", logo: "/images/kafe/grey.png", url: "https://www.instagram.com/grey_cte/" },
-];
 
 const moods = [
   { icon: Target, name: "Fokus", desc: "Sunyi, colokan di mana-mana" },

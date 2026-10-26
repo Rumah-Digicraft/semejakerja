@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { basecamps } from "@/lib/basecamps";
 import ScrollReveal from "./ScrollReveal";
 import styles from "./GrowthStats.module.css";
 
@@ -13,7 +14,7 @@ interface StatItem {
 const stats: StatItem[] = [
   { value: 500, suffix: "+", label: "Member Komunitas" },
   { value: 30, suffix: "+", label: "Edisi WFC" },
-  { value: 5, suffix: "", label: "Kafe Pilihan" },
+  { value: basecamps.length, suffix: "", label: "Kafe Pilihan" },
   { value: 3, suffix: "", label: "Founder" },
 ];
 

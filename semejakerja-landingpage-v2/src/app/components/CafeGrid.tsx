@@ -3,19 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { MapPin, MessageSquare } from "lucide-react";
+import { basecamps, type Basecamp } from "@/lib/basecamps";
 import ScrollReveal from "./ScrollReveal";
 import styles from "./CafeGrid.module.css";
 
-const cafes: { name: string; logo: string; url?: string }[] = [
-  { name: "Duanja", logo: "/images/kafe/duanja.png" },
-  { name: "The Soeds", logo: "/images/kafe/the-soeds.png" },
-  { name: "Meatboss", logo: "/images/kafe/meatboss.png" },
-  { name: "Ruang Temu", logo: "/images/kafe/ruang-temu.png" },
-  { name: "At Nine", logo: "/images/kafe/atnine.png" },
-  { name: "Grey", logo: "/images/kafe/grey.png", url: "https://www.instagram.com/grey_cte/" },
-];
-
-function CafeLogo({ cafe }: { cafe: { name: string; logo: string } }) {
+function CafeLogo({ cafe }: { cafe: Basecamp }) {
   return (
     <Image
       src={cafe.logo}
@@ -46,7 +38,7 @@ export default function CafeGrid() {
         </ScrollReveal>
 
         <div className={styles.grid}>
-          {cafes.map((cafe, i) => (
+          {basecamps.map((cafe, i) => (
             <ScrollReveal key={cafe.name} delay={i * 80}>
               {cafe.url ? (
                 <a
