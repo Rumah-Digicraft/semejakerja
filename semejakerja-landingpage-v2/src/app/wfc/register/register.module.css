@@ -561,3 +561,9 @@
   width: 100%;
   max-width: 320px;
 }
+
+.termsRow {
+  margin-top: var(--space-5);
+  width: 100%;
+  max-width: 420px;
+}

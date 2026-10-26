@@ -12,6 +12,7 @@ const ROUTES: { path: string; priority: number }[] = [
   { path: "/talks", priority: 0.6 },
   { path: "/english", priority: 0.6 },
   { path: "/dokumentasi", priority: 0.6 },
+  { path: "/syarat-ketentuan", priority: 0.3 },
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

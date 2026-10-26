@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { STUDENT_MEMBERSHIP_ENABLED } from "@/lib/flags";
 import type { User } from "@supabase/supabase-js";
 import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { TermsCheckbox } from "../../components/TermsAgreement";
 import styles from "./checkout.module.css";
 
 // Biaya layanan flat per transaksi. Sinkron dengan v_service_fee di
@@ -40,6 +41,7 @@ function CheckoutContent() {
   const [promoStatus, setPromoStatus] = useState<"idle" | "success" | "error">("idle");
   const [discountPercent, setDiscountPercent] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
+  const [agreedTerms, setAgreedTerms] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -99,7 +101,7 @@ function CheckoutContent() {
   };
 
   const handleCheckout = async () => {
-    if (!user) return;
+    if (!user || !agreedTerms) return;
     setSubmitting(true);
     setErrorMsg("");
 
@@ -173,9 +175,13 @@ function CheckoutContent() {
                 </div>
               )}
 
+              <div className={styles.termsRow}>
+                <TermsCheckbox checked={agreedTerms} onChange={setAgreedTerms} />
+              </div>
+
               <button
                 onClick={handleCheckout}
-                disabled={submitting}
+                disabled={submitting || !agreedTerms}
                 className={`btn btn--primary ${styles.submitBtn}`}
               >
                 {submitting ? (

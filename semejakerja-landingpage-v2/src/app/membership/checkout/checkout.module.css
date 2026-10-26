@@ -176,3 +176,7 @@
 .submitBtn {
   width: 100%;
 }
+
+.termsRow {
+  margin-bottom: var(--space-4);
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { JoinGroupButton } from "./TermsAgreement";
 import styles from "./HeroSection.module.css";
 
 export default function HeroSection() {
@@ -39,14 +40,13 @@ export default function HeroSection() {
         </p>
 
         <div className={styles.actions}>
-          <a
+          <JoinGroupButton
             href="https://chat.whatsapp.com/BMzJMgEsOVgCCVDnM4EeJP"
-            target="_blank"
-            rel="noopener noreferrer"
             className={`btn btn--primary btn--large ${styles.ctaMain}`}
+            confirmLabel="Gabung Komunitas Sekarang"
           >
             Gabung Komunitas
-          </a>
+          </JoinGroupButton>
           <a href="#cerita" className={`btn btn--ghost ${styles.ctaSecondary}`}>
             Kenalan Dulu ↓
           </a>
