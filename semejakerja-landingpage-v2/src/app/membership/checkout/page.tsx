@@ -28,7 +28,8 @@ function CheckoutContent() {
   const supabase = createClient();
   
   const tierParam = searchParams.get("tier") || "nongkrong";
-  const periodParam = searchParams.get("period") || "bulanan";
+  // Link lama ?period=bulanan diperlakukan sebagai triwulan (paket terpendek sekarang).
+  const periodParam = searchParams.get("period") === "semesteran" ? "semesteran" : "triwulan";
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -55,8 +56,8 @@ function CheckoutContent() {
 
   // Pricing Logic
   const getBasePrice = () => {
-    if (tierParam === "nongkrong") return periodParam === "triwulan" ? 41000 : 19000;
-    if (tierParam === "mode_serius") return periodParam === "triwulan" ? 74000 : 31000;
+    if (tierParam === "nongkrong") return periodParam === "semesteran" ? 41000 : 19000;
+    if (tierParam === "mode_serius") return periodParam === "semesteran" ? 74000 : 31000;
     return 0;
   };
 
@@ -197,7 +198,7 @@ function CheckoutContent() {
               </div>
               <div className={styles.summaryRow}>
                 <span>Durasi</span>
-                <strong>{periodParam === "triwulan" ? "3 Bulan" : "1 Bulan"}</strong>
+                <strong>{periodParam === "semesteran" ? "6 Bulan" : "3 Bulan"}</strong>
               </div>
               <div className={styles.summaryRow}>
                 <span>Harga</span>

@@ -38,11 +38,11 @@ export default function MembershipPage() {
     loadPlan();
   }, []);
 
-  // Pricing based on Triwulan vs Bulanan (Triwulan is 3 months)
+  // Pricing based on Semesteran vs Triwulan (Triwulan = 3 bulan, Semesteran = 6 bulan)
   const priceNongkrong = isAnnual ? "41.000" : "19.000";
   const priceSerius = isAnnual ? "74.000" : "31.000";
-  const periodLabel = isAnnual ? "/triwulan" : "/bln";
-  const linkParams = isAnnual ? "?period=triwulan" : "?period=bulanan";
+  const periodLabel = isAnnual ? "/6 bln" : "/3 bln";
+  const linkParams = isAnnual ? "?period=semesteran" : "?period=triwulan";
 
   // Tombol tiap tier menyesuaikan plan aktif user:
   //  - tier == plan aktif  → "Plan Saya" (hijau, non-klik, info)
@@ -73,12 +73,12 @@ export default function MembershipPage() {
           </p>
 
           <div className={styles.billingToggle}>
-            <span className={!isAnnual ? styles.toggleLabelActive : styles.toggleLabel} onClick={() => setIsAnnual(false)}>Bulanan</span>
+            <span className={!isAnnual ? styles.toggleLabelActive : styles.toggleLabel} onClick={() => setIsAnnual(false)}>Triwulan</span>
             <label className={styles.switch}>
               <input type="checkbox" checked={isAnnual} onChange={() => setIsAnnual(!isAnnual)} />
               <span className={styles.slider}></span>
             </label>
-            <span className={isAnnual ? styles.toggleLabelActive : styles.toggleLabel} onClick={() => setIsAnnual(true)}>Triwulan (Hemat!)</span>
+            <span className={isAnnual ? styles.toggleLabelActive : styles.toggleLabel} onClick={() => setIsAnnual(true)}>6 Bulan (Hemat!)</span>
           </div>
         </div>
       </section>
