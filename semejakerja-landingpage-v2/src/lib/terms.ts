@@ -2,7 +2,7 @@
 // /syarat-ketentuan dan modal persetujuan (pembayaran + tombol masuk grup).
 // Kalau isinya diubah, update juga TERMS_UPDATED_AT.
 
-export const TERMS_UPDATED_AT = "26 Oktober 2026";
+export const TERMS_UPDATED_AT = "25 Oktober 2026";
 
 export type TermsBlock =
   | { kind: "p"; text: string }
