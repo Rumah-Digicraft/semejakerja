@@ -126,16 +126,20 @@ export default function DashboardPage() {
     setProfile((profileData as UserProfile) ?? null);
     setMemberships((membershipData as Membership[]) ?? []);
 
-    // Link bayar DOKU untuk dilanjutkan: utamakan yang belum kedaluwarsa,
-    // jatuh ke transaksi ber-URL terbaru kalau semua sudah lewat (DOKU akan
-    // menampilkan halaman "kedaluwarsa" yang jelas ketimbang jalur buntu).
+    // Link bayar DOKU untuk dilanjutkan — hanya yang belum kedaluwarsa
+    // (payment_due_date 60 menit; transaksi lama tanpa expires_at dihitung
+    // dari created_at). Kalau semua sudah lewat, banner menawarkan
+    // "Buat pembayaran baru": checkout membatalkan pesanan basi (061).
     const tx =
-      (txData as { payment_url: string | null; expires_at: string | null }[] | null) ?? [];
-    const fresh = tx.find(
-      (t) => t.payment_url && (!t.expires_at || new Date(t.expires_at).getTime() > Date.now())
-    );
-    const latestWithUrl = tx.find((t) => t.payment_url);
-    setPendingPayUrl((fresh ?? latestWithUrl)?.payment_url ?? null);
+      (txData as { payment_url: string | null; expires_at: string | null; created_at: string }[] | null) ?? [];
+    const fresh = tx.find((t) => {
+      if (!t.payment_url) return false;
+      const deadline = t.expires_at
+        ? new Date(t.expires_at).getTime()
+        : new Date(t.created_at).getTime() + 60 * 60_000;
+      return deadline > Date.now();
+    });
+    setPendingPayUrl(fresh?.payment_url ?? null);
 
     setLoading(false);
   }, [router, supabase]);
