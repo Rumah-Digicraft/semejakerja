@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAppSettings } from '@/lib/useAppSettings'
 import type { Form, FormResponse, FormQuestion, FormQuestionType, FormStatus } from '@/types'
-import { formatDatetime } from '@/lib/utils/format'
+import { formatDatetime, formatCurrency } from '@/lib/utils/format'
 import {
   STATUS_LABELS, STATUS_OPTIONS, STATUS_COLORS, QUESTION_TYPE_OPTIONS,
   needsOptions, isAnswerable, newQuestion, responsesToCsv, downloadCsv, slugifyTitle,
@@ -22,6 +22,15 @@ import {
 
 // Local (browser) "today" as YYYY-MM-DD — bukan toISOString() (itu UTC,
 // bisa mundur 1 hari kalau admin di WIB buka form deket tengah malam).
+// Transaksi DOKU sukses per respons — buat kolom Nominal (event berbayar).
+interface PaidTx {
+  response_id: string
+  amount: number
+  base_amount: number | null
+  discount_amount: number
+  promo_codes: { code: string } | null
+}
+
 const todayLocal = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -57,6 +66,7 @@ export default function FormDetailPage() {
   const [settings, setSettings] = useState<SettingsState | null>(null)
   const [questions, setQuestions] = useState<FormQuestion[]>([])
   const [responses, setResponses] = useState<FormResponse[]>([])
+  const [payments, setPayments] = useState<Record<string, PaidTx>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
@@ -95,6 +105,11 @@ export default function FormDetailPage() {
     const { data: resp } = await supabase.from('form_responses')
       .select('*').eq('form_id', id).order('created_at', { ascending: false })
     setResponses((resp ?? []) as FormResponse[])
+
+    const { data: txs } = await supabase.from('form_payment_transactions')
+      .select('response_id, amount, base_amount, discount_amount, promo_codes(code)')
+      .eq('form_id', id).eq('status', 'success')
+    setPayments(Object.fromEntries(((txs ?? []) as unknown as PaidTx[]).map(t => [t.response_id, t])))
     setLoading(false)
   }, [id])
 
@@ -248,6 +263,8 @@ export default function FormDetailPage() {
   const input = 'w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400'
   const label = 'block text-sm font-medium text-slate-700 mb-1'
   const answerCols = (form.questions ?? []).filter(q => isAnswerable(q.type))
+  // Kolom Nominal muncul kalau event berbayar (atau pernah ada transaksi).
+  const isPaid = (form.price ?? 0) > 0 || Object.keys(payments).length > 0
   const registeredCount = responses.filter(r => r.status === 'registered').length
   const pendingCount = responses.filter(r => r.status === 'pending').length
 
@@ -503,6 +520,7 @@ export default function FormDetailPage() {
                 {answerCols.map((q, i) => (
                   <th key={q.id} className="text-left font-semibold px-4 py-3 whitespace-nowrap max-w-[220px] truncate" title={q.label}>{q.label || `Pertanyaan ${i + 1}`}</th>
                 ))}
+                {isPaid && <th className="text-left font-semibold px-4 py-3">Nominal</th>}
                 <th className="text-left font-semibold px-4 py-3">Status</th>
                 <th className="text-left font-semibold px-4 py-3">Hadir</th>
                 <th className="text-right font-semibold px-4 py-3">Aksi</th>
@@ -510,7 +528,7 @@ export default function FormDetailPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {responses.length === 0 ? (
-                <tr><td colSpan={answerCols.length + 4} className="px-5 py-12 text-center text-slate-400">Belum ada respons.</td></tr>
+                <tr><td colSpan={answerCols.length + (isPaid ? 5 : 4)} className="px-5 py-12 text-center text-slate-400">Belum ada respons.</td></tr>
               ) : responses.map(r => (
                 <tr key={r.id} className="hover:bg-slate-50 align-top">
                   <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{formatDatetime(r.created_at)}</td>
@@ -530,6 +548,21 @@ export default function FormDetailPage() {
                     }
                     return <td key={q.id} className="px-4 py-3 text-slate-700 max-w-[240px]"><span className="line-clamp-3 break-words">{text || <span className="text-slate-300">—</span>}</span></td>
                   })}
+                  {isPaid && (
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {payments[r.id] ? (
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className="font-semibold text-slate-800">{formatCurrency(payments[r.id].amount)}</span>
+                          {payments[r.id].promo_codes && (
+                            <span className="text-[11px] text-slate-500">
+                              <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-mono font-semibold">{payments[r.id].promo_codes!.code}</span>
+                              {payments[r.id].discount_amount > 0 && <> −{formatCurrency(payments[r.id].discount_amount)}</>}
+                            </span>
+                          )}
+                        </div>
+                      ) : <span className="text-slate-300 text-xs">—</span>}
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <div className="flex flex-col items-start gap-1.5">
                       <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${RESPONSE_STATUS_COLORS[r.status]}`}>{RESPONSE_STATUS_LABELS[r.status]}</span>
