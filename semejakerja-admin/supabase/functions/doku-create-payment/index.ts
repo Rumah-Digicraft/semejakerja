@@ -68,6 +68,9 @@ Deno.serve(async (req) => {
       service_fee: serviceFee,
       status: "pending",
       environment: dokuEnv,
+      // Sinkron dgn payment_due_date di bawah — dashboard pakai ini untuk
+      // tahu link bayar masih hidup atau tidak.
+      expires_at: new Date(Date.now() + 60 * 60_000).toISOString(),
     });
     if (txError) {
       return new Response(JSON.stringify({ error: txError.message }), {
